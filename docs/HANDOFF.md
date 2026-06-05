@@ -5,6 +5,7 @@ Use this file when starting a new Codex conversation for this project.
 ## Project
 
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
+- GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
 - Latest deployed version: `v54`
 - Latest preview deployment: `https://828b4261.little-depths.pages.dev/`

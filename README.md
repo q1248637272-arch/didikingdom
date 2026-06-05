@@ -72,6 +72,12 @@ wrangler pages deploy dist --project-name little-depths
 https://little-depths.pages.dev/
 ```
 
+GitHub 仓库：
+
+```text
+https://github.com/q1248637272-arch/didikingdom
+```
+
 ## 资料摘要
 
 - `Lil' Kingdom` 的中文页面写到“小小王国现在有中文版了”，并描述了“地下王国”“挖掘、建造”“居民生活工作环境”等卖点。
