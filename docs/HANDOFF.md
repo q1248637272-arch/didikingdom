@@ -8,7 +8,7 @@ Use this file when starting a new Codex conversation for this project.
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
 - Latest deployed version: `v54`
-- Latest preview deployment: `https://afaff86d.little-depths.pages.dev/`
+- Latest preview deployment: `https://3dd18d7f.little-depths.pages.dev/`
 - Local server used for v54 verification: `http://127.0.0.1:8804/`
 
 ## Current State
@@ -181,7 +181,7 @@ wrangler pages deploy dist --project-name little-depths
   - Repository: `https://github.com/q1248637272-arch/didikingdom`
   - Secrets configured in the GitHub repository: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
   - GitHub Actions workflow `Deploy Cloudflare Pages` completed successfully on commit `e9285b15ee9c415d4a45f3b1b77c83031a6ad964`.
-  - Cloudflare deployment from GitHub Actions: `https://afaff86d.little-depths.pages.dev/`.
+  - Latest Cloudflare deployment from GitHub Actions: `https://3dd18d7f.little-depths.pages.dev/`.
   - Production check after the Actions deploy confirmed v54 HTML, `little-depths-v54` service worker, and `assets/art/person-performer.webp` as `200 image/webp`.
 
 - Bundled runtime syntax checks:
@@ -402,7 +402,7 @@ wrangler pages deploy dist --project-name little-depths
 
 线上地址：https://little-depths.pages.dev/
 最新部署版本：v54
-最新预览：https://afaff86d.little-depths.pages.dev/
+最新预览：https://3dd18d7f.little-depths.pages.dev/
 交接文档：docs/HANDOFF.md
 
 请先读取项目代码、README.md、docs/HANDOFF.md 和最近状态，再继续优化。方向：从游戏内容、玩法、画面、图像质量等层面更新迭代，不只新增内容，也要把旧楼层和旧系统做得更好。涉及图像绘制时使用 gpt-image-2；如果网关不可用，不要写入或打印密钥，改为保存可直接用于网页端生成的提示词。
