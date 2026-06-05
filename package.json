@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "deploy": "wrangler pages deploy dist --project-name little-depths",
+    "preview": "wrangler pages dev ."
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

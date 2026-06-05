@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#151923" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="迪迪王国" />
+    <title>迪迪王国 | 城堡经营</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon-512.png" type="image/png" />
+    <link rel="apple-touch-icon" href="icons/icon-512.png" />
+    <link rel="stylesheet" href="styles.css?v=54" />
+    <link rel="stylesheet" href="overrides.css?v=54" />
+  </head>
+  <body>
+    <div class="app" id="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="crest" aria-hidden="true">
+            <svg viewBox="0 0 64 64" role="img">
+              <path d="M10 51h44v5H10z" fill="#7b4a22" />
+              <path d="M14 50V26l7 4 5-11 6 11 6-11 5 11 7-4v24H14z" fill="#f5c557" />
+              <path d="M20 50V34h7v16M37 50V34h7v16" fill="#8b3b25" />
+              <path d="M28 50V38a4 4 0 0 1 8 0v12z" fill="#2d2231" />
+              <path d="M16 29h32" stroke="#fff0a8" stroke-width="3" stroke-linecap="round" />
+              <path d="M21 21 26 9l6 12 6-12 5 12" fill="none" stroke="#fff0a8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+              <circle cx="32" cy="41" r="2" fill="#fff0a8" />
+            </svg>
+          </div>
+          <div>
+            <h1>迪迪王国</h1>
+            <p>城堡楼层经营</p>
+          </div>
+        </div>
+        <div class="resources" aria-live="polite">
+          <span class="resource"><span class="res-icon coin"></span><strong id="coins">0</strong></span>
+          <span class="resource"><span class="res-icon gem"></span><strong id="gems">0</strong></span>
+          <span class="resource"><span class="res-icon pop"></span><strong id="population">0/0</strong></span>
+          <span class="resource"><span class="res-icon joy"></span><strong id="happiness">0</strong></span>
+          <span class="resource"><span class="res-icon streak"></span><strong id="streak">0</strong></span>
+        </div>
+        <div class="top-actions">
+          <button class="icon-btn" id="guideBtn" title="王国公告" aria-label="王国公告">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h12"/><path d="M8 7h8"/><path d="M8 11h5"/><path d="M6 21h12a2 2 0 0 0 2-2V7"/></svg>
+          </button>
+          <button class="icon-btn elevator-toggle" id="elevatorToggleBtn" title="访客电梯" aria-label="访客电梯" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/><path d="M9 8h6"/><path d="m9 13 3-3 3 3"/><path d="m15 16-3 3-3-3"/></svg>
+          </button>
+          <button class="icon-btn" id="fullscreenBtn" title="进入全屏" aria-label="进入全屏">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+          </button>
+          <button class="icon-btn" id="saveBtn" title="保存进度" aria-label="保存进度">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21h14a2 2 0 0 0 2-2V8l-5-5H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2Z"/><path d="M7 3v6h9"/><path d="M8 21v-7h8v7"/></svg>
+          </button>
+          <button class="icon-btn danger" id="resetBtn" title="重置王国" aria-label="重置王国">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="stage-panel" aria-label="迪迪王国">
+          <div class="cave-glow" aria-hidden="true"></div>
+          <div class="kingdom-scroll" id="kingdomScroll">
+            <div class="kingdom" id="kingdom"></div>
+          </div>
+        </section>
+
+        <aside class="side-panel" aria-label="控制面板">
+          <section class="panel-section elevator-card">
+            <div class="section-head">
+              <h2>访客入口</h2>
+              <span id="elevatorFloor">0</span>
+            </div>
+            <div class="passenger-box" id="passengerBox"></div>
+            <div class="elevator-controls">
+              <button class="control-btn" id="upBtn" title="上一层" aria-label="上一层">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>
+              </button>
+              <button class="control-btn primary" id="dropBtn">接待</button>
+              <button class="control-btn" id="downBtn" title="下一层" aria-label="下一层">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+            </div>
+            <div class="floor-jump" id="floorJump"></div>
+            <button class="wide-btn" id="upgradeElevatorBtn">扩充入口</button>
+          </section>
+
+          <section class="panel-section floor-detail-card" data-mobile-panel="detail">
+            <div class="section-head">
+              <h2>当前楼层</h2>
+              <span id="selectedFloorTag">0</span>
+            </div>
+            <div class="floor-detail" id="floorDetail"></div>
+          </section>
+
+          <section class="panel-section roster-panel" data-mobile-panel="roster">
+            <div class="section-head">
+              <h2>居民名册</h2>
+              <span id="residentCount">0</span>
+            </div>
+            <div class="roster-filters" id="rosterFilters"></div>
+            <div class="resident-roster" id="residentRoster"></div>
+          </section>
+
+          <section class="panel-section" data-mobile-panel="quests">
+            <div class="section-head">
+              <h2>任务</h2>
+              <span id="questCount">0/0</span>
+            </div>
+            <div class="quests" id="quests"></div>
+          </section>
+
+          <section class="panel-section" data-mobile-panel="orders">
+            <div class="section-head">
+              <h2>王室订单</h2>
+              <span id="orderCount">0</span>
+            </div>
+            <div class="orders" id="orders"></div>
+          </section>
+
+          <section class="panel-section" data-mobile-panel="collection">
+            <div class="section-head">
+              <h2>珍藏图鉴</h2>
+              <span id="collectionCount">0/0</span>
+            </div>
+            <div class="collection" id="collection"></div>
+          </section>
+
+          <section class="panel-section" data-mobile-panel="expeditions">
+            <div class="section-head">
+              <h2>地底探险</h2>
+              <span id="expeditionCount">0/1</span>
+            </div>
+            <div class="expeditions" id="expeditions"></div>
+          </section>
+
+          <section class="panel-section compact-log" data-mobile-panel="log">
+            <div class="section-head">
+              <h2>王国日志</h2>
+            </div>
+            <div class="log" id="log"></div>
+          </section>
+        </aside>
+      </main>
+
+      <nav class="mobile-panel-dock" id="mobilePanelDock" aria-label="移动端控制面板">
+        <button class="mobile-panel-tab" data-mobile-panel-target="detail" title="当前楼层" aria-label="当前楼层">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M6 7v10h12V7"/><path d="M9 11h6"/><path d="M9 15h4"/></svg>
+        </button>
+        <button class="mobile-panel-tab" data-mobile-panel-target="roster" title="居民名册" aria-label="居民名册">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M16 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M3 21a5 5 0 0 1 10 0"/><path d="M11 21a5 5 0 0 1 10 0"/></svg>
+        </button>
+        <button class="mobile-panel-tab" data-mobile-panel-target="quests" title="任务" aria-label="任务">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12"/><path d="M8 12h12"/><path d="M8 18h12"/><path d="m3 6 1 1 2-2"/><path d="m3 12 1 1 2-2"/><path d="m3 18 1 1 2-2"/></svg>
+        </button>
+        <button class="mobile-panel-tab" data-mobile-panel-target="orders" title="王室订单" aria-label="王室订单">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14v13H5z"/><path d="M8 7a4 4 0 0 1 8 0"/><path d="M8 12h8"/><path d="M8 16h5"/></svg>
+        </button>
+        <button class="mobile-panel-tab" data-mobile-panel-target="collection" title="珍藏图鉴" aria-label="珍藏图鉴">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 4 6-4 12L8 9z"/><path d="M8 9h8"/><path d="m4 9 4-6h8l4 6-8 12z"/></svg>
+        </button>
+        <button class="mobile-panel-tab" data-mobile-panel-target="expeditions" title="地底探险" aria-label="地底探险">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 20 7-14 4 8 3-5 4 11Z"/><path d="M10 6 8 20"/></svg>
+        </button>
+        <button class="mobile-panel-tab" data-mobile-panel-target="log" title="王国日志" aria-label="王国日志">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h5"/></svg>
+        </button>
+        <button class="mobile-panel-tab mobile-panel-close" data-mobile-panel-target="close" title="收起面板" aria-label="收起面板">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </nav>
+    </div>
+
+    <div class="modal-backdrop" id="buildModal" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="buildTitle">
+        <div class="modal-head">
+          <h2 id="buildTitle">建设新楼层</h2>
+          <button class="icon-btn" id="closeBuildBtn" title="关闭" aria-label="关闭">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        <div class="build-grid" id="buildOptions"></div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop guide-backdrop" id="guideModal" hidden>
+      <div class="guide-scroll" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+        <div class="jester-portrait" aria-hidden="true"><span></span></div>
+        <div class="guide-copy">
+          <h2 id="guideTitle">欢迎来到迪迪王国</h2>
+          <p>这里会长出一座上下延伸的小城堡。点按访客安排入住和消费，点按楼层管理居民、补货、探险、升级与扩建。</p>
+        </div>
+        <button class="guide-confirm" id="closeGuideBtn" aria-label="开始经营">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" aria-live="polite"></div>
+    <script src="app.js?v=54"></script>
+  </body>
+</html>

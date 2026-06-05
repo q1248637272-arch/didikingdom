@@ -1,0 +1,25 @@
+{
+  "name": "迪迪王国",
+  "short_name": "迪迪王国",
+  "description": "一款城堡楼层经营、双向扩建、探险收集与居民调度小游戏。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#181615",
+  "theme_color": "#181615",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

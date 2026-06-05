@@ -1,0 +1,22 @@
+# Dependencies and local tool caches
+node_modules/
+.tools/
+.wrangler/
+
+# Local verification/runtime output
+.edge-profile-*/
+tmp/edge-*/
+tmp/imagegen/
+tmp/*.log
+tmp/verification-*.json
+verification-*.png
+
+# Deploy artifacts rebuilt from dist
+cloudflare-pages-upload.zip
+*-cloudflare-pages-upload.zip
+castle-escape-*.zip
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.log
