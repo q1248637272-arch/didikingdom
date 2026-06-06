@@ -374,6 +374,20 @@ const SHOWTIME_BEATS = [
   { id: "twist", label: "转场", threshold: 0.36, performer: ["dance", "wave"], audience: ["watch", "applaud"] },
   { id: "finale", label: "谢幕", threshold: 0.72, performer: ["wave", "dance"], audience: ["applaud", "dance"] },
 ];
+const FOOD_RUSH_FLOOR_TYPES = ["food"];
+const FOOD_RUSH_LABELS = {
+  food: "餐桌高峰",
+};
+const FOOD_RUSH_ACTIONS = {
+  food: "组织用餐高峰",
+};
+const FOOD_RUSH_NEEDS = ["food", "social"];
+const FOOD_RUSH_PACES = [
+  { id: "seating", label: "入座", threshold: 0, worker: ["serve", "work"], diner: ["wait", "talk"] },
+  { id: "serving", label: "上菜", threshold: 0.26, worker: ["serve", "work"], diner: ["eat", "snack"] },
+  { id: "sharing", label: "拼桌", threshold: 0.58, worker: ["serve", "talk"], diner: ["eat", "talk"] },
+  { id: "lastcall", label: "加桌", threshold: 0.84, worker: ["serve", "wave"], diner: ["snack", "talk"] },
+];
 const PERSON_ROOM_SPOTS = {
   default: [
     { id: "door", x: 18, y: 12, scale: 0.94, activities: ["stroll", "wait", "serve"] },
@@ -638,6 +652,14 @@ const QUEST_DEFS = [
     text: "拥有 1 层餐饮楼层",
   },
   {
+    id: "table_turnover",
+    title: "餐桌高峰",
+    goal: 2,
+    metric: "foodRushesDone",
+    reward: { coins: 420, gems: 2 },
+    text: "用餐饮楼层组织 2 次用餐高峰",
+  },
+  {
     id: "shoppers",
     title: "热闹街市",
     goal: 8,
@@ -890,7 +912,7 @@ let guideReady = false;
 
 function makeNewGame() {
   const game = {
-    version: 11,
+    version: 12,
     coins: 560,
     gems: 7,
     happiness: 72,
@@ -930,6 +952,8 @@ function makeNewGame() {
       dreamJobsFilled: 0,
       lobbyRoutesDone: 0,
       foodFloorsBuilt: 1,
+      foodRushesDone: 0,
+      foodServingsDone: 0,
       serviceFloorsBuilt: 1,
       craftFloorsBuilt: 0,
       marketDealsDone: 0,
@@ -1009,6 +1033,8 @@ function createFloor(game, type, options = {}) {
     stockMax: options.stockMax || data.stockMax,
     production: null,
     saleRemainder: 0,
+    foodRushCooldown: FOOD_RUSH_FLOOR_TYPES.includes(type) ? 0 : undefined,
+    foodRush: FOOD_RUSH_FLOOR_TYPES.includes(type) ? null : undefined,
     marketCooldown: type === "market" ? 0 : undefined,
     libraryCooldown: type === "library" ? 0 : undefined,
     comfortCooldown: isComfortFloorType(type) ? 0 : undefined,
@@ -1066,6 +1092,8 @@ function finalizeConstruction(floor) {
     stockMax: data.stockMax,
     production: null,
     saleRemainder: 0,
+    foodRushCooldown: FOOD_RUSH_FLOOR_TYPES.includes(floor.type) ? 0 : undefined,
+    foodRush: FOOD_RUSH_FLOOR_TYPES.includes(floor.type) ? null : undefined,
     marketCooldown: floor.type === "market" ? 0 : undefined,
     libraryCooldown: floor.type === "library" ? 0 : undefined,
     comfortCooldown: isComfortFloorType(floor.type) ? 0 : undefined,
@@ -1293,6 +1321,8 @@ function migrateGame(game) {
     dreamJobsFilled: 0,
     lobbyRoutesDone: 0,
     foodFloorsBuilt: 0,
+    foodRushesDone: 0,
+    foodServingsDone: 0,
     serviceFloorsBuilt: 0,
     craftFloorsBuilt: 0,
     marketDealsDone: 0,
@@ -1312,7 +1342,7 @@ function migrateGame(game) {
     aquariumFloorsBuilt: 0,
     festivalFloorsBuilt: 0,
   };
-  game.version = Math.max(Number(game.version) || 0, 11);
+  game.version = Math.max(Number(game.version) || 0, 12);
   game.nextExpeditionId ||= 1;
   game.quests ||= QUEST_DEFS.map((quest) => ({ id: quest.id, claimed: false }));
   game.stats ||= {};
@@ -1390,6 +1420,27 @@ function migrateGame(game) {
       floor.stock ||= 0;
       floor.stockMax ||= FLOOR_TYPES[floor.type]?.stockMax || 18;
       floor.saleRemainder ||= 0;
+      if (FOOD_RUSH_FLOOR_TYPES.includes(floor.type)) {
+        floor.foodRushCooldown = Math.max(0, Number(floor.foodRushCooldown) || 0);
+        floor.foodRush =
+          floor.foodRush && typeof floor.foodRush === "object" && Number(floor.foodRush.remaining) > 0
+            ? {
+                ...floor.foodRush,
+                remaining: Math.max(0, Number(floor.foodRush.remaining) || 0),
+                total: Math.max(1, Number(floor.foodRush.total) || Number(floor.foodRush.remaining) || 1),
+                participantIds: Array.isArray(floor.foodRush.participantIds)
+                  ? floor.foodRush.participantIds.map(Number).filter(Boolean)
+                  : [],
+                pace: floor.foodRush.pace || "seating",
+                heat: clamp(Number(floor.foodRush.heat) || 24, 0, 100),
+                served: Math.max(0, Number(floor.foodRush.served) || 0),
+                targetServings: Math.max(1, Number(floor.foodRush.targetServings) || 1),
+                serviceTimer: Math.max(0, Number(floor.foodRush.serviceTimer) || 0),
+                earned: Math.max(0, Number(floor.foodRush.earned) || 0),
+                finalRewarded: Boolean(floor.foodRush.finalRewarded),
+              }
+            : null;
+      }
       if (floor.type === "market") floor.marketCooldown = Math.max(0, Number(floor.marketCooldown) || 0);
       if (floor.type === "library") floor.libraryCooldown = Math.max(0, Number(floor.libraryCooldown) || 0);
       if (isComfortFloorType(floor.type)) {
@@ -1474,6 +1525,15 @@ function applyOfflineProgress(game) {
         floor.comfortSession.remaining = Math.max(0, Number(floor.comfortSession.remaining || 0) - elapsed);
         if (floor.comfortSession.remaining <= 0) {
           floor.comfortSession = null;
+        }
+      }
+    }
+    if (FOOD_RUSH_FLOOR_TYPES.includes(floor.type)) {
+      floor.foodRushCooldown = Math.max(0, (floor.foodRushCooldown || 0) - elapsed * (1 + clockworkTempoBonus(game) * 0.14));
+      if (floor.foodRush) {
+        floor.foodRush.remaining = Math.max(0, Number(floor.foodRush.remaining || 0) - elapsed);
+        if (floor.foodRush.remaining <= 0) {
+          floor.foodRush = null;
         }
       }
     }
@@ -1604,9 +1664,29 @@ function updateLifeVisits(dt) {
       person.lifeWish = lifeVisitProgressLabel(person);
       const targetValue = Number(person.motives?.[visit.need] || 0);
       const elapsed = Number(visit.total || 0) - Number(visit.remaining || 0);
-      const minimumStay = Number(visit.minStay || 0) || (visit.reason === "showtime" ? 20 : visit.reason === "companion" ? 6 : visit.reason === "comfort" ? 10 : 0);
+      const minimumStay =
+        Number(visit.minStay || 0) ||
+        (visit.reason === "showtime"
+          ? 20
+          : visit.reason === "foodRush"
+            ? 14
+            : visit.reason === "companion"
+              ? 6
+              : visit.reason === "comfort"
+                ? 10
+                : 0);
       const minimumStayDone = elapsed > minimumStay;
-      const targetGoal = Number(visit.targetGoal || 0) || (visit.reason === "showtime" ? 96 : visit.reason === "companion" ? 86 : visit.reason === "comfort" ? 88 : 78);
+      const targetGoal =
+        Number(visit.targetGoal || 0) ||
+        (visit.reason === "showtime"
+          ? 96
+          : visit.reason === "foodRush"
+            ? 92
+            : visit.reason === "companion"
+              ? 86
+              : visit.reason === "comfort"
+                ? 88
+                : 78);
       if ((targetValue >= targetGoal && minimumStayDone) || visit.remaining <= 0) {
         changed = endLifeVisit(person) || changed;
       }
@@ -2459,6 +2539,9 @@ function updateTimers(dt) {
     if (floor.type === "library") {
       floor.libraryCooldown = Math.max(0, (floor.libraryCooldown || 0) - dt * (1 + clockworkTempoBonus(state) * 0.18));
     }
+    if (isFoodRushFloorType(floor.type) && updateFoodRushFloor(floor, dt)) {
+      lastKingdomKey = "";
+    }
     if (isShowtimeFloorType(floor.type) && updateShowtimeFloor(floor, dt)) {
       lastKingdomKey = "";
     }
@@ -2805,6 +2888,363 @@ function isActiveComfortSession(floor) {
 
 function comfortSessionBonus(game = state) {
   return Math.min(0.1, (game.stats?.comfortSessionsDone || 0) * 0.0035);
+}
+
+function isFoodRushFloorType(type) {
+  return FOOD_RUSH_FLOOR_TYPES.includes(type);
+}
+
+function isActiveFoodRush(floor) {
+  return Boolean(isFoodRushFloorType(floor?.type) && floor.foodRush && Number(floor.foodRush.remaining) > 0);
+}
+
+function foodRushPracticeBonus(game = state) {
+  return Math.min(0.12, (game.stats?.foodRushesDone || 0) * 0.004 + (game.stats?.foodServingsDone || 0) * 0.0015);
+}
+
+function activeFoodRushBonus(game = state) {
+  return businessFloors(game).some((floor) => isActiveFoodRush(floor)) ? 0.038 : 0;
+}
+
+function foodRushProgress(floor) {
+  if (!isActiveFoodRush(floor)) return 0;
+  const total = Math.max(1, Number(floor.foodRush.total) || 1);
+  const servings = Math.max(1, Number(floor.foodRush.targetServings) || 1);
+  const timeProgress = clamp(1 - Number(floor.foodRush.remaining || 0) / total, 0, 1);
+  const serveProgress = clamp(Number(floor.foodRush.served || 0) / servings, 0, 1);
+  return clamp(Math.max(timeProgress, serveProgress * 0.92), 0, 1);
+}
+
+function foodRushPaceForProgress(progress = 0) {
+  return FOOD_RUSH_PACES.reduce((current, pace) => (progress >= pace.threshold ? pace : current), FOOD_RUSH_PACES[0]);
+}
+
+function currentFoodRushPace(floor) {
+  if (!isFoodRushFloorType(floor?.type)) return FOOD_RUSH_PACES[0];
+  const activePace = FOOD_RUSH_PACES.find((pace) => pace.id === floor.foodRush?.pace);
+  return activePace || foodRushPaceForProgress(foodRushProgress(floor));
+}
+
+function foodRushHeatTone(floor) {
+  const heat = Number(floor?.foodRush?.heat || 0);
+  if (heat >= 76) return "peak";
+  if (heat >= 46) return "busy";
+  return "cozy";
+}
+
+function foodRushHeatLabel(floor) {
+  const heat = Number(floor?.foodRush?.heat || 0);
+  if (heat >= 76) return "满桌";
+  if (heat >= 46) return "忙场";
+  return "暖场";
+}
+
+function foodRushCooldown(floor) {
+  const skill = averageSkill(floor.workers || [], floor.type);
+  return Math.max(24, Math.round(58 - skill * 2 - serviceCareBonus(state) * 28 - clockworkTempoBonus(state) * 7));
+}
+
+function foodRushCandidatesForFloor(floor) {
+  if (!isFoodRushFloorType(floor?.type)) return [];
+  const staff = new Set(floor.workers || []);
+  return allResidents(state)
+    .filter((person) => person && !staff.has(person.id) && !person.expeditionId && !isActiveLifeVisit(person))
+    .map((person) => {
+      ensurePersonLife(person);
+      const currentFloor = currentFloorForPerson(person);
+      const foodNeed = personNeedUrgency(person, "food") * 1.9;
+      const socialNeed = personNeedUrgency(person, "social") * 0.65;
+      const favorite = (person.favoriteTypes || []).includes("food") ? 0.5 : 0;
+      const dream = person.dreamType === "food" || person.dreamType === "service" ? 0.35 : 0;
+      const familiarStaff = (floor.workers || []).reduce((sum, id) => {
+        const worker = getResident(id);
+        return sum + (worker ? relationshipScore(person, worker) / 110 : 0);
+      }, 0);
+      const near = currentFloor ? Math.max(0, 0.42 - Math.abs(Number(currentFloor.id) - Number(floor.id)) * 0.04) : 0;
+      const mood = personMotiveMood(person);
+      const moodNeed = mood === "strained" ? 0.42 : mood === "seeking" ? 0.22 : 0;
+      const hunger = Number(person.motives?.food || 0) <= 44 ? 0.28 : 0;
+      const workBreak = person.workFloorId ? 0.18 : 0;
+      return { person, score: foodNeed + socialNeed + favorite + dream + familiarStaff + near + moodNeed + hunger + workBreak + Math.random() * 0.18 };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.person);
+}
+
+function foodRushActionBlockReason(floor) {
+  if (!isFoodRushFloorType(floor?.type)) return "这个楼层不能组织用餐高峰";
+  if (!floor.workers?.length) return `${FLOOR_TYPES[floor.type].label}需要员工招呼餐桌`;
+  if ((floor.stock || 0) <= 0) return `${FLOOR_TYPES[floor.type].label}备餐不足，先补货`;
+  if (isActiveFoodRush(floor)) return "餐桌高峰正在进行";
+  if ((floor.foodRushCooldown || 0) > 0) return `还要 ${Math.ceil(floor.foodRushCooldown)}s 才能再次开桌`;
+  if (!foodRushCandidatesForFloor(floor).length) return "暂时没有居民腾得出空来吃饭";
+  return "";
+}
+
+function applyFoodRushMotiveBurst(floor, person, scale = 1) {
+  boostPersonMotive(person, "food", 16 * scale);
+  boostPersonMotive(person, "social", 6 * scale);
+  boostPersonMotive(person, "energy", 3 * scale);
+  boostPersonMotive(person, "entertainment", 2 * scale);
+  if (floor.level > 2) boostPersonMotive(person, "food", 2 * scale);
+}
+
+function foodRushParticipants(floor) {
+  if (!isFoodRushFloorType(floor?.type) || !floor.foodRush?.id) return [];
+  const sessionId = floor.foodRush.id;
+  return allResidents(state).filter((person) => {
+    return person?.lifeVisit?.reason === "foodRush" && person.lifeVisit.sessionId === sessionId && Number(person.lifeVisit.floorId) === Number(floor.id);
+  });
+}
+
+function applyFoodRushPaceMotion(floor, diners = foodRushParticipants(floor), staff = null) {
+  if (!isActiveFoodRush(floor)) return;
+  const pace = currentFoodRushPace(floor);
+  const workers = staff || (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
+  workers.forEach((worker, index) => {
+    endSocialForPerson(worker);
+    worker.need = index % 2 ? "social" : "food";
+    worker.activity = pace.worker[index % pace.worker.length] || "serve";
+    worker.activityTimer = Math.max(worker.activityTimer || 0, randFloat(7, 11));
+    worker.activityLane = "c";
+    worker.lifeWish = `${pace.label}${FOOD_RUSH_LABELS[floor.type] || "餐桌高峰"}`;
+    assignPersonMotion(worker, floor.type, worker.activity);
+  });
+  diners.forEach((person, index) => {
+    person.need = index % 3 === 0 ? "social" : "food";
+    person.activity = pace.diner[index % pace.diner.length] || "eat";
+    person.activityTimer = Math.max(person.activityTimer || 0, randFloat(6, 10));
+    person.lifeWish = `${pace.label}用餐：${floor.name}`;
+    assignPersonMotion(person, floor.type, person.activity);
+  });
+}
+
+function pairFoodRushTables(floor, diners, staff, seed = 0) {
+  if (!diners.length) return;
+  const servers = staff.filter((person) => person && !person.socialPartnerId);
+  const guests = diners.filter((person) => person && !person.socialPartnerId);
+  servers.forEach((worker, index) => {
+    const diner = guests[(index + seed) % guests.length];
+    if (!diner || diner.socialPartnerId) return;
+    const scene = SOCIAL_SCENES.food[(index + seed) % SOCIAL_SCENES.food.length] || SOCIAL_SCENES.food[0];
+    applySocialScene(worker, diner, scene, `food-rush-${floor.id}-${worker.id}-${diner.id}-${Date.now()}`, randFloat(8, 12), floor.type, floorSocialScope(floor));
+  });
+  for (let index = 0; index + 1 < guests.length; index += 2) {
+    const left = guests[index];
+    const right = guests[index + 1];
+    if (!left || !right || left.socialPartnerId || right.socialPartnerId) continue;
+    const scene = SOCIAL_SCENES.food[1] || SOCIAL_SCENES.default[0];
+    applySocialScene(left, right, scene, `food-rush-table-${floor.id}-${left.id}-${right.id}-${Date.now()}`, randFloat(7, 11), floor.type, floorSocialScope(floor));
+  }
+}
+
+function serveFoodRushCourse(floor, diners = foodRushParticipants(floor), staff = null) {
+  if (!isActiveFoodRush(floor) || !diners.length) return 0;
+  const workers = staff || (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
+  const rush = floor.foodRush;
+  const skill = averageSkill(floor.workers || [], floor.type);
+  const remaining = Math.max(0, (rush.targetServings || 0) - (rush.served || 0));
+  const serveCapacity = clamp(1 + Math.floor(skill / 3) + Math.min(2, workers.length), 1, Math.max(1, diners.length));
+  const servedNow = Math.min(remaining || 1, serveCapacity, Math.max(1, Math.ceil(diners.length / 2)));
+  rush.served = (rush.served || 0) + servedNow;
+  rush.courses = (rush.courses || 0) + 1;
+  state.stats.foodServingsDone = (state.stats.foodServingsDone || 0) + servedNow;
+  rush.heat = clamp(Number(rush.heat || 0) + 5 + servedNow * 4 + skill * 0.28 + serviceCareBonus(state) * 18, 0, 100);
+  applyFoodRushPaceMotion(floor, diners, workers);
+  for (let index = 0; index < servedNow; index += 1) {
+    const diner = diners[(index + rush.courses - 1) % diners.length];
+    if (!diner) continue;
+    diner.activity = index % 2 ? "eat" : "snack";
+    diner.activityTimer = Math.max(diner.activityTimer || 0, randFloat(7, 11));
+    assignPersonMotion(diner, floor.type, diner.activity);
+    applyFoodRushMotiveBurst(floor, diner, 0.65);
+    const home = findFloor(diner.homeFloorId);
+    if (home?.type === "dwelling") {
+      home.rentReady = Math.min(360, (home.rentReady || 0) + 2);
+    }
+  }
+  workers.forEach((worker) => {
+    boostPersonMotive(worker, "social", 2.2);
+    boostPersonMotive(worker, "food", 1.4);
+  });
+  pairFoodRushTables(floor, diners, workers, rush.courses || 0);
+  const tips = Math.round((4 + servedNow * (3.2 + state.happiness / 90) + skill * 0.7) * (1 + foodRushPracticeBonus(state) * 0.7 + serviceCareBonus(state) * 0.28));
+  addCoins(tips);
+  showFloat(`上菜 +${tips}`);
+  rush.earned = (rush.earned || 0) + tips;
+  if (rush.heat >= 76 && !rush.peakLogged) {
+    rush.peakLogged = true;
+    addLog(`${floor.name} 忙成一片，餐桌几乎坐满了。`);
+  }
+  return tips;
+}
+
+function settleFoodRushFinale(floor, diners = foodRushParticipants(floor)) {
+  if (!isActiveFoodRush(floor) || floor.foodRush.finalRewarded) return 0;
+  const rush = floor.foodRush;
+  const heat = Number(rush.heat || 0);
+  const target = Math.max(1, Number(rush.targetServings) || 1);
+  const ratio = clamp((rush.served || 0) / target, 0, 1.35);
+  const bonus = Math.round((rush.earned || 0) * (0.12 + ratio * 0.18) + heat * 0.6 + (rush.served || 0) * 4);
+  rush.finalRewarded = true;
+  rush.earned = (rush.earned || 0) + bonus;
+  if (bonus > 0) addCoins(bonus);
+  state.happiness = clamp(state.happiness + Math.min(6, 1 + Math.floor((rush.served || 0) / 2)), 0, 100);
+  diners.forEach((person) => {
+    applyFoodRushMotiveBurst(floor, person, 0.42);
+    const home = findFloor(person.homeFloorId);
+    if (home?.type === "dwelling") {
+      home.rentReady = Math.min(360, (home.rentReady || 0) + 4);
+    }
+  });
+  return bonus;
+}
+
+function startFoodRush(floorId) {
+  const floor = findFloor(floorId);
+  if (!isBusiness(floor) || !isFoodRushFloorType(floor.type)) return;
+  const reason = foodRushActionBlockReason(floor);
+  if (reason) {
+    showToast(reason);
+    return;
+  }
+  const skill = averageSkill(floor.workers || [], floor.type);
+  const capacity = clamp(2 + (floor.level || 1) + Math.floor(skill / 4), 2, 6);
+  const diners = foodRushCandidatesForFloor(floor).slice(0, Math.min(capacity, Math.max(2, (floor.stock || 0) * 2)));
+  if (!diners.length) {
+    showToast("暂时没有居民有空来用餐");
+    return;
+  }
+  const stockCost = Math.min(floor.stock || 0, Math.max(1, Math.ceil(diners.length / 2)));
+  const label = FOOD_RUSH_LABELS[floor.type] || "餐桌高峰";
+  const sessionId = `food-rush-${floor.id}-${Date.now()}-${randInt(10, 99)}`;
+  const duration = randFloat(34, 46);
+  const targetServings = Math.max(diners.length + 2, diners.length * 2 + Math.floor(skill / 3));
+  const openingHeat = clamp(22 + diners.length * 6 + skill * 0.9 + foodRushPracticeBonus(state) * 80 + serviceCareBonus(state) * 18, 18, 68);
+  floor.stock = Math.max(0, (floor.stock || 0) - stockCost);
+  floor.foodRushCooldown = foodRushCooldown(floor);
+  floor.foodRush = {
+    id: sessionId,
+    label,
+    remaining: duration,
+    total: duration,
+    participantIds: diners.map((person) => person.id),
+    pace: "seating",
+    heat: openingHeat,
+    served: 0,
+    targetServings,
+    serviceTimer: randFloat(4.2, 5.8),
+    earned: 0,
+    finalRewarded: false,
+    courses: 0,
+  };
+  const staff = (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
+  staff.forEach((worker, index) => {
+    endSocialForPerson(worker);
+    worker.need = index % 2 ? "social" : "food";
+    worker.activity = index % 2 ? "serve" : "work";
+    worker.activityTimer = Math.max(worker.activityTimer || 0, duration);
+    worker.activityLane = "c";
+    assignPersonMotion(worker, floor.type, worker.activity);
+    boostPersonMotive(worker, "food", 4);
+  });
+  diners.forEach((person, index) => {
+    startLifeVisit(person, floor, "food", {
+      allowCompanion: false,
+      label: `参加${label}`,
+      reason: "foodRush",
+      duration: duration + randFloat(-3, 4),
+      minStay: Math.max(14, duration * 0.38),
+      targetGoal: 92,
+      sessionId,
+    });
+    person.activity = index % 2 ? "wait" : "talk";
+    person.activityTimer = Math.max(person.activityTimer || 0, duration * 0.45);
+    assignPersonMotion(person, floor.type, person.activity);
+    applyFoodRushMotiveBurst(floor, person, 0.55);
+  });
+  applyFoodRushPaceMotion(floor, diners, staff);
+  pairFoodRushTables(floor, diners, staff, 0);
+  state.stats.foodRushesDone = (state.stats.foodRushesDone || 0) + 1;
+  state.happiness = clamp(state.happiness + Math.min(5, 1 + diners.length), 0, 100);
+  const names = diners.map((person) => person.name).slice(0, 3).join("、");
+  const extra = diners.length > 3 ? `等 ${diners.length} 人` : "";
+  showToast(`${label}开始：${diners.length} 位居民入座`);
+  addLog(`${floor.name} 组织${label}，${names}${extra}入座，用掉 ${stockCost} 份备餐。`);
+  lastKingdomKey = "";
+  render(true);
+}
+
+function updateFoodRushFloor(floor, dt) {
+  if (!isFoodRushFloorType(floor?.type)) return false;
+  const before = foodRushMapKey(floor);
+  floor.foodRushCooldown = Math.max(0, (floor.foodRushCooldown || 0) - dt * (1 + clockworkTempoBonus(state) * 0.18));
+  if (!isActiveFoodRush(floor)) return before !== foodRushMapKey(floor);
+  floor.foodRush.remaining = Math.max(0, Number(floor.foodRush.remaining || 0) - dt);
+  const diners = foodRushParticipants(floor);
+  floor.foodRush.participantIds = diners.map((person) => person.id);
+  diners.forEach((person) => applyFoodRushMotiveBurst(floor, person, dt * 0.06));
+  const staff = (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
+  staff.forEach((person) => {
+    boostPersonMotive(person, "food", dt * 0.08);
+    boostPersonMotive(person, "social", dt * 0.04);
+  });
+  const pace = foodRushPaceForProgress(foodRushProgress(floor));
+  if (floor.foodRush.pace !== pace.id) {
+    floor.foodRush.pace = pace.id;
+    floor.foodRush.heat = clamp(Number(floor.foodRush.heat || 0) + 6 + diners.length, 0, 100);
+    applyFoodRushPaceMotion(floor, diners, staff);
+    addLog(`${floor.name} 的${floor.foodRush.label || "餐桌高峰"}进入${pace.label}。`);
+  }
+  floor.foodRush.serviceTimer = Math.max(0, Number(floor.foodRush.serviceTimer || 0) - dt * (1 + serviceCareBonus(state) * 0.4));
+  if (floor.foodRush.serviceTimer <= 0 && diners.length) {
+    serveFoodRushCourse(floor, diners, staff);
+    floor.foodRush.serviceTimer = randFloat(4.2, 6.1);
+  }
+  if (floor.foodRush.remaining <= 0 || !diners.length || (floor.foodRush.served || 0) >= (floor.foodRush.targetServings || 1)) {
+    const label = FOOD_RUSH_LABELS[floor.type] || "餐桌高峰";
+    const served = floor.foodRush.served || 0;
+    const heat = Math.round(floor.foodRush.heat || 0);
+    const finale = diners.length ? settleFoodRushFinale(floor, diners) : 0;
+    floor.foodRush = null;
+    if (diners.length) addLog(`${floor.name} 的${label}收尾，上菜 ${served} 次，忙场 ${heat}，追加 ${finale} 金币。`);
+  }
+  return before !== foodRushMapKey(floor);
+}
+
+function renderFoodRushPanel(floor) {
+  if (!isFoodRushFloorType(floor?.type)) return "";
+  const active = isActiveFoodRush(floor);
+  const diners = active ? foodRushParticipants(floor) : [];
+  const pace = currentFoodRushPace(floor);
+  const heat = active ? Math.round(Number(floor.foodRush.heat || 0)) : 0;
+  const heatTone = active ? foodRushHeatTone(floor) : "cozy";
+  const served = active ? floor.foodRush.served || 0 : state.stats.foodServingsDone || 0;
+  const target = active ? Math.max(1, Number(floor.foodRush.targetServings) || 1) : Math.max(1, served || 1);
+  const progress = active ? clamp(served / target, 0, 1) : 0;
+  const names = diners.length ? diners.map((person) => person.name).slice(0, 4).join("、") : "等待居民入座";
+  const status = active
+    ? `${pace.label} ${Math.ceil(floor.foodRush.remaining)}s · ${names}`
+    : (floor.foodRushCooldown || 0) > 0
+      ? `冷却 ${Math.ceil(floor.foodRushCooldown)}s`
+      : "就绪";
+  const extra = active ? ` · 收益 ${floor.foodRush.earned || 0}` : "";
+  return `
+    <div class="food-rush-panel ${active ? "active" : ""}" data-heat="${escapeAttr(heatTone)}" data-pace="${escapeAttr(pace.id)}">
+      <div class="food-rush-panel-head">
+        <strong>${FOOD_RUSH_LABELS[floor.type] || "餐桌高峰"}</strong>
+        <em>${active ? `${foodRushHeatLabel(floor)} ${heat}%` : "待开桌"}</em>
+      </div>
+      <div class="food-rush-meter" aria-hidden="true"><i style="width:${Math.round(progress * 100)}%"></i></div>
+      <span>${escapeHtml(status)}${extra}</span>
+      <small>上菜 ${served}/${target} · 已组织 ${state.stats.foodRushesDone || 0} 次</small>
+    </div>`;
+}
+
+function foodRushMapKey(floor) {
+  if (!isFoodRushFloorType(floor?.type)) return "";
+  const participants = floor.foodRush?.participantIds || [];
+  return `foodRush:${Math.ceil(floor.foodRushCooldown || 0)}:${Math.ceil(floor.foodRush?.remaining || 0)}:${participants.join("-")}:${floor.foodRush?.pace || ""}:${Math.round(floor.foodRush?.heat || 0)}:${floor.foodRush?.served || 0}:${floor.foodRush?.targetServings || 0}:${floor.foodRush?.earned || 0}`;
 }
 
 function isShowtimeFloorType(type) {
@@ -3357,7 +3797,7 @@ function dwellingJourneyBonus(game = state) {
 }
 
 function foodWarmthBonus(game = state) {
-  return Math.min(0.2, floorTypeInfluence(game, "food") * 0.04);
+  return Math.min(0.24, floorTypeInfluence(game, "food") * 0.038 + foodRushPracticeBonus(game) * 0.85 + activeFoodRushBonus(game));
 }
 
 function craftToolBonus(game = state) {
@@ -4296,7 +4736,7 @@ function getKingdomRenderKey() {
       if (floor.type === "lobby") {
         return `${floor.id}:lobby:${state.queue.map((visitor) => `${visitor.id}:${visitor.need || ""}:${visitor.activity || ""}`).join("-")}:${state.selectedFloorId}`;
       }
-      return `${floor.id}:${floor.type}:${floor.level}:${floor.stock}:${floor.stockMax}:${floor.workers.length}:${Boolean(floor.production)}:${comfortSessionMapKey(floor)}:${showtimeMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
+      return `${floor.id}:${floor.type}:${floor.level}:${floor.stock}:${floor.stockMax}:${floor.workers.length}:${Boolean(floor.production)}:${foodRushMapKey(floor)}:${comfortSessionMapKey(floor)}:${showtimeMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
     })
     .join("|");
   const arrivalKey = (state.arrivals || []).map((arrival) => `${arrival.id}:${arrival.floorId}`).join("-");
@@ -4332,6 +4772,10 @@ function renderFloor(floor) {
   const selected = floor.id === state.selectedFloorId ? "selected" : "";
   const constructing = floor.status === "construction" ? "constructing" : "";
   const routeClass = floorRouteClass(floor);
+  const foodRushClass = isActiveFoodRush(floor) ? "food-rush-active" : "";
+  const foodRushAttrs = isActiveFoodRush(floor)
+    ? ` data-food-rush-pace="${escapeAttr(currentFoodRushPace(floor).id)}" data-food-rush-heat="${escapeAttr(foodRushHeatTone(floor))}"`
+    : "";
   const comfortClass = isActiveComfortSession(floor) ? "comfort-active" : "";
   const showtimeClass = isActiveShowtime(floor) ? "showtime-active" : "";
   const showtimeAttrs = isActiveShowtime(floor)
@@ -4339,7 +4783,7 @@ function renderFloor(floor) {
     : "";
   const zone = getFloorZone(floor);
   return `
-    <article class="floor ${selected} ${constructing} ${routeClass} ${comfortClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${showtimeAttrs}>
+    <article class="floor ${selected} ${constructing} ${routeClass} ${foodRushClass} ${comfortClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${foodRushAttrs}${showtimeAttrs}>
       ${renderFloorIndex(floor)}
       <div class="room" data-action="select-floor" data-floor-id="${floor.id}" title="${escapeAttr(floorMapLabel(floor))}" aria-label="${escapeAttr(floorMapLabel(floor))}">
         ${floor.status === "construction" ? renderConstruction(floor) : renderOpenFloor(floor)}
@@ -4561,6 +5005,10 @@ function renderRoomStateTag(floor) {
     const label = COMFORT_SESSION_LABELS[floor.type] || "休整";
     return `<span class="room-state-tag good icon-only" data-state="comfort" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"></span>`;
   }
+  if (isActiveFoodRush(floor)) {
+    const label = FOOD_RUSH_LABELS[floor.type] || "餐桌高峰";
+    return `<span class="room-state-tag good icon-only" data-state="meal-rush" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"></span>`;
+  }
   if (isActiveShowtime(floor)) {
     const label = SHOWTIME_LABELS[floor.type] || "小剧";
     return `<span class="room-state-tag good icon-only" data-state="showtime" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"></span>`;
@@ -4609,6 +5057,7 @@ function renderFloorStatusGlyph(floor) {
   if (floor.type === "lobby") stateName = state.queue.length ? "queue" : "idle";
   else if (floor.type === "dwelling") stateName = floor.rentReady ? "rent" : "home";
   else if (isActiveComfortSession(floor)) stateName = "comfort";
+  else if (isActiveFoodRush(floor)) stateName = "meal-rush";
   else if (isActiveShowtime(floor)) stateName = "showtime";
   else if (floor.production) stateName = "stocking";
   else if (floor.stock <= 0) stateName = "soldout";
@@ -4822,6 +5271,31 @@ function renderFloorStatus(floor) {
   if (floor.type === "market") return "旺市";
   if (floor.type === "library") return "研读";
   if (floor.type === "garden") return "花宴";
+  if (floor.type === "entertainment") return "演出";
+  if (floor.type === "service") return "礼宾";
+  if (floor.type === "observatory") return "观星";
+  if (floor.type === "bathhouse") return "暖雾";
+  if (floor.type === "clinic") return "护理";
+  if (floor.type === "clockwork") return "运转";
+  if (floor.type === "aquarium") return "水光";
+  if (floor.type === "festival") return "开演";
+  return "营业";
+}
+
+function renderFloorStatus(floor) {
+  if (floor.type === "lobby") return state.queue.length ? "等候接待" : "自然待客";
+  if (floor.type === "dwelling") return floor.rentReady ? `租金 ${floor.rentReady}` : "居住";
+  if (isActiveComfortSession(floor)) return `${COMFORT_SESSION_LABELS[floor.type] || "休整"} ${Math.ceil(floor.comfortSession.remaining)}s`;
+  if (isActiveFoodRush(floor)) return `${currentFoodRushPace(floor).label}${FOOD_RUSH_LABELS[floor.type] || "餐桌高峰"} · 上菜 ${floor.foodRush.served || 0}/${floor.foodRush.targetServings || 0}`;
+  if (isActiveShowtime(floor)) return `${currentShowtimeBeat(floor).label}${SHOWTIME_LABELS[floor.type] || "小剧"} · 热度 ${Math.round(floor.showtime.heat || 0)}%`;
+  if (floor.production) return `补货 ${Math.ceil(floor.production.remaining)}s`;
+  if (floor.stock <= 0) return "缺货";
+  if (!floor.workers.length) return "缺员工";
+  if (floor.type === "food") return "出餐";
+  if (floor.type === "craft") return "打磨";
+  if (floor.type === "market") return "市集";
+  if (floor.type === "library") return "研读";
+  if (floor.type === "garden") return "花圃";
   if (floor.type === "entertainment") return "演出";
   if (floor.type === "service") return "礼宾";
   if (floor.type === "observatory") return "观星";
@@ -5109,6 +5583,209 @@ function renderFloorPerks(floor) {
   if (resonance > 0) perks.push(`街区共鸣 +${resonance}%`);
   if (!perks.length) return "";
   return `<div class="floor-perks">${perks.map((perk) => `<span>${perk}</span>`).join("")}</div>`;
+}
+
+function renderFloorDetail() {
+  const floor = findFloor(state.selectedFloorId) || state.floors[0];
+  state.selectedFloorId = floor.id;
+  els.selectedFloorTag.textContent = formatFloorLabel(floor.id);
+
+  if (floor.status === "construction") {
+    els.floorDetail.innerHTML = `
+      <strong>${FLOOR_TYPES[floor.type].label}施工中</strong>
+      <p>剩余 ${Math.ceil(floor.buildRemaining)} 秒</p>
+      <div class="stat-grid">
+        <div class="stat"><b>${Math.round((1 - floor.buildRemaining / floor.buildTotal) * 100)}%</b><span>进度</span></div>
+        <div class="stat"><b>${state.gems}</b><span>宝石</span></div>
+      </div>
+      <div class="detail-actions">
+        <button class="detail-btn primary" data-action="speed" data-floor-id="${floor.id}">加速</button>
+      </div>`;
+    return;
+  }
+
+  if (floor.type === "lobby") {
+    const best = bestLobbyVisitor(state);
+    const bestRoute = best ? visitorRouteInfo(best, state) : null;
+    els.floorDetail.innerHTML = `
+      <strong>${escapeHtml(floor.name)}</strong>
+      <p>${elevatorIsMaxed() ? "入口满级后，可以直接在这里接待访客。" : "先让访客进入电梯，再根据推荐路线安排接待。"}</p>
+      <div class="stat-grid">
+        <div class="stat"><b>${state.queue.length}</b><span>等待访客</span></div>
+        <div class="stat"><b>x${state.streak || 0}</b><span>连送奖励</span></div>
+        <div class="stat"><b>${bestRoute ? bestRoute.floorLabel : "-"}</b><span>推荐目标</span></div>
+        <div class="stat"><b>${state.stats.lobbyRoutesDone || 0}</b><span>派号</span></div>
+      </div>
+      ${renderFloorPerks(floor)}
+      ${renderLobbyRouteBoard()}
+      <div class="detail-actions">
+        <button class="detail-btn primary" data-action="dispatch-lobby" ${state.queue.length && !state.elevator.passenger ? "" : "disabled"}>派号接待</button>
+        <button class="detail-btn primary" data-action="open-build">建设</button>
+      </div>`;
+    return;
+  }
+
+  if (floor.type === "dwelling") {
+    const unemployed = floor.residents.filter((resident) => {
+      const full = getResident(resident.id);
+      return full && !full.workFloorId && !full.expeditionId;
+    }).length;
+    els.floorDetail.innerHTML = `
+      <strong>${escapeHtml(floor.name)}</strong>
+      <p>${FLOOR_TYPES.dwelling.desc}</p>
+      <div class="stat-grid">
+        <div class="stat"><b>${floor.residents.length}/${floor.capacity}</b><span>住户</span></div>
+        <div class="stat"><b>Lv${floor.level}</b><span>楼层等级</span></div>
+        <div class="stat"><b>${unemployed}</b><span>空闲居民</span></div>
+        <div class="stat"><b>${floor.rentReady || 0}</b><span>待收租金</span></div>
+      </div>
+      ${renderFloorPerks(floor)}
+      ${renderResidentList(floor.residents)}
+      <div class="detail-actions">
+        <button class="detail-btn primary" data-action="collect-rent" data-floor-id="${floor.id}">收租</button>
+        <button class="detail-btn" data-action="start-dwelling-expedition" data-floor-id="${floor.id}">外出探险</button>
+        <button class="detail-btn" data-action="upgrade-floor" data-floor-id="${floor.id}">升级 ${floorUpgradeCost(floor)}</button>
+        <button class="detail-btn" data-action="open-build">建设</button>
+      </div>`;
+    return;
+  }
+
+  const workers = floor.workers.map((id) => getResident(id)).filter(Boolean);
+  const skill = averageSkill(floor.workers, floor.type);
+  const dreamWorkers = countDreamWorkers(floor);
+  const marketCooldown = floor.type === "market" ? Math.ceil(floor.marketCooldown || 0) : 0;
+  const libraryCooldown = floor.type === "library" ? Math.ceil(floor.libraryCooldown || 0) : 0;
+  const foodRushCooldownValue = isFoodRushFloorType(floor.type) ? Math.ceil(floor.foodRushCooldown || 0) : 0;
+  const foodRushActive = isActiveFoodRush(floor);
+  const foodRushReason = isFoodRushFloorType(floor.type) ? foodRushActionBlockReason(floor) : "";
+  const foodRushHeatValue = foodRushActive ? `${Math.round(floor.foodRush.heat || 0)}%` : "-";
+  const foodRushPaceValue = foodRushActive ? currentFoodRushPace(floor).label : foodRushCooldownValue ? `${foodRushCooldownValue}s` : "就绪";
+  const foodRushServedValue = foodRushActive ? `${floor.foodRush.served || 0}/${floor.foodRush.targetServings || 0}` : `${state.stats.foodServingsDone || 0}`;
+  const comfortCooldown = isComfortFloorType(floor.type) ? Math.ceil(floor.comfortCooldown || 0) : 0;
+  const comfortActive = isActiveComfortSession(floor);
+  const comfortReason = isComfortFloorType(floor.type) ? comfortActionBlockReason(floor) : "";
+  const showtimeCooldownValue = isShowtimeFloorType(floor.type) ? Math.ceil(floor.showtimeCooldown || 0) : 0;
+  const showtimeActive = isActiveShowtime(floor);
+  const showtimeReason = isShowtimeFloorType(floor.type) ? showtimeActionBlockReason(floor) : "";
+  const showtimeHeatValue = showtimeActive ? `${Math.round(floor.showtime.heat || 0)}%` : "-";
+  const showtimeBeatValue = showtimeActive ? currentShowtimeBeat(floor).label : showtimeCooldownValue ? `${showtimeCooldownValue}s` : "就绪";
+  const catalog = floor.type === "library" ? collectionProgress(state) : null;
+
+  els.floorDetail.innerHTML = `
+    <strong>${escapeHtml(floor.name)}</strong>
+    <p>${FLOOR_TYPES[floor.type].desc}</p>
+    <div class="stat-grid">
+      <div class="stat"><b>${floor.stock}/${floor.stockMax}</b><span>库存</span></div>
+      <div class="stat"><b>Lv${floor.level}</b><span>楼层等级</span></div>
+      <div class="stat"><b>${workers.length}/3</b><span>员工</span></div>
+      <div class="stat"><b>${dreamWorkers}/3</b><span>理想岗位</span></div>
+      <div class="stat"><b>${skill.toFixed(1)}</b><span>技能</span></div>
+      <div class="stat"><b>${floor.production ? Math.ceil(floor.production.remaining) + "s" : "就绪"}</b><span>补货</span></div>
+      ${isFoodRushFloorType(floor.type) ? `<div class="stat"><b>${foodRushActive ? Math.ceil(floor.foodRush.remaining) + "s" : foodRushCooldownValue ? foodRushCooldownValue + "s" : "就绪"}</b><span>高峰</span></div><div class="stat"><b>${foodRushPaceValue}</b><span>节奏</span></div><div class="stat"><b>${foodRushHeatValue}</b><span>忙场</span></div><div class="stat"><b>${foodRushServedValue}</b><span>上菜</span></div>` : ""}
+      ${floor.type === "market" ? `<div class="stat"><b>${state.orders.length}/${orderCapacity(state)}</b><span>订单栏</span></div><div class="stat"><b>${marketCooldown ? marketCooldown + "s" : "就绪"}</b><span>撮合</span></div>` : ""}
+      ${floor.type === "library" ? `<div class="stat"><b>${catalog.completed}/${COLLECTION_DEFS.length}</b><span>图鉴</span></div><div class="stat"><b>${libraryCooldown ? libraryCooldown + "s" : "就绪"}</b><span>编目</span></div>` : ""}
+      ${isComfortFloorType(floor.type) ? `<div class="stat"><b>${comfortActive ? Math.ceil(floor.comfortSession.remaining) + "s" : comfortCooldown ? comfortCooldown + "s" : "就绪"}</b><span>休整</span></div>` : ""}
+      ${isShowtimeFloorType(floor.type) ? `<div class="stat"><b>${showtimeActive ? Math.ceil(floor.showtime.remaining) + "s" : showtimeCooldownValue ? showtimeCooldownValue + "s" : "就绪"}</b><span>演出</span></div><div class="stat"><b>${showtimeBeatValue}</b><span>段落</span></div><div class="stat"><b>${showtimeHeatValue}</b><span>热度</span></div><div class="stat"><b>${state.stats.entertainmentShowsDone || 0}/${state.stats.showtimeReactionsDone || 0}</b><span>小剧/反应</span></div>` : ""}
+    </div>
+    ${renderFloorPerks(floor)}
+    ${renderFoodRushPanel(floor)}
+    ${renderComfortSessionPanel(floor)}
+    ${renderShowtimePanel(floor)}
+    ${renderResidentList(workers, floor.type)}
+    <div class="detail-actions">
+      <button class="detail-btn primary" data-action="stock" data-floor-id="${floor.id}">补货</button>
+      ${isFoodRushFloorType(floor.type) ? `<button class="detail-btn" data-action="food-rush" data-floor-id="${floor.id}" title="${escapeAttr(foodRushReason || "组织饥饿居民入座并完成一轮忙碌上菜")}" ${foodRushReason ? "disabled" : ""}>${FOOD_RUSH_ACTIONS[floor.type] || "组织用餐高峰"}</button>` : ""}
+      ${floor.type === "market" ? `<button class="detail-btn" data-action="market-deal" data-floor-id="${floor.id}" ${marketCooldown || !floor.workers.length || floor.stock <= 0 || state.orders.length >= orderCapacity(state) ? "disabled" : ""}>撮合订单</button>` : ""}
+      ${floor.type === "library" ? `<button class="detail-btn" data-action="library-study" data-floor-id="${floor.id}" ${libraryCooldown || !floor.workers.length || floor.stock <= 0 ? "disabled" : ""}>整理典藏</button>` : ""}
+      ${isShowtimeFloorType(floor.type) ? `<button class="detail-btn" data-action="entertainment-show" data-floor-id="${floor.id}" title="${escapeAttr(showtimeReason || "组织演员与观众开演")}" ${showtimeReason ? "disabled" : ""}>${SHOWTIME_ACTIONS[floor.type] || "排演"}</button>` : ""}
+      ${isComfortFloorType(floor.type) ? `<button class="detail-btn" data-action="comfort-session" data-floor-id="${floor.id}" title="${escapeAttr(comfortReason || "组织居民结伴休整")}" ${comfortReason ? "disabled" : ""}>${COMFORT_SESSION_ACTIONS[floor.type] || "组织休整"}</button>` : ""}
+      <button class="detail-btn" data-action="hire" data-floor-id="${floor.id}">雇佣</button>
+      <button class="detail-btn" data-action="upgrade-floor" data-floor-id="${floor.id}">升级 ${floorUpgradeCost(floor)}</button>
+      <button class="detail-btn" data-action="speed" data-floor-id="${floor.id}">加速</button>
+      <button class="detail-btn" data-action="open-build">建设</button>
+    </div>`;
+}
+
+function renderFloorPerks(floor) {
+  const perks = [];
+  if (floor.type === "lobby") {
+    perks.push(`入口调度 +${Math.round(lobbyDispatchBonus(state) * 100)}%`);
+    perks.push(elevatorIsMaxed() ? "满级直达接待" : "访客节奏优化");
+  } else if (floor.type === "dwelling") {
+    perks.push(`远行整备 +${Math.round(dwellingJourneyBonus(state) * 100)}%`);
+    perks.push(`租金回响 +${Math.round(dwellingJourneyBonus(state) * 30)}%`);
+  } else if (!isBusiness(floor)) {
+    return "";
+  } else if (floor.type === "food") {
+    perks.push(`快乐暖意 +${Math.round(foodWarmthBonus(state) * 55)}%`);
+    perks.push(`探险补给 +${Math.round(foodWarmthBonus(state) * 22)}%`);
+    perks.push(`高峰 ${state.stats.foodRushesDone || 0}`);
+    perks.push(`上菜 ${state.stats.foodServingsDone || 0}`);
+    if (isActiveFoodRush(floor)) perks.push(`${currentFoodRushPace(floor).label}忙场 ${Math.round(floor.foodRush.heat || 0)}%`);
+  } else if (floor.type === "craft") {
+    perks.push(`工具链 +${Math.round(craftToolBonus(state) * 100)}%`);
+    perks.push(`补货省耗 +${Math.round(Math.min(0.2, craftToolBonus(state) * 0.42) * 100)}%`);
+    perks.push(`探险装备 +${Math.round(craftToolBonus(state) * 24)}%`);
+  } else if (floor.type === "market") {
+    perks.push(`订单 +${Math.round((orderNetworkBonus(state) - 1) * 100)}%`);
+    perks.push(`容量 ${state.orders.length}/${orderCapacity(state)}`);
+    perks.push(`销售 +${Math.round((businessIncomeMultiplier(floor, state) - 1) * 100)}%`);
+  } else if (floor.type === "library") {
+    const next = nextCollectionItem(state);
+    perks.push(`探险碎片 +${Math.round(libraryResearchBonus(state) * 100)}%`);
+    perks.push(`典藏订单 +${Math.round((collectionOrderBonus(state) - 1) * 100)}%`);
+    perks.push(`整理 ${state.stats.libraryStudiesDone || 0}`);
+    if (next) perks.push(`下枚 ${next.name}`);
+  } else if (floor.type === "kingdom") {
+    perks.push(`王令订单 +${Math.round(kingdomMandateBonus(state) * 55)}%`);
+    perks.push(`全城声望 +${Math.round(kingdomMandateBonus(state) * 100)}%`);
+  } else if (floor.type === "garden") {
+    perks.push("快乐缓慢恢复");
+    perks.push(`贵客 +${Math.round(gardenComfortBonus(state) * 36)}%`);
+    perks.push(`休整 ${state.stats.comfortSessionsDone || 0}`);
+  } else if (floor.type === "entertainment") {
+    perks.push("快乐稳定恢复");
+    perks.push(`掌声奖励 +${Math.round(entertainmentJoyBonus(state) * 55)}%`);
+    perks.push(`小剧 ${state.stats.entertainmentShowsDone || 0}`);
+    perks.push(`现场反应 ${state.stats.showtimeReactionsDone || 0}`);
+    if (isActiveShowtime(floor)) perks.push(`${currentShowtimeBeat(floor).label}热度 ${Math.round(floor.showtime.heat || 0)}%`);
+  } else if (floor.type === "service") {
+    perks.push(`排队缓冲 +${Math.round(serviceCareBonus(state) * 90)}%`);
+    perks.push(`到站接待 +${Math.round(serviceCareBonus(state) * 55)}%`);
+  } else if (floor.type === "observatory") {
+    perks.push(`探险收益 +${Math.round(observatoryStarBonus(state) * 55)}%`);
+    perks.push(`宝石概率 +${Math.round(observatoryStarBonus(state) * 35)}%`);
+  } else if (floor.type === "skyport") {
+    perks.push(`访客节奏 +${Math.round(skyportFlowBonus(state) * 185)}%`);
+    perks.push(`订单/探险 +${Math.round(skyportFlowBonus(state) * 42)}%`);
+  } else if (floor.type === "festival") {
+    perks.push(`连送奖励 +${Math.round(festivalBuzzBonus(state) * 90)}%`);
+    perks.push(`贵客热度 +${Math.round(festivalBuzzBonus(state) * 30)}%`);
+  } else if (floor.type === "bathhouse") {
+    perks.push(`补货加速 +${Math.round(bathhouseRestBonus(state) * 42)}%`);
+    perks.push(`休整回租 +${Math.round(bathhouseRestBonus(state) * 26)}%`);
+    perks.push(`休整 ${state.stats.comfortSessionsDone || 0}`);
+  } else if (floor.type === "clinic") {
+    perks.push(`容错护理 +${Math.round(clinicCareBonus(state) * 100)}%`);
+    perks.push(`情绪修复 +${Math.round(clinicCareBonus(state) * 42)}%`);
+  } else if (floor.type === "clockwork") {
+    perks.push(`全城节奏 +${Math.round(clockworkTempoBonus(state) * 100)}%`);
+    perks.push(`施工/补货 +${Math.round(clockworkTempoBonus(state) * 36)}%`);
+  } else if (floor.type === "aquarium") {
+    perks.push(`贵客惊喜 +${Math.round(aquariumWonderBonus(state) * 44)}%`);
+    perks.push(`探险观光 +${Math.round(aquariumWonderBonus(state) * 28)}%`);
+  } else if (floor.type === "alchemy") {
+    perks.push(`药剂线索 +${Math.round(alchemyPotionBonus(state) * 100)}%`);
+    perks.push(`订单溢价 +${Math.round(alchemyPotionBonus(state) * 36)}%`);
+  } else if (floor.type === "training") {
+    perks.push(`接待韧性 +${Math.round(trainingDrillBonus(state) * 100)}%`);
+    perks.push(`贵客演练 +${Math.round(trainingDrillBonus(state) * 28)}%`);
+  } else if (floor.type === "treasure") {
+    perks.push(`王室奖赏 +${Math.round(treasureVaultBonus(state) * 100)}%`);
+    perks.push(`藏品溢价 +${Math.round(treasureVaultBonus(state) * 34)}%`);
+  }
+  if (!perks.length) return "";
+  return `<div class="detail-perks">${perks.map((text) => `<span class="perk">${escapeHtml(text)}</span>`).join("")}</div>`;
 }
 
 function renderResidentList(residents, skillType = null) {
@@ -5856,6 +6533,9 @@ function bindEvents() {
         break;
       case "library-study":
         startLibraryStudy(floorId);
+        break;
+      case "food-rush":
+        startFoodRush(floorId);
         break;
       case "comfort-session":
         startComfortSession(floorId);

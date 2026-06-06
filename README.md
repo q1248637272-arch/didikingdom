@@ -41,6 +41,13 @@ http://127.0.0.1:8806
 - v54 进行了轻量化清理：发布包移除了已被新版替代的旧房间图和旧表演者 PNG，表演者素材改为无损 WebP；发布运行目录只保留当前必要资产，本地旧浏览器配置、旧截图、图像中间产物和过期生成记录已清理。
 - v55 深化了旧演艺玩法：新增小剧任务、演出冷却、观众需求撮合、掌声金币奖励和娱乐/社交恢复，并保留 `docs/v55-entertainment-showtime-image-prompt.txt` 供后续图像网关恢复后刷新演艺房间背景。
 
+## v57 Update
+
+- v57 deepens the old food floor with an active `餐桌高峰` loop.
+- Food floors can now organize a dining rush that pulls hungry residents into visible table service, tracks pace/heat/servings, and pays out through staged meal income.
+- The food detail panel, room state tag, floor data attributes, and mobile layout now expose `food-rush-panel`, `data-food-rush-pace`, and `data-food-rush-heat` so the old room reads as a live busy space instead of a passive stock bar.
+- Local verification for this pass used `http://127.0.0.1:8807/` with `tmp/verify-v57-food-rush.mjs`.
+
 ## Cloudflare Pages
 
 项目是纯静态文件，可直接部署到 Cloudflare Pages。当前已包含：

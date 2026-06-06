@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v56`
-- Latest preview deployment: `https://385344ad.little-depths.pages.dev/`
-- Local server used for v56 verification: `http://127.0.0.1:8806/`
+- Latest deployed version: `v57`
+- Latest preview deployment: `https://17dab29c.little-depths.pages.dev/`
+- Local server used for v57 verification: `http://127.0.0.1:8807/`
 
 ## Current State
 
@@ -22,11 +22,20 @@ wrangler pages deploy dist --project-name little-depths
 ```
 
 - GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`, but current release practice is to deploy Cloudflare with local Wrangler OAuth from `dist`, then sync GitHub separately. Use `[skip ci]` when pushing documentation/code sync commits that should not ask GitHub Actions to deploy Cloudflare.
-- Current caveat: v56 was deployed successfully with local Wrangler OAuth. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
+- Current caveat: v57 was deployed successfully with local Wrangler OAuth. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v57 Food Floor Dining Rush
+
+- Deepened the old food floor instead of adding a new room: food floors can now trigger an active `餐桌高峰`, turning the old warmth bonus into a readable service event.
+- Added `FOOD_RUSH_FLOOR_TYPES`, `FOOD_RUSH_LABELS`, `FOOD_RUSH_ACTIONS`, `FOOD_RUSH_PACES`, `foodRushesDone`, `foodServingsDone`, `foodRushCooldown`, `foodRush`, `startFoodRush()`, `updateFoodRushFloor()`, `renderFoodRushPanel()`, and `foodRushMapKey()`.
+- Dining rushes now pull hungry/social residents into the room through `lifeVisit.reason === "foodRush"`, seat them in visible table scenes, pulse staged serving rounds, and pay out interim tips plus a closing bonus.
+- Food floors now expose active room state through `.floor.food-rush-active`, `data-food-rush-pace`, `data-food-rush-heat`, `data-state="meal-rush"`, a dedicated food-rush panel, and stronger warm/peak lighting so the room reads as a live rush instead of a static stock room.
+- `foodWarmthBonus()` now scales with active dining-rush practice, so the old food loop feeds visitor pacing, expedition support, and stock prep more visibly over time.
+- Added the `餐桌高峰` quest keyed to `foodRushesDone`, bumped the save version to `12`, bumped `index.html` and `sw.js` to v57, synced `dist`, rebuilt `cloudflare-pages-upload.zip`, verified with `tmp/verify-v57-food-rush.mjs`, and deployed with local Wrangler direct upload.
 
 ### v56 Entertainment Live Showtime
 
@@ -180,6 +189,24 @@ wrangler pages deploy dist --project-name little-depths
 - Elevator passenger delivery now includes real waiting/door time before the visitor exits from the destination side.
 
 ## Verification Already Done
+
+- Bundled runtime syntax checks:
+  - `node --check app.js`
+  - `node --check dist/app.js`
+  - `node --check sw.js`
+  - `node --check dist/sw.js`
+  - `node --check tmp/verify-v57-food-rush.mjs`
+- Local v57 Edge CDP verification at `http://127.0.0.1:8807/?v57-food-rush=1`:
+  - Desktop screenshot: `verification-v57-food-rush-local.png`
+  - Mobile screenshot: `verification-v57-food-rush-mobile-local.png`
+  - `tmp/verify-v57-food-rush.mjs` starts a local static server, seeds a staffed food floor plus hungry residents, starts a dining rush, and checks desktop/mobile UI plus runtime errors.
+  - Assertions confirmed save version `12`, `app.js?v=57`, `overrides.css?v=57`, `little-depths-v57`, active `.floor.food-rush-active` / `.food-rush-panel`, `data-food-rush-pace`, `data-food-rush-heat`, `data-state="meal-rush"`, served rounds, pulled-in diners, mobile drawer visibility, and zero runtime errors.
+- Production and preview v57 checks confirmed on `https://little-depths.pages.dev/` and `https://17dab29c.little-depths.pages.dev/`:
+  - Both deployments load `app.js?v=57` and `overrides.css?v=57`
+  - Both `sw.js` files use `little-depths-v57`
+  - Both `app.js?v=57` files contain `startFoodRush`, `foodRushParticipants`, and `foodServingsDone`
+  - Both `overrides.css?v=57` files contain `food-rush-panel` and `data-food-rush-pace`
+- Deployment note: direct `wrangler.cmd` can still hit `Access is denied`; the successful command was the bundled Node runtime running `node_modules\\wrangler\\bin\\wrangler.js pages deploy dist --project-name little-depths`.
 
 - Bundled runtime syntax checks:
   - `node --check app.js`
@@ -462,8 +489,8 @@ wrangler pages deploy dist --project-name little-depths
 继续开发 C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4 里的迪迪王国项目。
 
 线上地址：https://little-depths.pages.dev/
-最新部署版本：v56
-最新预览：https://385344ad.little-depths.pages.dev/
+最新部署版本：v57
+最新预览：https://17dab29c.little-depths.pages.dev/
 交接文档：docs/HANDOFF.md
 
 请先读取项目代码、README.md、docs/HANDOFF.md 和最近状态，再继续优化。方向：从游戏内容、玩法、画面、图像质量等层面更新迭代，不只新增内容，也要把旧楼层和旧系统做得更好。涉及图像绘制时使用 gpt-image-2；如果网关不可用，不要写入或打印密钥，改为保存可直接用于网页端生成的提示词。
