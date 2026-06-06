@@ -8,7 +8,7 @@ Use this file when starting a new Codex conversation for this project.
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
 - Latest deployed version: `v55`
-- Latest preview deployment: `https://3dd18d7f.little-depths.pages.dev/`
+- Latest preview deployment: `https://08af18f8.little-depths.pages.dev/`
 - Local server used for v55 verification: `http://127.0.0.1:8805/`
 
 ## Current State
@@ -22,6 +22,7 @@ wrangler pages deploy dist --project-name little-depths
 ```
 
 - GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`; pushes to `main` deploy `dist` through Wrangler using repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+- Current caveat: the v55 push reached GitHub, but the GitHub Actions deploy failed because the repository Cloudflare token secret is invalid or under-permissioned (`Authentication error [code: 10000]`, `Invalid access token [code: 9109]`). v55 was deployed successfully with local Wrangler OAuth instead. Refresh `CLOUDFLARE_API_TOKEN` before relying on automatic push deploys again.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
 - Git is not currently available in PATH in this environment.
 
@@ -181,6 +182,12 @@ wrangler pages deploy dist --project-name little-depths
   - Mobile screenshot: `verification-v55-showtime-mobile-local.png`
   - `tmp/verify-v55-showtime.mjs` starts a local static server, seeds 10 residents, prepares an entertainment floor with performers and props, starts a showtime event, captures desktop/mobile screenshots, and checks the mobile bottom drawer plus tab switching.
   - Assertions confirmed save version `10`, `app.js?v=55`, `overrides.css?v=55`, `little-depths-v55`, active showtime, stock consumption, cooldown, applause reward, showtime audience visits, performer actions, `.showtime-panel.active`, `.floor.showtime-active`, `data-state="showtime"`, mobile drawer visibility, one active mobile panel, and zero runtime errors.
+- GitHub and Cloudflare v55 checks:
+  - GitHub commit: `7d48cd2 Add entertainment showtime v55`.
+  - GitHub Actions run `27058897519` failed only at the Cloudflare deploy step due to an invalid/under-permissioned `CLOUDFLARE_API_TOKEN` secret; `npm ci` succeeded.
+  - Local Wrangler OAuth deploy from `dist` succeeded and produced `https://08af18f8.little-depths.pages.dev/`.
+  - Production `https://little-depths.pages.dev/` and preview `https://08af18f8.little-depths.pages.dev/` both load `styles.css?v=55`, `overrides.css?v=55`, `app.js?v=55`, and `little-depths-v55` in `sw.js`.
+  - Production `app.js?v=55` contains `startEntertainmentShow`, `entertainmentShowsDone`, `showtimeMapKey`, and `curtain_call`; production `overrides.css?v=55` contains `showtime-panel`, `showtime-stage-glow`, and `showtime-active`.
 
 - Bundled runtime syntax checks:
   - `node --check app.js`
@@ -416,7 +423,7 @@ wrangler pages deploy dist --project-name little-depths
   - sync changed files to `dist`
   - run syntax checks
   - verify local browser
-  - deploy with Wrangler
+  - deploy with Wrangler or verify GitHub Actions succeeds
   - verify production and preview URLs
 
 ## New Chat Starter Prompt
@@ -426,7 +433,7 @@ wrangler pages deploy dist --project-name little-depths
 
 线上地址：https://little-depths.pages.dev/
 最新部署版本：v55
-最新预览：https://3dd18d7f.little-depths.pages.dev/
+最新预览：https://08af18f8.little-depths.pages.dev/
 交接文档：docs/HANDOFF.md
 
 请先读取项目代码、README.md、docs/HANDOFF.md 和最近状态，再继续优化。方向：从游戏内容、玩法、画面、图像质量等层面更新迭代，不只新增内容，也要把旧楼层和旧系统做得更好。涉及图像绘制时使用 gpt-image-2；如果网关不可用，不要写入或打印密钥，改为保存可直接用于网页端生成的提示词。
