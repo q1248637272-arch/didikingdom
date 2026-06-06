@@ -361,6 +361,14 @@ const COMFORT_SESSION_ACTIONS = {
   garden: "组织茶会",
   bathhouse: "安排休整",
 };
+const SHOWTIME_FLOOR_TYPES = ["entertainment"];
+const SHOWTIME_LABELS = {
+  entertainment: "烛光小剧",
+};
+const SHOWTIME_ACTIONS = {
+  entertainment: "排演小剧",
+};
+const SHOWTIME_NEEDS = ["entertainment", "social"];
 const PERSON_ROOM_SPOTS = {
   default: [
     { id: "door", x: 18, y: 12, scale: 0.94, activities: ["stroll", "wait", "serve"] },
@@ -648,6 +656,14 @@ const QUEST_DEFS = [
     text: "建成 1 层演艺楼层",
   },
   {
+    id: "curtain_call",
+    title: "谢幕掌声",
+    goal: 3,
+    metric: "entertainmentShowsDone",
+    reward: { coins: 520, gems: 3 },
+    text: "用演艺楼层排演 3 场小剧",
+  },
+  {
     id: "builders",
     title: "双向扩建",
     goal: 2,
@@ -860,7 +876,7 @@ let guideReady = false;
 
 function makeNewGame() {
   const game = {
-    version: 9,
+    version: 10,
     coins: 560,
     gems: 7,
     happiness: 72,
@@ -905,6 +921,7 @@ function makeNewGame() {
       marketDealsDone: 0,
       libraryStudiesDone: 0,
       comfortSessionsDone: 0,
+      entertainmentShowsDone: 0,
       entertainmentFloorsBuilt: 0,
       marketFloorsBuilt: 0,
       libraryFloorsBuilt: 0,
@@ -981,6 +998,8 @@ function createFloor(game, type, options = {}) {
     libraryCooldown: type === "library" ? 0 : undefined,
     comfortCooldown: isComfortFloorType(type) ? 0 : undefined,
     comfortSession: isComfortFloorType(type) ? null : undefined,
+    showtimeCooldown: isShowtimeFloorType(type) ? 0 : undefined,
+    showtime: isShowtimeFloorType(type) ? null : undefined,
   };
 }
 
@@ -1036,6 +1055,8 @@ function finalizeConstruction(floor) {
     libraryCooldown: floor.type === "library" ? 0 : undefined,
     comfortCooldown: isComfortFloorType(floor.type) ? 0 : undefined,
     comfortSession: isComfortFloorType(floor.type) ? null : undefined,
+    showtimeCooldown: isShowtimeFloorType(floor.type) ? 0 : undefined,
+    showtime: isShowtimeFloorType(floor.type) ? null : undefined,
     rentReady: 0,
     bonus: 0,
   };
@@ -1262,6 +1283,7 @@ function migrateGame(game) {
     marketDealsDone: 0,
     libraryStudiesDone: 0,
     comfortSessionsDone: 0,
+    entertainmentShowsDone: 0,
     entertainmentFloorsBuilt: 0,
     marketFloorsBuilt: 0,
     libraryFloorsBuilt: 0,
@@ -1274,7 +1296,7 @@ function migrateGame(game) {
     aquariumFloorsBuilt: 0,
     festivalFloorsBuilt: 0,
   };
-  game.version = Math.max(Number(game.version) || 0, 9);
+  game.version = Math.max(Number(game.version) || 0, 10);
   game.nextExpeditionId ||= 1;
   game.quests ||= QUEST_DEFS.map((quest) => ({ id: quest.id, claimed: false }));
   game.stats ||= {};
@@ -1364,6 +1386,20 @@ function migrateGame(game) {
                 total: Math.max(1, Number(floor.comfortSession.total) || Number(floor.comfortSession.remaining) || 1),
                 participantIds: Array.isArray(floor.comfortSession.participantIds)
                   ? floor.comfortSession.participantIds.map(Number).filter(Boolean)
+                  : [],
+              }
+            : null;
+      }
+      if (isShowtimeFloorType(floor.type)) {
+        floor.showtimeCooldown = Math.max(0, Number(floor.showtimeCooldown) || 0);
+        floor.showtime =
+          floor.showtime && typeof floor.showtime === "object" && Number(floor.showtime.remaining) > 0
+            ? {
+                ...floor.showtime,
+                remaining: Math.max(0, Number(floor.showtime.remaining) || 0),
+                total: Math.max(1, Number(floor.showtime.total) || Number(floor.showtime.remaining) || 1),
+                participantIds: Array.isArray(floor.showtime.participantIds)
+                  ? floor.showtime.participantIds.map(Number).filter(Boolean)
                   : [],
               }
             : null;
@@ -1546,9 +1582,9 @@ function updateLifeVisits(dt) {
       person.lifeWish = lifeVisitProgressLabel(person);
       const targetValue = Number(person.motives?.[visit.need] || 0);
       const elapsed = Number(visit.total || 0) - Number(visit.remaining || 0);
-      const minimumStay = Number(visit.minStay || 0) || (visit.reason === "companion" ? 6 : visit.reason === "comfort" ? 10 : 0);
+      const minimumStay = Number(visit.minStay || 0) || (visit.reason === "showtime" ? 20 : visit.reason === "companion" ? 6 : visit.reason === "comfort" ? 10 : 0);
       const minimumStayDone = elapsed > minimumStay;
-      const targetGoal = Number(visit.targetGoal || 0) || (visit.reason === "companion" ? 86 : visit.reason === "comfort" ? 88 : 78);
+      const targetGoal = Number(visit.targetGoal || 0) || (visit.reason === "showtime" ? 96 : visit.reason === "companion" ? 86 : visit.reason === "comfort" ? 88 : 78);
       if ((targetValue >= targetGoal && minimumStayDone) || visit.remaining <= 0) {
         changed = endLifeVisit(person) || changed;
       }
@@ -2401,6 +2437,9 @@ function updateTimers(dt) {
     if (floor.type === "library") {
       floor.libraryCooldown = Math.max(0, (floor.libraryCooldown || 0) - dt * (1 + clockworkTempoBonus(state) * 0.18));
     }
+    if (isShowtimeFloorType(floor.type) && updateShowtimeFloor(floor, dt)) {
+      lastKingdomKey = "";
+    }
     if (isComfortFloorType(floor.type) && updateComfortFloor(floor, dt)) {
       lastKingdomKey = "";
     }
@@ -2746,6 +2785,194 @@ function comfortSessionBonus(game = state) {
   return Math.min(0.1, (game.stats?.comfortSessionsDone || 0) * 0.0035);
 }
 
+function isShowtimeFloorType(type) {
+  return SHOWTIME_FLOOR_TYPES.includes(type);
+}
+
+function isActiveShowtime(floor) {
+  return Boolean(isShowtimeFloorType(floor?.type) && floor.showtime && Number(floor.showtime.remaining) > 0);
+}
+
+function showtimePracticeBonus(game = state) {
+  return Math.min(0.12, (game.stats?.entertainmentShowsDone || 0) * 0.004);
+}
+
+function activeShowtimeBonus(game = state) {
+  return businessFloors(game).some((floor) => isActiveShowtime(floor)) ? 0.035 : 0;
+}
+
+function showtimeCooldown(floor) {
+  const skill = averageSkill(floor.workers || [], floor.type);
+  return Math.max(24, Math.round(62 - skill * 2.25 - entertainmentJoyBonus(state) * 34 - clockworkTempoBonus(state) * 7));
+}
+
+function showtimeAudienceCandidates(floor) {
+  if (!isShowtimeFloorType(floor?.type)) return [];
+  const performers = new Set(floor.workers || []);
+  return allResidents(state)
+    .filter((person) => person && !performers.has(person.id) && !person.expeditionId && !isActiveLifeVisit(person))
+    .map((person) => {
+      ensurePersonLife(person);
+      const currentFloor = currentFloorForPerson(person);
+      const entertainmentNeed = personNeedUrgency(person, "entertainment") * 1.75;
+      const socialNeed = personNeedUrgency(person, "social") * 0.9;
+      const favorite = (person.favoriteTypes || []).includes("entertainment") ? 0.5 : 0;
+      const dream = person.dreamType === "entertainment" || person.dreamType === "festival" ? 0.38 : 0;
+      const familiarCast = (floor.workers || []).reduce((sum, id) => {
+        const worker = getResident(id);
+        return sum + (worker ? relationshipScore(person, worker) / 95 : 0);
+      }, 0);
+      const near = currentFloor ? Math.max(0, 0.42 - Math.abs(Number(currentFloor.id) - Number(floor.id)) * 0.045) : 0;
+      const mood = personMotiveMood(person);
+      const moodNeed = mood === "strained" ? 0.42 : mood === "seeking" ? 0.24 : 0;
+      return { person, score: entertainmentNeed + socialNeed + favorite + dream + familiarCast + near + moodNeed + Math.random() * 0.18 };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.person);
+}
+
+function showtimeActionBlockReason(floor) {
+  if (!isShowtimeFloorType(floor?.type)) return "这个楼层不能排演";
+  if (!floor.workers?.length) return "演艺楼层需要演员";
+  if ((floor.stock || 0) <= 0) return "剧场道具不足，先补货";
+  if (isActiveShowtime(floor)) return "小剧正在演出";
+  if ((floor.showtimeCooldown || 0) > 0) return `还要 ${Math.ceil(floor.showtimeCooldown)}s 才能再次开演`;
+  if (!showtimeAudienceCandidates(floor).length) return "暂时没有观众有空";
+  return "";
+}
+
+function applyShowtimeMotiveBurst(floor, person, scale = 1) {
+  boostPersonMotive(person, "entertainment", 13 * scale);
+  boostPersonMotive(person, "social", 7 * scale);
+  boostPersonMotive(person, "energy", 2 * scale);
+  if (floor.stock > 0) boostPersonMotive(person, "food", 2 * scale);
+}
+
+function showtimeAudience(floor) {
+  if (!isActiveShowtime(floor)) return [];
+  const sessionId = floor.showtime.id;
+  return allResidents(state).filter((person) => {
+    return person?.lifeVisit?.reason === "showtime" && person.lifeVisit.sessionId === sessionId && Number(person.lifeVisit.floorId) === Number(floor.id);
+  });
+}
+
+function startEntertainmentShow(floorId) {
+  const floor = findFloor(floorId);
+  if (!isBusiness(floor) || !isShowtimeFloorType(floor.type)) return;
+  const reason = showtimeActionBlockReason(floor);
+  if (reason) {
+    showToast(reason);
+    return;
+  }
+  const skill = averageSkill(floor.workers || [], floor.type);
+  const capacity = clamp(2 + (floor.level || 1) + Math.floor(skill / 4), 2, 6);
+  const audience = showtimeAudienceCandidates(floor).slice(0, Math.min(capacity, Math.max(1, (floor.stock || 0) * 4)));
+  if (!audience.length) {
+    showToast("暂时没有观众有空");
+    return;
+  }
+  const stockCost = Math.min(floor.stock || 0, Math.max(1, Math.ceil(audience.length / 3)));
+  const label = SHOWTIME_LABELS[floor.type] || "小剧";
+  const sessionId = `showtime-${floor.id}-${Date.now()}-${randInt(10, 99)}`;
+  const duration = randFloat(34, 48);
+  floor.stock = Math.max(0, (floor.stock || 0) - stockCost);
+  floor.showtimeCooldown = showtimeCooldown(floor);
+  floor.showtime = {
+    id: sessionId,
+    label,
+    remaining: duration,
+    total: duration,
+    participantIds: audience.map((person) => person.id),
+    applause: 0,
+  };
+  const cast = (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
+  cast.forEach((performer, index) => {
+    endSocialForPerson(performer);
+    performer.need = "entertainment";
+    performer.activity = index % 2 ? "wave" : "dance";
+    performer.activityTimer = Math.max(performer.activityTimer || 0, duration);
+    performer.activityLane = "c";
+    assignPersonMotion(performer, floor.type, performer.activity);
+    boostPersonMotive(performer, "entertainment", 5);
+  });
+  audience.forEach((person, index) => {
+    startLifeVisit(person, floor, "entertainment", {
+      allowCompanion: false,
+      label: `看${label}`,
+      reason: "showtime",
+      duration: duration + randFloat(-3, 4),
+      minStay: Math.max(18, duration * 0.62),
+      targetGoal: 96,
+      sessionId,
+    });
+    person.activity = index % 3 === 0 ? "applaud" : "watch";
+    person.activityTimer = Math.max(person.activityTimer || 0, duration);
+    assignPersonMotion(person, floor.type, person.activity);
+    applyShowtimeMotiveBurst(floor, person, 1);
+  });
+  cast.slice(0, audience.length).forEach((performer, index) => {
+    const watcher = audience[index];
+    if (!watcher) return;
+    const scene = SOCIAL_SCENES.entertainment[index % 2] || SOCIAL_SCENES.entertainment[0];
+    applySocialScene(performer, watcher, scene, `showtime-${floor.id}-${performer.id}-${watcher.id}-${Date.now()}`, Math.min(duration, randFloat(14, 20)), floor.type, floorSocialScope(floor));
+  });
+  const applause = Math.round((18 + audience.length * 8 + skill * 2.4) * (1 + showtimePracticeBonus(state) + festivalBuzzBonus(state) * 0.22));
+  floor.showtime.applause = applause;
+  addCoins(applause);
+  state.stats.entertainmentShowsDone = (state.stats.entertainmentShowsDone || 0) + 1;
+  state.happiness = clamp(state.happiness + Math.min(6, 2 + Math.ceil(audience.length / 2)), 0, 100);
+  const names = audience.map((person) => person.name).slice(0, 3).join("、");
+  const extra = audience.length > 3 ? `等 ${audience.length} 人` : "";
+  showToast(`${label}开演：${audience.length} 位观众`);
+  addLog(`${floor.name} 排演${label}，${names}${extra}入座喝彩，消耗 ${stockCost} 份道具，收获 ${applause} 金币。`);
+  lastKingdomKey = "";
+  render(true);
+}
+
+function updateShowtimeFloor(floor, dt) {
+  if (!isShowtimeFloorType(floor?.type)) return false;
+  const before = `${Math.ceil(floor.showtimeCooldown || 0)}:${Math.ceil(floor.showtime?.remaining || 0)}`;
+  floor.showtimeCooldown = Math.max(0, (floor.showtimeCooldown || 0) - dt * (1 + clockworkTempoBonus(state) * 0.18));
+  if (!isActiveShowtime(floor)) return before !== `${Math.ceil(floor.showtimeCooldown || 0)}:0`;
+  floor.showtime.remaining = Math.max(0, Number(floor.showtime.remaining || 0) - dt);
+  const audience = showtimeAudience(floor);
+  floor.showtime.participantIds = audience.map((person) => person.id);
+  audience.forEach((person) => applyShowtimeMotiveBurst(floor, person, dt * 0.06));
+  const cast = (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
+  cast.forEach((person) => boostPersonMotive(person, "entertainment", dt * 0.12));
+  if (floor.showtime.remaining <= 0 || !audience.length) {
+    const label = SHOWTIME_LABELS[floor.type] || "小剧";
+    floor.showtime = null;
+    if (audience.length) addLog(`${floor.name} 的${label}谢幕，观众带着笑声离场。`);
+  }
+  return before !== `${Math.ceil(floor.showtimeCooldown || 0)}:${Math.ceil(floor.showtime?.remaining || 0)}`;
+}
+
+function renderShowtimePanel(floor) {
+  if (!isShowtimeFloorType(floor?.type)) return "";
+  const active = isActiveShowtime(floor);
+  const audience = active ? showtimeAudience(floor) : [];
+  const names = audience.length ? audience.map((person) => person.name).slice(0, 4).join("、") : "等待观众入座";
+  const status = active
+    ? `${Math.ceil(floor.showtime.remaining)}s · ${names}`
+    : (floor.showtimeCooldown || 0) > 0
+      ? `冷却 ${Math.ceil(floor.showtimeCooldown)}s`
+      : "就绪";
+  const applause = active && floor.showtime?.applause ? ` · 掌声 ${floor.showtime.applause}` : "";
+  return `
+    <div class="showtime-panel ${active ? "active" : ""}">
+      <strong>${SHOWTIME_LABELS[floor.type] || "小剧"}</strong>
+      <span>${escapeHtml(status)}${applause}</span>
+      <small>恢复娱乐与社交 · 已排演 ${state.stats.entertainmentShowsDone || 0} 场</small>
+    </div>`;
+}
+
+function showtimeMapKey(floor) {
+  if (!isShowtimeFloorType(floor?.type)) return "";
+  const participants = floor.showtime?.participantIds || [];
+  return `showtime:${Math.ceil(floor.showtimeCooldown || 0)}:${Math.ceil(floor.showtime?.remaining || 0)}:${participants.join("-")}:${floor.showtime?.applause || 0}`;
+}
+
 function comfortSessionCooldown(floor) {
   const skill = averageSkill(floor.workers || [], floor.type);
   const roomBonus = floor.type === "garden" ? gardenComfortBonus(state) : bathhouseRestBonus(state);
@@ -3047,7 +3274,7 @@ function festivalBuzzBonus(game = state) {
 }
 
 function entertainmentJoyBonus(game = state) {
-  return Math.min(0.23, floorTypeInfluence(game, "entertainment") * 0.048);
+  return Math.min(0.29, floorTypeInfluence(game, "entertainment") * 0.048 + showtimePracticeBonus(game) + activeShowtimeBonus(game));
 }
 
 function orderNetworkBonus(game = state) {
@@ -3921,7 +4148,7 @@ function getKingdomRenderKey() {
       if (floor.type === "lobby") {
         return `${floor.id}:lobby:${state.queue.map((visitor) => `${visitor.id}:${visitor.need || ""}:${visitor.activity || ""}`).join("-")}:${state.selectedFloorId}`;
       }
-      return `${floor.id}:${floor.type}:${floor.level}:${floor.stock}:${floor.stockMax}:${floor.workers.length}:${Boolean(floor.production)}:${comfortSessionMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
+      return `${floor.id}:${floor.type}:${floor.level}:${floor.stock}:${floor.stockMax}:${floor.workers.length}:${Boolean(floor.production)}:${comfortSessionMapKey(floor)}:${showtimeMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
     })
     .join("|");
   const arrivalKey = (state.arrivals || []).map((arrival) => `${arrival.id}:${arrival.floorId}`).join("-");
@@ -3958,9 +4185,10 @@ function renderFloor(floor) {
   const constructing = floor.status === "construction" ? "constructing" : "";
   const routeClass = floorRouteClass(floor);
   const comfortClass = isActiveComfortSession(floor) ? "comfort-active" : "";
+  const showtimeClass = isActiveShowtime(floor) ? "showtime-active" : "";
   const zone = getFloorZone(floor);
   return `
-    <article class="floor ${selected} ${constructing} ${routeClass} ${comfortClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}">
+    <article class="floor ${selected} ${constructing} ${routeClass} ${comfortClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}">
       ${renderFloorIndex(floor)}
       <div class="room" data-action="select-floor" data-floor-id="${floor.id}" title="${escapeAttr(floorMapLabel(floor))}" aria-label="${escapeAttr(floorMapLabel(floor))}">
         ${floor.status === "construction" ? renderConstruction(floor) : renderOpenFloor(floor)}
@@ -4182,6 +4410,10 @@ function renderRoomStateTag(floor) {
     const label = COMFORT_SESSION_LABELS[floor.type] || "休整";
     return `<span class="room-state-tag good icon-only" data-state="comfort" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"></span>`;
   }
+  if (isActiveShowtime(floor)) {
+    const label = SHOWTIME_LABELS[floor.type] || "小剧";
+    return `<span class="room-state-tag good icon-only" data-state="showtime" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"></span>`;
+  }
   if (floor.type === "lobby") {
     return state.queue.length ? "" : `<span class="room-state-tag calm icon-only" data-state="idle" title="自然待客" aria-label="自然待客"></span>`;
   }
@@ -4226,6 +4458,7 @@ function renderFloorStatusGlyph(floor) {
   if (floor.type === "lobby") stateName = state.queue.length ? "queue" : "idle";
   else if (floor.type === "dwelling") stateName = floor.rentReady ? "rent" : "home";
   else if (isActiveComfortSession(floor)) stateName = "comfort";
+  else if (isActiveShowtime(floor)) stateName = "showtime";
   else if (floor.production) stateName = "stocking";
   else if (floor.stock <= 0) stateName = "soldout";
   else if (!floor.workers.length) stateName = "empty";
@@ -4429,6 +4662,7 @@ function renderFloorStatus(floor) {
   if (floor.type === "lobby") return state.queue.length ? "待接待" : "自然待客";
   if (floor.type === "dwelling") return floor.rentReady ? `租金 ${floor.rentReady}` : "居住";
   if (isActiveComfortSession(floor)) return `${COMFORT_SESSION_LABELS[floor.type] || "休整"} ${Math.ceil(floor.comfortSession.remaining)}s`;
+  if (isActiveShowtime(floor)) return `${SHOWTIME_LABELS[floor.type] || "小剧"} ${Math.ceil(floor.showtime.remaining)}s`;
   if (floor.production) return `补货 ${Math.ceil(floor.production.remaining)}s`;
   if (floor.stock <= 0) return "缺货";
   if (!floor.workers.length) return "缺员工";
@@ -4607,6 +4841,9 @@ function renderFloorDetail() {
   const comfortCooldown = isComfortFloorType(floor.type) ? Math.ceil(floor.comfortCooldown || 0) : 0;
   const comfortActive = isActiveComfortSession(floor);
   const comfortReason = isComfortFloorType(floor.type) ? comfortActionBlockReason(floor) : "";
+  const showtimeCooldownValue = isShowtimeFloorType(floor.type) ? Math.ceil(floor.showtimeCooldown || 0) : 0;
+  const showtimeActive = isActiveShowtime(floor);
+  const showtimeReason = isShowtimeFloorType(floor.type) ? showtimeActionBlockReason(floor) : "";
   const catalog = floor.type === "library" ? collectionProgress(state) : null;
   els.floorDetail.innerHTML = `
     <strong>${escapeHtml(floor.name)}</strong>
@@ -4621,14 +4858,17 @@ function renderFloorDetail() {
       ${floor.type === "market" ? `<div class="stat"><b>${state.orders.length}/${orderCapacity(state)}</b><span>订单栏</span></div><div class="stat"><b>${marketCooldown ? marketCooldown + "s" : "就绪"}</b><span>撮合</span></div>` : ""}
       ${floor.type === "library" ? `<div class="stat"><b>${catalog.completed}/${COLLECTION_DEFS.length}</b><span>图鉴</span></div><div class="stat"><b>${libraryCooldown ? libraryCooldown + "s" : "就绪"}</b><span>编目</span></div>` : ""}
       ${isComfortFloorType(floor.type) ? `<div class="stat"><b>${comfortActive ? Math.ceil(floor.comfortSession.remaining) + "s" : comfortCooldown ? comfortCooldown + "s" : "就绪"}</b><span>休整</span></div>` : ""}
+      ${isShowtimeFloorType(floor.type) ? `<div class="stat"><b>${showtimeActive ? Math.ceil(floor.showtime.remaining) + "s" : showtimeCooldownValue ? showtimeCooldownValue + "s" : "就绪"}</b><span>演出</span></div><div class="stat"><b>${state.stats.entertainmentShowsDone || 0}</b><span>小剧</span></div>` : ""}
     </div>
     ${renderFloorPerks(floor)}
     ${renderComfortSessionPanel(floor)}
+    ${renderShowtimePanel(floor)}
     ${renderResidentList(workers, floor.type)}
     <div class="detail-actions">
       <button class="detail-btn primary" data-action="stock" data-floor-id="${floor.id}">补货</button>
       ${floor.type === "market" ? `<button class="detail-btn" data-action="market-deal" data-floor-id="${floor.id}" ${marketCooldown || !floor.workers.length || floor.stock <= 0 || state.orders.length >= orderCapacity(state) ? "disabled" : ""}>撮合订单</button>` : ""}
       ${floor.type === "library" ? `<button class="detail-btn" data-action="library-study" data-floor-id="${floor.id}" ${libraryCooldown || !floor.workers.length || floor.stock <= 0 ? "disabled" : ""}>整理典藏</button>` : ""}
+      ${isShowtimeFloorType(floor.type) ? `<button class="detail-btn" data-action="entertainment-show" data-floor-id="${floor.id}" title="${escapeAttr(showtimeReason || "组织演员与观众开演")}" ${showtimeReason ? "disabled" : ""}>${SHOWTIME_ACTIONS[floor.type] || "排演"}</button>` : ""}
       ${isComfortFloorType(floor.type) ? `<button class="detail-btn" data-action="comfort-session" data-floor-id="${floor.id}" title="${escapeAttr(comfortReason || "组织居民结伴休整")}" ${comfortReason ? "disabled" : ""}>${COMFORT_SESSION_ACTIONS[floor.type] || "组织休整"}</button>` : ""}
       <button class="detail-btn" data-action="hire" data-floor-id="${floor.id}">雇佣</button>
       <button class="detail-btn" data-action="upgrade-floor" data-floor-id="${floor.id}">升级 ${floorUpgradeCost(floor)}</button>
@@ -4674,6 +4914,8 @@ function renderFloorPerks(floor) {
   } else if (floor.type === "entertainment") {
     perks.push("快乐稳定恢复");
     perks.push(`掌声奖励 +${Math.round(entertainmentJoyBonus(state) * 55)}%`);
+    perks.push(`小剧 ${state.stats.entertainmentShowsDone || 0}`);
+    if (isActiveShowtime(floor)) perks.push("正在开演");
   } else if (floor.type === "service") {
     perks.push(`排队缓冲 +${Math.round(serviceCareBonus(state) * 90)}%`);
     perks.push(`到站接待 +${Math.round(serviceCareBonus(state) * 55)}%`);
@@ -5463,6 +5705,9 @@ function bindEvents() {
         break;
       case "comfort-session":
         startComfortSession(floorId);
+        break;
+      case "entertainment-show":
+        startEntertainmentShow(floorId);
         break;
       case "dispatch-lobby":
         dispatchLobbyVisitor();

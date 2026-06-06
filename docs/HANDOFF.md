@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v54`
+- Latest deployed version: `v55`
 - Latest preview deployment: `https://3dd18d7f.little-depths.pages.dev/`
-- Local server used for v54 verification: `http://127.0.0.1:8804/`
+- Local server used for v55 verification: `http://127.0.0.1:8805/`
 
 ## Current State
 
@@ -26,6 +26,16 @@ wrangler pages deploy dist --project-name little-depths
 - Git is not currently available in PATH in this environment.
 
 ## Latest Completed Work
+
+### v55 Entertainment Showtime
+
+- Deepened the old entertainment floor instead of adding a new floor. Selected entertainment floors can now trigger `排演小剧`, consuming prop stock to assemble residents with entertainment/social needs into a readable audience.
+- Added `SHOWTIME_FLOOR_TYPES`, `SHOWTIME_LABELS`, `SHOWTIME_ACTIONS`, `curtain_call`, `entertainmentShowsDone`, `showtimeCooldown`, `showtime`, `startEntertainmentShow()`, `updateShowtimeFloor()`, `renderShowtimePanel()`, and `showtimeMapKey()`.
+- Showtime now pulls eligible residents into `lifeVisit.reason === "showtime"`, keeps them in the room long enough to watch a meaningful part of the performance, applies entertainment/social motive bursts, and pairs performers with audience members through the existing social-scene system.
+- Entertainment floors now show active stage state through `.floor.showtime-active`, `data-state="showtime"` status glyphs, a showtime detail panel, floor-detail stats, floor perks, performer/audience activity classes, stage glow, and spotlight animation.
+- Added the `谢幕掌声` quest and connected completed shows into `entertainmentJoyBonus()` through practice and active-show bonuses.
+- Bumped the save version to `10`, bumped `index.html` and `sw.js` to v55, synced `dist`, and added `tmp/verify-v55-showtime.mjs`.
+- `gpt-image-2` gateway calls returned path-related 404s during the image attempt, so no new room art was generated in v55. The ready-to-use prompt is tracked at `docs/v55-entertainment-showtime-image-prompt.txt`; current art remains `assets/art/room-entertainment-v2.webp`.
 
 ### v54 Lightweight Cleanup
 
@@ -159,6 +169,18 @@ wrangler pages deploy dist --project-name little-depths
 - Elevator passenger delivery now includes real waiting/door time before the visitor exits from the destination side.
 
 ## Verification Already Done
+
+- Bundled runtime syntax checks:
+  - `node --check app.js`
+  - `node --check dist/app.js`
+  - `node --check sw.js`
+  - `node --check dist/sw.js`
+  - `node --check tmp/verify-v55-showtime.mjs`
+- Local v55 Edge CDP verification at `http://127.0.0.1:8805/?v55-showtime=1`:
+  - Desktop screenshot: `verification-v55-showtime-local.png`
+  - Mobile screenshot: `verification-v55-showtime-mobile-local.png`
+  - `tmp/verify-v55-showtime.mjs` starts a local static server, seeds 10 residents, prepares an entertainment floor with performers and props, starts a showtime event, captures desktop/mobile screenshots, and checks the mobile bottom drawer plus tab switching.
+  - Assertions confirmed save version `10`, `app.js?v=55`, `overrides.css?v=55`, `little-depths-v55`, active showtime, stock consumption, cooldown, applause reward, showtime audience visits, performer actions, `.showtime-panel.active`, `.floor.showtime-active`, `data-state="showtime"`, mobile drawer visibility, one active mobile panel, and zero runtime errors.
 
 - Bundled runtime syntax checks:
   - `node --check app.js`
@@ -373,6 +395,7 @@ wrangler pages deploy dist --project-name little-depths
 - The user wants image work to use `gpt-image-2` through their configured gateway.
 - Read credentials only from `GPT_IMAGE_2_API_KEY`, `GPT_IMAGE_2_BASE_URL`, and `GPT_IMAGE_2_MODEL`.
 - Never print, echo, commit, or store API keys.
+- v55 attempted refreshed entertainment showtime room art, but the configured gateway returned 404 for the Images API paths. No new art was generated; the saved web-ready prompt is `docs/v55-entertainment-showtime-image-prompt.txt`.
 - v54 did not generate new art with `gpt-image-2`; it converted the old `person-performer.png` asset into lossless `assets/art/person-performer.webp`.
 - Current published image assets from prior image work include `room-craft-v2.webp`, `room-dwelling-v3.webp`, `room-market-v2.webp`, `room-library-v2.webp`, `room-garden-v2.webp`, and `room-bathhouse-v2.webp`.
 - Previous `tmp/imagegen` generation images/JSON records and other intermediate image outputs were cleaned during v54 local lightweight cleanup; `tmp/imagegen` is currently empty unless a future run recreates it.
@@ -383,6 +406,7 @@ wrangler pages deploy dist --project-name little-depths
 - Continue improving older floors instead of only adding new floors. Good next targets:
   - `character life`: add visible path/outing traces, short interruptions, and player-readable mini stories now that companions and mobile UI exist.
   - `kingdom`: make royal orders and mandates more physical in the room detail flow.
+  - `food`: deepen dining needs with table rushes, staff serving feedback, and clearer kitchen UI.
   - `garden/bathhouse`: make happiness, rest, rent, and expedition preparation more visible and interactive.
   - `alchemy/training/treasure`: give the late-game floors stronger decision hooks beyond passive bonuses.
   - `market`: add visible small order-parcel motion after a quick order is brokered.
@@ -401,7 +425,7 @@ wrangler pages deploy dist --project-name little-depths
 继续开发 C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4 里的迪迪王国项目。
 
 线上地址：https://little-depths.pages.dev/
-最新部署版本：v54
+最新部署版本：v55
 最新预览：https://3dd18d7f.little-depths.pages.dev/
 交接文档：docs/HANDOFF.md
 
