@@ -1,0 +1,7 @@
+Use case: stylized-concept
+Asset type: browser tower-management game room background, 2:1 wide cutaway room art
+Primary request: Create a refreshed no-text entertainment theater room for Didi Kingdom, replacing the older entertainment floor background.
+Scene/backdrop: cozy fantasy underground kingdom theater room, side-view cutaway, candlelit stage, burgundy curtains, polished wooden stage floor, tiny audience benches in the foreground, lantern strings, puppet props, soft spotlight beams, subtle teal accent lights, warm gold stage glow.
+Composition: wide horizontal 2:1 room background, readable at small mobile size, clear lower-middle floor space for character sprites and UI overlays, important stage detail kept away from the very bottom edge, no hard crop of the room.
+Style: whimsical high-quality hand-painted game art, cute castle-management room asset, clean silhouettes, crisp details, painterly but not blurry, rich material texture, cozy theatrical mood.
+Constraints: no text, no letters, no numbers, no signage, no UI, no people, no watermark, no logo, no speech bubbles, no readable posters. The image itself must not contain Chinese or English characters.

@@ -4,10 +4,10 @@
 
 ## 本地运行
 
-直接打开 `index.html` 可以游玩；最近一次 v55 本地验证使用：
+直接打开 `index.html` 可以游玩；最近一次 v56 本地验证使用：
 
 ```text
-http://127.0.0.1:8805
+http://127.0.0.1:8806
 ```
 
 ## 玩法切片
@@ -23,6 +23,7 @@ http://127.0.0.1:8805
 - 人物会根据需求和熟人关系结伴出门，去吃饭、看演出、找朋友或休息，不再只是原地摇晃。
 - 花园和温泉现在可以主动组织“花园茶会”与“温泉休整”，消耗准备库存邀请低需求居民结伴放松，地图会显示休整光效、状态图标和详情面板；花园与温泉背景已更新为无文字的 `room-garden-v2.webp`、`room-bathhouse-v2.webp`。
 - 演艺楼层现在可以主动排演“烛光小剧”，会消耗道具库存邀请娱乐/社交需求高的居民入座，演员与观众会在房间里形成表演、鼓掌、合演等互动，并通过详情面板、状态图标和舞台光效反馈演出进度。
+- v56 继续把演艺楼层做成“会热起来的现场”：新增段落、热度、现场反应和收益沉淀，演出面板会直接显示进度条和反应数；这次图像网关超时，所以先保留 `docs/v56-entertainment-theater-image-prompt.txt` 作为后续刷新演艺房间背景的提示词。
 - 选中经营楼层可以雇佣居民、补货、升级、加速，并查看员工技能。
 - 选中居住楼层可以收租、升级、派空闲居民外出探险，并查看居民理想工作。
 - 建设新楼层可以选择向地下开凿，也可以向上加建摩天大楼，天空层会显示为 `T1/T2/...`。
@@ -59,9 +60,9 @@ wrangler pages deploy dist --project-name little-depths
 
 ## GitHub 同步
 
-仓库包含 `.github/workflows/cloudflare-pages.yml`。推送到 GitHub 的 `main` 分支后，GitHub Actions 会运行 `npm ci`，再把 `dist` 部署到 Cloudflare Pages。
+仓库包含 `.github/workflows/cloudflare-pages.yml`，但当前发布流程以本地 Wrangler 直传 Cloudflare 为准；GitHub 主要用于同步代码和 `dist`。需要只同步 GitHub 时，提交信息可带 `[skip ci]`，避免触发 GitHub Actions 部署 Cloudflare。
 
-需要在 GitHub 仓库的 Secrets 里配置：
+如果以后重新启用 GitHub Actions 部署，需要在 GitHub 仓库的 Secrets 里配置并验证：
 
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`

@@ -369,6 +369,11 @@ const SHOWTIME_ACTIONS = {
   entertainment: "排演小剧",
 };
 const SHOWTIME_NEEDS = ["entertainment", "social"];
+const SHOWTIME_BEATS = [
+  { id: "opening", label: "开场", threshold: 0, performer: ["wave", "dance"], audience: ["watch", "talk"] },
+  { id: "twist", label: "转场", threshold: 0.36, performer: ["dance", "wave"], audience: ["watch", "applaud"] },
+  { id: "finale", label: "谢幕", threshold: 0.72, performer: ["wave", "dance"], audience: ["applaud", "dance"] },
+];
 const PERSON_ROOM_SPOTS = {
   default: [
     { id: "door", x: 18, y: 12, scale: 0.94, activities: ["stroll", "wait", "serve"] },
@@ -413,9 +418,10 @@ const PERSON_ROOM_SPOTS = {
     { id: "walkway", x: 22, y: 12, scale: 0.96, activities: ["stroll", "wait"] },
   ],
   entertainment: [
-    { id: "stage", x: 58, y: 15, scale: 0.98, activities: ["dance", "wave", "work"] },
-    { id: "seat", x: 34, y: 4, scale: 1.08, activities: ["watch", "applaud", "snack"] },
-    { id: "aisle", x: 76, y: 10, scale: 0.98, activities: ["stroll", "talk"] },
+    { id: "stage", x: 57, y: 16, scale: 0.98, activities: ["dance", "wave", "work"] },
+    { id: "stage-left", x: 46, y: 13, scale: 1, activities: ["dance", "wave", "talk"] },
+    { id: "front-seat", x: 31, y: 4, scale: 1.08, activities: ["watch", "applaud", "snack"] },
+    { id: "aisle", x: 76, y: 9, scale: 0.98, activities: ["stroll", "talk", "applaud"] },
   ],
   festival: [
     { id: "stage", x: 58, y: 15, scale: 0.98, activities: ["dance", "wave", "work"] },
@@ -664,6 +670,14 @@ const QUEST_DEFS = [
     text: "用演艺楼层排演 3 场小剧",
   },
   {
+    id: "full_house",
+    title: "满堂喝彩",
+    goal: 8,
+    metric: "showtimeReactionsDone",
+    reward: { coins: 620, gems: 3 },
+    text: "让演艺现场触发 8 次观众反应",
+  },
+  {
     id: "builders",
     title: "双向扩建",
     goal: 2,
@@ -876,7 +890,7 @@ let guideReady = false;
 
 function makeNewGame() {
   const game = {
-    version: 10,
+    version: 11,
     coins: 560,
     gems: 7,
     happiness: 72,
@@ -922,6 +936,7 @@ function makeNewGame() {
       libraryStudiesDone: 0,
       comfortSessionsDone: 0,
       entertainmentShowsDone: 0,
+      showtimeReactionsDone: 0,
       entertainmentFloorsBuilt: 0,
       marketFloorsBuilt: 0,
       libraryFloorsBuilt: 0,
@@ -1284,6 +1299,7 @@ function migrateGame(game) {
     libraryStudiesDone: 0,
     comfortSessionsDone: 0,
     entertainmentShowsDone: 0,
+    showtimeReactionsDone: 0,
     entertainmentFloorsBuilt: 0,
     marketFloorsBuilt: 0,
     libraryFloorsBuilt: 0,
@@ -1296,7 +1312,7 @@ function migrateGame(game) {
     aquariumFloorsBuilt: 0,
     festivalFloorsBuilt: 0,
   };
-  game.version = Math.max(Number(game.version) || 0, 10);
+  game.version = Math.max(Number(game.version) || 0, 11);
   game.nextExpeditionId ||= 1;
   game.quests ||= QUEST_DEFS.map((quest) => ({ id: quest.id, claimed: false }));
   game.stats ||= {};
@@ -1401,6 +1417,12 @@ function migrateGame(game) {
                 participantIds: Array.isArray(floor.showtime.participantIds)
                   ? floor.showtime.participantIds.map(Number).filter(Boolean)
                   : [],
+                beat: floor.showtime.beat || "opening",
+                heat: clamp(Number(floor.showtime.heat) || 28, 0, 100),
+                reactions: Math.max(0, Number(floor.showtime.reactions) || 0),
+                reactionTimer: Math.max(0, Number(floor.showtime.reactionTimer) || 0),
+                earned: Math.max(0, Number(floor.showtime.earned) || 0),
+                finalRewarded: Boolean(floor.showtime.finalRewarded),
               }
             : null;
       }
@@ -2793,6 +2815,36 @@ function isActiveShowtime(floor) {
   return Boolean(isShowtimeFloorType(floor?.type) && floor.showtime && Number(floor.showtime.remaining) > 0);
 }
 
+function showtimeProgress(floor) {
+  if (!isActiveShowtime(floor)) return 0;
+  const total = Math.max(1, Number(floor.showtime.total) || 1);
+  return clamp(1 - Number(floor.showtime.remaining || 0) / total, 0, 1);
+}
+
+function showtimeBeatForProgress(progress = 0) {
+  return SHOWTIME_BEATS.reduce((current, beat) => (progress >= beat.threshold ? beat : current), SHOWTIME_BEATS[0]);
+}
+
+function currentShowtimeBeat(floor) {
+  if (!isShowtimeFloorType(floor?.type)) return SHOWTIME_BEATS[0];
+  const activeBeat = SHOWTIME_BEATS.find((beat) => beat.id === floor.showtime?.beat);
+  return activeBeat || showtimeBeatForProgress(showtimeProgress(floor));
+}
+
+function showtimeHeatTone(floor) {
+  const heat = Number(floor?.showtime?.heat || 0);
+  if (heat >= 78) return "hot";
+  if (heat >= 48) return "warm";
+  return "quiet";
+}
+
+function showtimeHeatLabel(floor) {
+  const heat = Number(floor?.showtime?.heat || 0);
+  if (heat >= 78) return "满堂";
+  if (heat >= 48) return "热场";
+  return "入戏";
+}
+
 function showtimePracticeBonus(game = state) {
   return Math.min(0.12, (game.stats?.entertainmentShowsDone || 0) * 0.004);
 }
@@ -2856,6 +2908,73 @@ function showtimeAudience(floor) {
   });
 }
 
+function applyShowtimeBeatMotion(floor, audience = showtimeAudience(floor), cast = null) {
+  if (!isActiveShowtime(floor)) return;
+  const beat = currentShowtimeBeat(floor);
+  const performers = cast || (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
+  performers.forEach((performer, index) => {
+    endSocialForPerson(performer);
+    performer.need = "entertainment";
+    performer.activity = beat.performer[index % beat.performer.length] || "dance";
+    performer.activityTimer = Math.max(performer.activityTimer || 0, randFloat(7, 13));
+    performer.activityLane = "c";
+    performer.lifeWish = `${beat.label}${SHOWTIME_LABELS[floor.type] || "小剧"}`;
+    assignPersonMotion(performer, floor.type, performer.activity);
+  });
+  audience.forEach((person, index) => {
+    person.need = index % 3 === 0 ? "social" : "entertainment";
+    person.activity = beat.audience[index % beat.audience.length] || "watch";
+    person.activityTimer = Math.max(person.activityTimer || 0, randFloat(6, 12));
+    person.lifeWish = `${beat.label}喝彩：${floor.name}`;
+    assignPersonMotion(person, floor.type, person.activity);
+  });
+}
+
+function pulseShowtimeReaction(floor, audience = showtimeAudience(floor), cast = null) {
+  if (!isActiveShowtime(floor) || !audience.length) return 0;
+  const performers = cast || (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
+  const show = floor.showtime;
+  const skill = averageSkill(floor.workers || [], floor.type);
+  const crowdNeed = audience.reduce((sum, person) => sum + personNeedUrgency(person, "entertainment") + personNeedUrgency(person, "social") * 0.45, 0);
+  const relation = performers.reduce((sum, performer) => {
+    return sum + audience.reduce((inner, watcher) => inner + relationshipScore(performer, watcher), 0);
+  }, 0);
+  const heatGain = clamp(4 + audience.length * 1.15 + skill * 0.22 + crowdNeed * 0.62 + relation / 360, 4, 18);
+  show.heat = clamp(Number(show.heat || 0) + heatGain, 0, 100);
+  show.reactions = (show.reactions || 0) + 1;
+  state.stats.showtimeReactionsDone = (state.stats.showtimeReactionsDone || 0) + 1;
+  applyShowtimeBeatMotion(floor, audience, performers);
+  performers.slice(0, audience.length).forEach((performer, index) => {
+    const watcher = audience[(index + show.reactions) % audience.length];
+    if (!watcher || performer.socialPartnerId || watcher.socialPartnerId) return;
+    const scene = SOCIAL_SCENES.entertainment[(index + show.reactions) % SOCIAL_SCENES.entertainment.length] || SOCIAL_SCENES.entertainment[0];
+    applySocialScene(performer, watcher, scene, `showtime-pulse-${floor.id}-${performer.id}-${watcher.id}-${Date.now()}`, randFloat(7, 11), floor.type, floorSocialScope(floor));
+  });
+  audience.forEach((person) => applyShowtimeMotiveBurst(floor, person, 0.28));
+  performers.forEach((person) => boostPersonMotive(person, "social", 2));
+  const bonus = Math.round((3 + audience.length * 1.8 + skill * 0.42) * (1 + show.heat / 180 + festivalBuzzBonus(state) * 0.18));
+  addCoins(bonus);
+  show.earned = (show.earned || 0) + bonus;
+  if (show.heat >= 78 && !show.hotLogged) {
+    show.hotLogged = true;
+    addLog(`${floor.name} 现场热起来了，观众跟着演员鼓掌。`);
+  }
+  return bonus;
+}
+
+function settleShowtimeFinale(floor, audience = showtimeAudience(floor)) {
+  if (!isActiveShowtime(floor) || floor.showtime.finalRewarded) return 0;
+  const show = floor.showtime;
+  const heat = Number(show.heat || 0);
+  const bonus = Math.round((show.applause || 0) * clamp(heat / 240, 0.12, 0.52) + (show.earned || 0) * 0.16);
+  show.finalRewarded = true;
+  show.earned = (show.earned || 0) + bonus;
+  if (bonus > 0) addCoins(bonus);
+  state.happiness = clamp(state.happiness + Math.min(5, 1 + Math.floor(heat / 32)), 0, 100);
+  audience.forEach((person) => applyShowtimeMotiveBurst(floor, person, 0.45));
+  return bonus;
+}
+
 function startEntertainmentShow(floorId) {
   const floor = findFloor(floorId);
   if (!isBusiness(floor) || !isShowtimeFloorType(floor.type)) return;
@@ -2874,7 +2993,8 @@ function startEntertainmentShow(floorId) {
   const stockCost = Math.min(floor.stock || 0, Math.max(1, Math.ceil(audience.length / 3)));
   const label = SHOWTIME_LABELS[floor.type] || "小剧";
   const sessionId = `showtime-${floor.id}-${Date.now()}-${randInt(10, 99)}`;
-  const duration = randFloat(34, 48);
+  const duration = randFloat(38, 52);
+  const openingHeat = clamp(24 + audience.length * 5 + skill * 1.2 + showtimePracticeBonus(state) * 90 + festivalBuzzBonus(state) * 20, 18, 64);
   floor.stock = Math.max(0, (floor.stock || 0) - stockCost);
   floor.showtimeCooldown = showtimeCooldown(floor);
   floor.showtime = {
@@ -2883,6 +3003,12 @@ function startEntertainmentShow(floorId) {
     remaining: duration,
     total: duration,
     participantIds: audience.map((person) => person.id),
+    beat: "opening",
+    heat: openingHeat,
+    reactions: 0,
+    reactionTimer: randFloat(4.5, 6.8),
+    earned: 0,
+    finalRewarded: false,
     applause: 0,
   };
   const cast = (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
@@ -2919,6 +3045,7 @@ function startEntertainmentShow(floorId) {
   const applause = Math.round((18 + audience.length * 8 + skill * 2.4) * (1 + showtimePracticeBonus(state) + festivalBuzzBonus(state) * 0.22));
   floor.showtime.applause = applause;
   addCoins(applause);
+  floor.showtime.earned += applause;
   state.stats.entertainmentShowsDone = (state.stats.entertainmentShowsDone || 0) + 1;
   state.happiness = clamp(state.happiness + Math.min(6, 2 + Math.ceil(audience.length / 2)), 0, 100);
   const names = audience.map((person) => person.name).slice(0, 3).join("、");
@@ -2931,46 +3058,67 @@ function startEntertainmentShow(floorId) {
 
 function updateShowtimeFloor(floor, dt) {
   if (!isShowtimeFloorType(floor?.type)) return false;
-  const before = `${Math.ceil(floor.showtimeCooldown || 0)}:${Math.ceil(floor.showtime?.remaining || 0)}`;
+  const before = showtimeMapKey(floor);
   floor.showtimeCooldown = Math.max(0, (floor.showtimeCooldown || 0) - dt * (1 + clockworkTempoBonus(state) * 0.18));
-  if (!isActiveShowtime(floor)) return before !== `${Math.ceil(floor.showtimeCooldown || 0)}:0`;
+  if (!isActiveShowtime(floor)) return before !== showtimeMapKey(floor);
   floor.showtime.remaining = Math.max(0, Number(floor.showtime.remaining || 0) - dt);
   const audience = showtimeAudience(floor);
   floor.showtime.participantIds = audience.map((person) => person.id);
   audience.forEach((person) => applyShowtimeMotiveBurst(floor, person, dt * 0.06));
   const cast = (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
   cast.forEach((person) => boostPersonMotive(person, "entertainment", dt * 0.12));
+  const beat = showtimeBeatForProgress(showtimeProgress(floor));
+  if (floor.showtime.beat !== beat.id) {
+    floor.showtime.beat = beat.id;
+    floor.showtime.heat = clamp(Number(floor.showtime.heat || 0) + 7 + audience.length, 0, 100);
+    applyShowtimeBeatMotion(floor, audience, cast);
+    addLog(`${floor.name} 的${floor.showtime.label || "小剧"}进入${beat.label}。`);
+  }
+  floor.showtime.reactionTimer = Math.max(0, Number(floor.showtime.reactionTimer || 0) - dt);
+  if (floor.showtime.reactionTimer <= 0 && audience.length) {
+    pulseShowtimeReaction(floor, audience, cast);
+    floor.showtime.reactionTimer = randFloat(5.2, 7.6);
+  }
   if (floor.showtime.remaining <= 0 || !audience.length) {
     const label = SHOWTIME_LABELS[floor.type] || "小剧";
+    const finale = audience.length ? settleShowtimeFinale(floor, audience) : 0;
+    const heat = Math.round(floor.showtime.heat || 0);
     floor.showtime = null;
-    if (audience.length) addLog(`${floor.name} 的${label}谢幕，观众带着笑声离场。`);
+    if (audience.length) addLog(`${floor.name} 的${label}谢幕，现场热度 ${heat}，追加 ${finale} 金币。`);
   }
-  return before !== `${Math.ceil(floor.showtimeCooldown || 0)}:${Math.ceil(floor.showtime?.remaining || 0)}`;
+  return before !== showtimeMapKey(floor);
 }
 
 function renderShowtimePanel(floor) {
   if (!isShowtimeFloorType(floor?.type)) return "";
   const active = isActiveShowtime(floor);
   const audience = active ? showtimeAudience(floor) : [];
+  const beat = currentShowtimeBeat(floor);
+  const heat = active ? Math.round(Number(floor.showtime.heat || 0)) : 0;
+  const heatTone = active ? showtimeHeatTone(floor) : "quiet";
   const names = audience.length ? audience.map((person) => person.name).slice(0, 4).join("、") : "等待观众入座";
   const status = active
-    ? `${Math.ceil(floor.showtime.remaining)}s · ${names}`
+    ? `${beat.label} ${Math.ceil(floor.showtime.remaining)}s · ${names}`
     : (floor.showtimeCooldown || 0) > 0
       ? `冷却 ${Math.ceil(floor.showtimeCooldown)}s`
       : "就绪";
-  const applause = active && floor.showtime?.applause ? ` · 掌声 ${floor.showtime.applause}` : "";
+  const applause = active && floor.showtime?.applause ? ` · 收益 ${floor.showtime.earned || floor.showtime.applause}` : "";
   return `
-    <div class="showtime-panel ${active ? "active" : ""}">
-      <strong>${SHOWTIME_LABELS[floor.type] || "小剧"}</strong>
+    <div class="showtime-panel ${active ? "active" : ""}" data-beat="${escapeAttr(beat.id)}" data-heat="${escapeAttr(heatTone)}">
+      <div class="showtime-panel-head">
+        <strong>${SHOWTIME_LABELS[floor.type] || "小剧"}</strong>
+        <em>${active ? showtimeHeatLabel(floor) + " " + heat + "%" : "待演"}</em>
+      </div>
+      <div class="showtime-meter" aria-hidden="true"><i style="width:${active ? heat : 0}%"></i></div>
       <span>${escapeHtml(status)}${applause}</span>
-      <small>恢复娱乐与社交 · 已排演 ${state.stats.entertainmentShowsDone || 0} 场</small>
+      <small>现场反应 ${active ? floor.showtime.reactions || 0 : state.stats.showtimeReactionsDone || 0} · 已排演 ${state.stats.entertainmentShowsDone || 0} 场</small>
     </div>`;
 }
 
 function showtimeMapKey(floor) {
   if (!isShowtimeFloorType(floor?.type)) return "";
   const participants = floor.showtime?.participantIds || [];
-  return `showtime:${Math.ceil(floor.showtimeCooldown || 0)}:${Math.ceil(floor.showtime?.remaining || 0)}:${participants.join("-")}:${floor.showtime?.applause || 0}`;
+  return `showtime:${Math.ceil(floor.showtimeCooldown || 0)}:${Math.ceil(floor.showtime?.remaining || 0)}:${participants.join("-")}:${floor.showtime?.beat || ""}:${Math.round(floor.showtime?.heat || 0)}:${floor.showtime?.reactions || 0}:${floor.showtime?.earned || floor.showtime?.applause || 0}`;
 }
 
 function comfortSessionCooldown(floor) {
@@ -4186,9 +4334,12 @@ function renderFloor(floor) {
   const routeClass = floorRouteClass(floor);
   const comfortClass = isActiveComfortSession(floor) ? "comfort-active" : "";
   const showtimeClass = isActiveShowtime(floor) ? "showtime-active" : "";
+  const showtimeAttrs = isActiveShowtime(floor)
+    ? ` data-showtime-beat="${escapeAttr(currentShowtimeBeat(floor).id)}" data-showtime-heat="${escapeAttr(showtimeHeatTone(floor))}"`
+    : "";
   const zone = getFloorZone(floor);
   return `
-    <article class="floor ${selected} ${constructing} ${routeClass} ${comfortClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}">
+    <article class="floor ${selected} ${constructing} ${routeClass} ${comfortClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${showtimeAttrs}>
       ${renderFloorIndex(floor)}
       <div class="room" data-action="select-floor" data-floor-id="${floor.id}" title="${escapeAttr(floorMapLabel(floor))}" aria-label="${escapeAttr(floorMapLabel(floor))}">
         ${floor.status === "construction" ? renderConstruction(floor) : renderOpenFloor(floor)}
@@ -4662,7 +4813,7 @@ function renderFloorStatus(floor) {
   if (floor.type === "lobby") return state.queue.length ? "待接待" : "自然待客";
   if (floor.type === "dwelling") return floor.rentReady ? `租金 ${floor.rentReady}` : "居住";
   if (isActiveComfortSession(floor)) return `${COMFORT_SESSION_LABELS[floor.type] || "休整"} ${Math.ceil(floor.comfortSession.remaining)}s`;
-  if (isActiveShowtime(floor)) return `${SHOWTIME_LABELS[floor.type] || "小剧"} ${Math.ceil(floor.showtime.remaining)}s`;
+  if (isActiveShowtime(floor)) return `${currentShowtimeBeat(floor).label}${SHOWTIME_LABELS[floor.type] || "小剧"} · 热度 ${Math.round(floor.showtime.heat || 0)}%`;
   if (floor.production) return `补货 ${Math.ceil(floor.production.remaining)}s`;
   if (floor.stock <= 0) return "缺货";
   if (!floor.workers.length) return "缺员工";
@@ -4844,6 +4995,8 @@ function renderFloorDetail() {
   const showtimeCooldownValue = isShowtimeFloorType(floor.type) ? Math.ceil(floor.showtimeCooldown || 0) : 0;
   const showtimeActive = isActiveShowtime(floor);
   const showtimeReason = isShowtimeFloorType(floor.type) ? showtimeActionBlockReason(floor) : "";
+  const showtimeHeatValue = showtimeActive ? `${Math.round(floor.showtime.heat || 0)}%` : "-";
+  const showtimeBeatValue = showtimeActive ? currentShowtimeBeat(floor).label : showtimeCooldownValue ? `${showtimeCooldownValue}s` : "就绪";
   const catalog = floor.type === "library" ? collectionProgress(state) : null;
   els.floorDetail.innerHTML = `
     <strong>${escapeHtml(floor.name)}</strong>
@@ -4858,7 +5011,7 @@ function renderFloorDetail() {
       ${floor.type === "market" ? `<div class="stat"><b>${state.orders.length}/${orderCapacity(state)}</b><span>订单栏</span></div><div class="stat"><b>${marketCooldown ? marketCooldown + "s" : "就绪"}</b><span>撮合</span></div>` : ""}
       ${floor.type === "library" ? `<div class="stat"><b>${catalog.completed}/${COLLECTION_DEFS.length}</b><span>图鉴</span></div><div class="stat"><b>${libraryCooldown ? libraryCooldown + "s" : "就绪"}</b><span>编目</span></div>` : ""}
       ${isComfortFloorType(floor.type) ? `<div class="stat"><b>${comfortActive ? Math.ceil(floor.comfortSession.remaining) + "s" : comfortCooldown ? comfortCooldown + "s" : "就绪"}</b><span>休整</span></div>` : ""}
-      ${isShowtimeFloorType(floor.type) ? `<div class="stat"><b>${showtimeActive ? Math.ceil(floor.showtime.remaining) + "s" : showtimeCooldownValue ? showtimeCooldownValue + "s" : "就绪"}</b><span>演出</span></div><div class="stat"><b>${state.stats.entertainmentShowsDone || 0}</b><span>小剧</span></div>` : ""}
+      ${isShowtimeFloorType(floor.type) ? `<div class="stat"><b>${showtimeActive ? Math.ceil(floor.showtime.remaining) + "s" : showtimeCooldownValue ? showtimeCooldownValue + "s" : "就绪"}</b><span>演出</span></div><div class="stat"><b>${showtimeBeatValue}</b><span>段落</span></div><div class="stat"><b>${showtimeHeatValue}</b><span>热度</span></div><div class="stat"><b>${state.stats.entertainmentShowsDone || 0}/${state.stats.showtimeReactionsDone || 0}</b><span>小剧/反应</span></div>` : ""}
     </div>
     ${renderFloorPerks(floor)}
     ${renderComfortSessionPanel(floor)}
@@ -4915,7 +5068,8 @@ function renderFloorPerks(floor) {
     perks.push("快乐稳定恢复");
     perks.push(`掌声奖励 +${Math.round(entertainmentJoyBonus(state) * 55)}%`);
     perks.push(`小剧 ${state.stats.entertainmentShowsDone || 0}`);
-    if (isActiveShowtime(floor)) perks.push("正在开演");
+    perks.push(`现场反应 ${state.stats.showtimeReactionsDone || 0}`);
+    if (isActiveShowtime(floor)) perks.push(`${currentShowtimeBeat(floor).label}热度 ${Math.round(floor.showtime.heat || 0)}%`);
   } else if (floor.type === "service") {
     perks.push(`排队缓冲 +${Math.round(serviceCareBonus(state) * 90)}%`);
     perks.push(`到站接待 +${Math.round(serviceCareBonus(state) * 55)}%`);

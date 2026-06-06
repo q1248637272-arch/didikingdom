@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v55`
-- Latest preview deployment: `https://08af18f8.little-depths.pages.dev/`
-- Local server used for v55 verification: `http://127.0.0.1:8805/`
+- Latest deployed version: `v56`
+- Latest preview deployment: `https://385344ad.little-depths.pages.dev/`
+- Local server used for v56 verification: `http://127.0.0.1:8806/`
 
 ## Current State
 
@@ -21,12 +21,22 @@ Use this file when starting a new Codex conversation for this project.
 wrangler pages deploy dist --project-name little-depths
 ```
 
-- GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`; pushes to `main` deploy `dist` through Wrangler using repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
-- Current caveat: the v55 push reached GitHub, but the GitHub Actions deploy failed because the repository Cloudflare token secret is invalid or under-permissioned (`Authentication error [code: 10000]`, `Invalid access token [code: 9109]`). v55 was deployed successfully with local Wrangler OAuth instead. Refresh `CLOUDFLARE_API_TOKEN` before relying on automatic push deploys again.
+- GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`, but current release practice is to deploy Cloudflare with local Wrangler OAuth from `dist`, then sync GitHub separately. Use `[skip ci]` when pushing documentation/code sync commits that should not ask GitHub Actions to deploy Cloudflare.
+- Current caveat: v56 was deployed successfully with local Wrangler OAuth. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
-- Git is not currently available in PATH in this environment.
+- Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v56 Entertainment Live Showtime
+
+- Deepened the existing entertainment/showtime system so the room behaves more like a live event instead of a passive timer.
+- Bumped the save version to `11` and added the `满堂喝彩` quest through `showtimeReactionsDone`.
+- Added `SHOWTIME_BEATS` with opening/twist/finale phases, per-phase performer/audience motions, heat labels, heat tone states, and live reaction pulses.
+- `startEntertainmentShow()` now tracks beat, heat, reactions, reaction timer, earned coins, and finale reward state. `updateShowtimeFloor()` advances phases, pulses audience reactions, awards interim/finale rewards, and keeps actors/audience visibly moving through performance, applause, dance, and paired social scenes.
+- Entertainment UI now shows a showtime header, heat meter, beat label, reaction count, earned income, floor-detail stats, active room state attributes, and stronger stage/spotlight CSS for warm/hot/finale states.
+- Added `tmp/verify-v56-showtime.mjs`, bumped `index.html` and `sw.js` to v56, synced `dist`, rebuilt `cloudflare-pages-upload.zip`, and deployed with local Wrangler direct upload.
+- `gpt-image-2`/image2 was attempted again for a refreshed theater room, but the configured gateway timed out during generation. No unstable image file was connected; the web-ready prompt is tracked at `docs/v56-entertainment-theater-image-prompt.txt`, and current art remains `assets/art/room-entertainment-v2.webp`.
 
 ### v55 Entertainment Showtime
 
@@ -170,6 +180,24 @@ wrangler pages deploy dist --project-name little-depths
 - Elevator passenger delivery now includes real waiting/door time before the visitor exits from the destination side.
 
 ## Verification Already Done
+
+- Bundled runtime syntax checks:
+  - `node --check app.js`
+  - `node --check dist/app.js`
+  - `node --check sw.js`
+  - `node --check dist/sw.js`
+  - `node --check tmp/verify-v56-showtime.mjs`
+- Local v56 Edge CDP verification at `http://127.0.0.1:8806/?v56-showtime=1`:
+  - Desktop screenshot: `verification-v56-showtime-local.png`
+  - Mobile screenshot: `verification-v56-showtime-mobile-local.png`
+  - `tmp/verify-v56-showtime.mjs` starts a local static server, seeds 10 residents, prepares an entertainment floor with performers and props, starts a showtime event, captures desktop/mobile screenshots, and checks the mobile bottom drawer plus tab switching.
+  - Assertions confirmed save version `11`, `app.js?v=56`, `overrides.css?v=56`, `little-depths-v56`, active showtime, stock consumption, cooldown, applause reward, heat > 0, valid beat, at least one live reaction, earned show income, showtime audience visits, performer actions, `.showtime-panel[data-heat]`, `.showtime-meter`, `.floor.showtime-active[data-showtime-beat]`, `.floor.showtime-active[data-showtime-heat]`, mobile drawer visibility, one active mobile panel, and zero runtime errors.
+- Cloudflare v56 checks:
+  - Local Wrangler OAuth deploy from `dist` succeeded and produced `https://385344ad.little-depths.pages.dev/`.
+  - Production `https://little-depths.pages.dev/` and preview `https://385344ad.little-depths.pages.dev/` both load `overrides.css?v=56`, `app.js?v=56`, and `little-depths-v56` in `sw.js`.
+  - Production and preview `app.js?v=56` contain `SHOWTIME_BEATS`, `pulseShowtimeReaction`, and `showtimeReactionsDone`; both `overrides.css?v=56` files contain `showtime-meter` and `data-showtime-heat`.
+- Image generation note:
+  - `gpt-image-2`/image2 through the configured gateway timed out before returning an image. No secret was written or printed; the reusable prompt was saved at `docs/v56-entertainment-theater-image-prompt.txt`.
 
 - Bundled runtime syntax checks:
   - `node --check app.js`
@@ -402,6 +430,7 @@ wrangler pages deploy dist --project-name little-depths
 - The user wants image work to use `gpt-image-2` through their configured gateway.
 - Read credentials only from `GPT_IMAGE_2_API_KEY`, `GPT_IMAGE_2_BASE_URL`, and `GPT_IMAGE_2_MODEL`.
 - Never print, echo, commit, or store API keys.
+- v56 attempted refreshed entertainment theater room art, but the configured gateway timed out before returning an image. No new art was connected; the saved web-ready prompt is `docs/v56-entertainment-theater-image-prompt.txt`.
 - v55 attempted refreshed entertainment showtime room art, but the configured gateway returned 404 for the Images API paths. No new art was generated; the saved web-ready prompt is `docs/v55-entertainment-showtime-image-prompt.txt`.
 - v54 did not generate new art with `gpt-image-2`; it converted the old `person-performer.png` asset into lossless `assets/art/person-performer.webp`.
 - Current published image assets from prior image work include `room-craft-v2.webp`, `room-dwelling-v3.webp`, `room-market-v2.webp`, `room-library-v2.webp`, `room-garden-v2.webp`, and `room-bathhouse-v2.webp`.
@@ -423,7 +452,8 @@ wrangler pages deploy dist --project-name little-depths
   - sync changed files to `dist`
   - run syntax checks
   - verify local browser
-  - deploy with Wrangler or verify GitHub Actions succeeds
+  - deploy Cloudflare from local `dist` with Wrangler
+  - push GitHub as code sync, using `[skip ci]` when GitHub Actions should not deploy
   - verify production and preview URLs
 
 ## New Chat Starter Prompt
@@ -432,8 +462,8 @@ wrangler pages deploy dist --project-name little-depths
 继续开发 C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4 里的迪迪王国项目。
 
 线上地址：https://little-depths.pages.dev/
-最新部署版本：v55
-最新预览：https://08af18f8.little-depths.pages.dev/
+最新部署版本：v56
+最新预览：https://385344ad.little-depths.pages.dev/
 交接文档：docs/HANDOFF.md
 
 请先读取项目代码、README.md、docs/HANDOFF.md 和最近状态，再继续优化。方向：从游戏内容、玩法、画面、图像质量等层面更新迭代，不只新增内容，也要把旧楼层和旧系统做得更好。涉及图像绘制时使用 gpt-image-2；如果网关不可用，不要写入或打印密钥，改为保存可直接用于网页端生成的提示词。
