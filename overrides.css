@@ -988,6 +988,222 @@
   border-color: rgba(100, 196, 176, 0.3);
 }
 
+.market-parcel-panel {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(100, 196, 176, 0.28);
+  background:
+    linear-gradient(115deg, rgba(100, 196, 176, 0.14), rgba(255, 205, 121, 0.1)),
+    rgba(255, 255, 255, 0.05);
+}
+
+.market-parcel-panel.active {
+  border-color: rgba(100, 196, 176, 0.58);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 218, 143, 0.12),
+    0 0 20px rgba(100, 196, 176, 0.16);
+}
+
+.market-parcel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.market-parcel-panel strong {
+  font-size: 12px;
+  color: #cffff4;
+}
+
+.market-parcel-panel em {
+  min-width: 48px;
+  text-align: right;
+  color: #ffe3a6;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.market-parcel-panel span,
+.market-parcel-panel small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.market-parcel-track {
+  position: relative;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0 8px, transparent 8px 16px),
+    rgba(8, 20, 24, 0.58);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.market-parcel-track i,
+.market-parcel-inline-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #64c4b0, #ffd47e 64%, #ff9f6a);
+  box-shadow: 0 0 14px rgba(100, 196, 176, 0.38);
+  transition: width 0.35s ease;
+}
+
+.market-parcel-track b {
+  position: absolute;
+  top: 50%;
+  left: max(7px, var(--parcel-x, 50%));
+  width: 14px;
+  height: 10px;
+  border-radius: 3px 3px 5px 5px;
+  translate: -50% -50%;
+  background:
+    linear-gradient(90deg, transparent 46%, rgba(78, 46, 22, 0.38) 47% 54%, transparent 55%),
+    linear-gradient(145deg, #ffe0a0, #cf8848);
+  box-shadow:
+    0 0 0 1px rgba(50, 28, 18, 0.34),
+    0 4px 10px rgba(0, 0, 0, 0.22);
+}
+
+.market-parcel-panel[data-phase="pack"] {
+  border-color: rgba(255, 212, 126, 0.54);
+}
+
+.market-parcel-panel[data-phase="send"] {
+  background:
+    linear-gradient(115deg, rgba(100, 196, 176, 0.18), rgba(255, 205, 121, 0.14), rgba(255, 159, 106, 0.08)),
+    rgba(255, 255, 255, 0.06);
+}
+
+.status-glyph[data-state="market-parcel"],
+.room-state-tag[data-state="market-parcel"] {
+  color: #64c4b0;
+}
+
+.status-glyph[data-state="market-parcel"]::before,
+.room-state-tag[data-state="market-parcel"]::before {
+  width: 15px;
+  height: 12px;
+  border-radius: 3px 3px 6px 6px;
+  background:
+    linear-gradient(90deg, transparent 45%, rgba(87, 50, 24, 0.5) 46% 54%, transparent 55%),
+    linear-gradient(145deg, #ffe4a8, #d88f4d 64%, #64c4b0);
+  box-shadow:
+    0 0 12px rgba(100, 196, 176, 0.62),
+    inset 0 -2px 0 rgba(48, 28, 18, 0.18);
+}
+
+.floor.market-parcel-active[data-type="market"] .room {
+  box-shadow:
+    inset 0 5px 0 rgba(214, 255, 244, 0.18),
+    inset 0 -24px 30px rgba(0, 0, 0, 0.34),
+    0 0 0 2px rgba(100, 196, 176, 0.34),
+    0 18px 34px rgba(0, 0, 0, 0.42),
+    0 0 30px rgba(100, 196, 176, 0.24);
+}
+
+.floor.market-parcel-active[data-type="market"] .life-stage::before {
+  content: "";
+  position: absolute;
+  left: 19%;
+  right: 16%;
+  bottom: 30px;
+  height: 10px;
+  border-radius: 999px;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 232, 168, 0.52) 0 10px, rgba(100, 196, 176, 0.24) 10px 20px),
+    rgba(25, 19, 18, 0.48);
+  box-shadow: 0 0 16px rgba(100, 196, 176, 0.26);
+  opacity: 0.84;
+  pointer-events: none;
+}
+
+.floor.market-parcel-active[data-type="market"] .life-stage::after {
+  content: "";
+  position: absolute;
+  left: 54%;
+  bottom: 39px;
+  width: 30px;
+  height: 20px;
+  border-radius: 4px 4px 8px 8px;
+  translate: -50% 0;
+  background:
+    linear-gradient(90deg, transparent 46%, rgba(87, 50, 24, 0.5) 47% 54%, transparent 55%),
+    linear-gradient(145deg, #ffe0a0, #cf8848);
+  box-shadow:
+    0 0 18px rgba(255, 212, 126, 0.28),
+    0 8px 12px rgba(0, 0, 0, 0.24);
+  animation: market-parcel-glide 4.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.floor.market-parcel-active[data-type="market"][data-market-parcel-phase="quote"] .life-stage::after {
+  animation-duration: 5.2s;
+  opacity: 0.82;
+}
+
+.floor.market-parcel-active[data-type="market"][data-market-parcel-phase="pack"] .life-stage::after {
+  filter: drop-shadow(0 0 8px rgba(255, 212, 126, 0.42));
+}
+
+.floor.market-parcel-active[data-type="market"][data-market-parcel-phase="send"] .life-stage::after {
+  animation-duration: 3.6s;
+  filter: drop-shadow(0 0 10px rgba(100, 196, 176, 0.5));
+}
+
+.order.parcel-order {
+  border-color: rgba(100, 196, 176, 0.48);
+  background:
+    linear-gradient(120deg, rgba(100, 196, 176, 0.14), rgba(255, 205, 121, 0.08)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035));
+}
+
+.order.parcel-active {
+  box-shadow:
+    inset 0 0 0 1px rgba(100, 196, 176, 0.15),
+    0 0 18px rgba(100, 196, 176, 0.12);
+}
+
+.order-tags .parcel-tag {
+  color: #cffff4;
+  background: rgba(100, 196, 176, 0.14);
+  border-color: rgba(100, 196, 176, 0.32);
+}
+
+.order-tags .parcel-tag.active {
+  color: #ffe4aa;
+  background: rgba(255, 205, 121, 0.14);
+  border-color: rgba(255, 205, 121, 0.34);
+}
+
+.order-tags .parcel-tag.shipped {
+  color: #b7ffe6;
+  background: rgba(72, 205, 143, 0.14);
+  border-color: rgba(72, 205, 143, 0.32);
+}
+
+@keyframes market-parcel-glide {
+  0%,
+  100% {
+    opacity: 0.74;
+    transform: translateX(-18px) translateY(0);
+  }
+  46% {
+    opacity: 1;
+    transform: translateX(18px) translateY(-1px);
+  }
+  64% {
+    opacity: 0.92;
+    transform: translateX(25px) translateY(0);
+  }
+}
+
 .order-foot {
   grid-template-columns: minmax(0, 1fr) auto auto;
 }
@@ -1008,6 +1224,10 @@
 
   .order-foot {
     grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .market-parcel-panel {
+    padding: 9px;
   }
 }
 

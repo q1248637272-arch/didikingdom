@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v59`
-- Latest preview deployment: `https://476d7f48.little-depths.pages.dev/`
-- Local server used for v59 verification: `http://127.0.0.1:8809/`
+- Latest deployed version: `v60`
+- Latest preview deployment: `https://77ef61b4.little-depths.pages.dev/`
+- Local server used for v60 verification: `http://127.0.0.1:8810/`
 
 ## Current State
 
@@ -22,11 +22,23 @@ wrangler pages deploy dist --project-name little-depths
 ```
 
 - GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`, but current release practice is to deploy Cloudflare with local Wrangler OAuth from `dist`, then sync GitHub separately. Use `[skip ci]` when pushing documentation/code sync commits that should not ask GitHub Actions to deploy Cloudflare.
-- Current caveat: v59 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
+- Current caveat: v60 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v60 Market Parcel Flow
+
+- Deepened the old `market` floor again so quick orders now become a readable logistics loop instead of an instant order-card spawn.
+- Added parcel state and migration support: `MARKET_PARCEL_PHASES`, `marketParcel`, `marketParcelsDone`, `marketParcelItemsPacked`, `normalizeOrderLogistics()`, `orderMarketPacked()`, `orderPreparedTotal()`, the `parcel_flow` quest, and save version `15`.
+- Market quick orders now start a `quote` / `pack` / `send` parcel flow. Packing deducts real stock from the matching business floor immediately, stores packed progress on the order, and adds a small negotiated reward bonus.
+- `orderStockInfo()` now distinguishes `stockOwned`, `mandatePrepared`, `packed`, and total `prepared`; `fulfillOrder()` consumes only `order.amount - orderPreparedTotal(order)`, so market-packed goods and royal mandate prep do not double-consume stock.
+- Market floor detail now shows parcel stage, packed count, flow count, a dedicated `.market-parcel-panel`, and a `撮合快单` action with a single readable block reason.
+- Map/status/order UI now exposes `.floor.market-parcel-active`, `data-market-parcel-phase`, `data-market-parcel-packed`, `data-state="market-parcel"`, `.parcel-order`, `.parcel-active`, and `.parcel-tag`.
+- Visual feedback uses stable package/track/counter lighting in `overrides.css`; no character shaking or fake in-place jitter was added.
+- Added `tmp/verify-v60-market-parcels.mjs`, bumped `index.html` / `sw.js` to v60, synced `dist`, rebuilt `cloudflare-pages-upload.zip`, verified local desktop/mobile with Edge CDP, and deployed with local Wrangler direct upload.
+- No new bitmap art was generated in v60; this pass improved gameplay, UI readability, and CSS visual quality over the existing `assets/art/room-market-v2.webp`.
 
 ### v59 Kingdom Royal Mandates
 
@@ -211,6 +223,23 @@ wrangler pages deploy dist --project-name little-depths
 - Elevator passenger delivery now includes real waiting/door time before the visitor exits from the destination side.
 
 ## Verification Already Done
+
+- v60 local market parcel verification:
+  - `node --check app.js`
+  - `node --check dist/app.js`
+  - `node --check sw.js`
+  - `node --check dist/sw.js`
+  - `node --check tmp/verify-v60-market-parcels.mjs`
+  - `node tmp/verify-v60-market-parcels.mjs`
+  - Local preview URL: `http://127.0.0.1:8810/?v60-market-parcels=1`
+  - Desktop screenshot: `verification-v60-market-parcels-local.png`
+  - Mobile screenshot: `verification-v60-market-parcels-mobile-local.png`
+  - Assertions confirmed save version `15`, `app.js?v=60`, `overrides.css?v=60`, `little-depths-v60`, active `.market-parcel-panel`, `.floor.market-parcel-active`, `data-market-parcel-phase`, `data-state="market-parcel"`, `.parcel-order`, `.parcel-tag`, mobile orders drawer visibility, immediate real-stock deduction when packed, and fulfillment consuming only stock not already packed.
+- Cloudflare v60 checks:
+  - Local Wrangler OAuth deploy from `dist` succeeded and produced `https://77ef61b4.little-depths.pages.dev/`.
+  - Production `https://little-depths.pages.dev/` and preview `https://77ef61b4.little-depths.pages.dev/` both load `app.js?v=60` and `overrides.css?v=60`.
+  - Both `sw.js` files use `little-depths-v60`.
+  - Both `app.js?v=60` files contain `MARKET_PARCEL_PHASES`, `renderMarketParcelPanel`, and `marketParcelItemsPacked`; both `overrides.css?v=60` files contain `market-parcel-panel` and `parcel-tag`.
 
 - v59 local kingdom mandate verification:
   - `node --check app.js`
@@ -506,6 +535,7 @@ wrangler pages deploy dist --project-name little-depths
 - The user wants image work to use `gpt-image-2` through their configured gateway.
 - Read credentials only from `GPT_IMAGE_2_API_KEY`, `GPT_IMAGE_2_BASE_URL`, and `GPT_IMAGE_2_MODEL`.
 - Never print, echo, commit, or store API keys.
+- v60 did not call `gpt-image-2`; the pass improved the existing market room through gameplay state, order UI, and CSS package/track visuals over `assets/art/room-market-v2.webp`.
 - v59 attempted refreshed kingdom royal council room art through the configured `gpt-image-2` gateway, but the request timed out after 300 seconds. No new art was connected; the saved web-ready prompt is `docs/v59-kingdom-royal-council-image-prompt.txt`.
 - v56 attempted refreshed entertainment theater room art, but the configured gateway timed out before returning an image. No new art was connected; the saved web-ready prompt is `docs/v56-entertainment-theater-image-prompt.txt`.
 - v55 attempted refreshed entertainment showtime room art, but the configured gateway returned 404 for the Images API paths. No new art was generated; the saved web-ready prompt is `docs/v55-entertainment-showtime-image-prompt.txt`.
@@ -518,11 +548,11 @@ wrangler pages deploy dist --project-name little-depths
 
 - Continue improving older floors instead of only adding new floors. Good next targets:
   - `character life`: add visible path/outing traces, short interruptions, and player-readable mini stories now that companions and mobile UI exist.
-  - `kingdom`: deepen mandate follow-through with visible courier trails, council-room art, or order parcel movement now that the core signing loop exists.
+  - `kingdom`: deepen mandate follow-through with visible courier trails, council-room art, or downstream city effects now that the core signing loop exists.
   - `food`: deepen dining needs with table rushes, staff serving feedback, and clearer kitchen UI.
   - `garden/bathhouse`: make happiness, rest, rent, and expedition preparation more visible and interactive.
   - `alchemy/training/treasure`: give the late-game floors stronger decision hooks beyond passive bonuses.
-  - `market`: add visible small order-parcel motion after a quick order is brokered.
+  - `market`: tune parcel pacing, expose stalled/partial packing more clearly, or let multiple market floors specialize in different goods after the first parcel-flow pass.
 - Keep each version small and deployable: one floor or one systemic pass per release.
 - After each release:
   - bump cache/query versions in `index.html` and `sw.js`
@@ -539,8 +569,8 @@ wrangler pages deploy dist --project-name little-depths
 继续开发 C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4 里的迪迪王国项目。
 
 线上地址：https://little-depths.pages.dev/
-最新部署版本：v59
-最新预览：https://476d7f48.little-depths.pages.dev/
+最新部署版本：v60
+最新预览：https://77ef61b4.little-depths.pages.dev/
 交接文档：docs/HANDOFF.md
 
 请先读取项目代码、README.md、docs/HANDOFF.md 和最近状态，再继续优化。方向：从游戏内容、玩法、画面、图像质量等层面更新迭代，不只新增内容，也要把旧楼层和旧系统做得更好。涉及图像绘制时使用 gpt-image-2；如果网关不可用，不要写入或打印密钥，改为保存可直接用于网页端生成的提示词。

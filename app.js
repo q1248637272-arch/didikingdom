@@ -398,6 +398,11 @@ const ROYAL_MANDATE_PHASES = [
   { id: "seal", label: "盖印", threshold: 0.38 },
   { id: "dispatch", label: "传令", threshold: 0.72 },
 ];
+const MARKET_PARCEL_PHASES = [
+  { id: "quote", label: "议价", threshold: 0 },
+  { id: "pack", label: "打包", threshold: 0.34 },
+  { id: "send", label: "发货", threshold: 0.7 },
+];
 const PERSON_ROOM_SPOTS = {
   default: [
     { id: "door", x: 18, y: 12, scale: 0.94, activities: ["stroll", "wait", "serve"] },
@@ -742,6 +747,14 @@ const QUEST_DEFS = [
     text: "用市集撮合 2 张快单",
   },
   {
+    id: "parcel_flow",
+    title: "包裹流转",
+    goal: 8,
+    metric: "marketParcelItemsPacked",
+    reward: { coins: 560, gems: 3 },
+    text: "让市集打包流转 8 件订单货物",
+  },
+  {
     id: "archive",
     title: "灯下书库",
     goal: 1,
@@ -930,7 +943,7 @@ let guideReady = false;
 
 function makeNewGame() {
   const game = {
-    version: 14,
+    version: 15,
     coins: 560,
     gems: 7,
     happiness: 72,
@@ -975,6 +988,8 @@ function makeNewGame() {
       serviceFloorsBuilt: 1,
       craftFloorsBuilt: 0,
       marketDealsDone: 0,
+      marketParcelsDone: 0,
+      marketParcelItemsPacked: 0,
       royalMandatesDone: 0,
       libraryStudiesDone: 0,
       comfortSessionsDone: 0,
@@ -1057,6 +1072,7 @@ function createFloor(game, type, options = {}) {
     royalMandateCooldown: type === "kingdom" ? 0 : undefined,
     royalMandate: type === "kingdom" ? null : undefined,
     marketCooldown: type === "market" ? 0 : undefined,
+    marketParcel: type === "market" ? null : undefined,
     libraryCooldown: type === "library" ? 0 : undefined,
     comfortCooldown: isComfortFloorType(type) ? 0 : undefined,
     comfortSession: isComfortFloorType(type) ? null : undefined,
@@ -1118,6 +1134,7 @@ function finalizeConstruction(floor) {
     royalMandateCooldown: floor.type === "kingdom" ? 0 : undefined,
     royalMandate: floor.type === "kingdom" ? null : undefined,
     marketCooldown: floor.type === "market" ? 0 : undefined,
+    marketParcel: floor.type === "market" ? null : undefined,
     libraryCooldown: floor.type === "library" ? 0 : undefined,
     comfortCooldown: isComfortFloorType(floor.type) ? 0 : undefined,
     comfortSession: isComfortFloorType(floor.type) ? null : undefined,
@@ -1349,6 +1366,8 @@ function migrateGame(game) {
     serviceFloorsBuilt: 0,
     craftFloorsBuilt: 0,
     marketDealsDone: 0,
+    marketParcelsDone: 0,
+    marketParcelItemsPacked: 0,
     royalMandatesDone: 0,
     libraryStudiesDone: 0,
     comfortSessionsDone: 0,
@@ -1366,7 +1385,7 @@ function migrateGame(game) {
     aquariumFloorsBuilt: 0,
     festivalFloorsBuilt: 0,
   };
-  game.version = Math.max(Number(game.version) || 0, 14);
+  game.version = Math.max(Number(game.version) || 0, 15);
   game.nextExpeditionId ||= 1;
   game.quests ||= QUEST_DEFS.map((quest) => ({ id: quest.id, claimed: false }));
   game.stats ||= {};
@@ -1389,7 +1408,7 @@ function migrateGame(game) {
     }
   });
   game.orders ||= [];
-  game.orders = game.orders.map((order) => normalizeOrderMandate(order));
+  game.orders = game.orders.map((order) => normalizeOrderLogistics(order));
   game.expeditions = Array.isArray(game.expeditions) ? game.expeditions : [];
   game.collection ||= makeEmptyCollection();
   game.floors = Array.isArray(game.floors) ? game.floors : [];
@@ -1466,7 +1485,21 @@ function migrateGame(game) {
               }
             : null;
       }
-      if (floor.type === "market") floor.marketCooldown = Math.max(0, Number(floor.marketCooldown) || 0);
+      if (floor.type === "market") {
+        floor.marketCooldown = Math.max(0, Number(floor.marketCooldown) || 0);
+        floor.marketParcel =
+          floor.marketParcel && typeof floor.marketParcel === "object" && Number(floor.marketParcel.remaining) > 0
+            ? {
+                ...floor.marketParcel,
+                remaining: Math.max(0, Number(floor.marketParcel.remaining) || 0),
+                total: Math.max(1, Number(floor.marketParcel.total) || Number(floor.marketParcel.remaining) || 1),
+                pulseTimer: Math.max(0, Number(floor.marketParcel.pulseTimer) || 0),
+                packed: Math.max(0, Number(floor.marketParcel.packed) || 0),
+                earned: Math.max(0, Number(floor.marketParcel.earned) || 0),
+                phase: floor.marketParcel.phase || "quote",
+              }
+            : null;
+      }
       if (floor.type === "kingdom") {
         floor.royalMandateCooldown = Math.max(0, Number(floor.royalMandateCooldown) || 0);
         floor.royalMandate =
@@ -2648,6 +2681,9 @@ function updateTimers(dt) {
     }
     if (floor.type === "market") {
       floor.marketCooldown = Math.max(0, (floor.marketCooldown || 0) - dt * (1 + clockworkTempoBonus(state) * 0.18));
+      if (updateMarketParcelFloor(floor, dt)) {
+        lastKingdomKey = "";
+      }
     }
     if (floor.type === "kingdom" && updateRoyalMandateFloor(floor, dt)) {
       lastKingdomKey = "";
@@ -2824,6 +2860,7 @@ function createOrder(game, options = {}) {
     source: options.source || "royal",
     bonusRelic: Math.random() < (options.source === "market" ? 0.44 : 0.35),
     royalMandate: null,
+    marketParcel: null,
   };
 }
 
@@ -2858,6 +2895,42 @@ function orderMandatePrepared(order) {
   return clamp(Number(order?.royalMandate?.prepared) || 0, 0, Math.max(1, Number(order?.amount) || 1));
 }
 
+function normalizeOrderLogistics(order) {
+  normalizeOrderMandate(order);
+  if (!order || typeof order !== "object") return order;
+  const amount = Math.max(1, Number(order.amount) || 1);
+  if (!order.marketParcel || typeof order.marketParcel !== "object") {
+    delete order.marketParcel;
+    return order;
+  }
+  const maxPacked = Math.max(0, amount - orderMandatePrepared(order));
+  const packed = clamp(Number(order.marketParcel.packed) || 0, 0, maxPacked);
+  const rewardBonus = Math.max(0, Number(order.marketParcel.rewardBonus) || 0);
+  if (!packed && !rewardBonus && !order.marketParcel.active && !order.marketParcel.shipped) {
+    delete order.marketParcel;
+    return order;
+  }
+  order.marketParcel = {
+    floorId: Number(order.marketParcel.floorId) || 0,
+    packed,
+    rewardBonus,
+    active: Boolean(order.marketParcel.active),
+    shipped: Boolean(order.marketParcel.shipped),
+  };
+  return order;
+}
+
+function orderMarketPacked(order) {
+  const amount = Math.max(1, Number(order?.amount) || 1);
+  const maxPacked = Math.max(0, amount - orderMandatePrepared(order));
+  return clamp(Number(order?.marketParcel?.packed) || 0, 0, maxPacked);
+}
+
+function orderPreparedTotal(order) {
+  const amount = Math.max(1, Number(order?.amount) || 1);
+  return clamp(orderMandatePrepared(order) + orderMarketPacked(order), 0, amount);
+}
+
 function orderRawStock(order, game = state) {
   return businessFloors(game)
     .filter((floor) => floor.type === order.type)
@@ -2867,7 +2940,9 @@ function orderRawStock(order, game = state) {
 function orderStockInfo(order, game = state) {
   const floors = businessFloors(game).filter((floor) => floor.type === order.type);
   const stockOwned = floors.reduce((sum, floor) => sum + floor.stock, 0);
-  const prepared = orderMandatePrepared(order);
+  const mandatePrepared = orderMandatePrepared(order);
+  const packed = orderMarketPacked(order);
+  const prepared = clamp(mandatePrepared + packed, 0, Math.max(1, Number(order.amount) || 1));
   const owned = stockOwned + prepared;
   const bestFloor = floors.sort((a, b) => {
     const missingA = a.stock > 0 ? 0 : a.production ? 1 : a.workers?.length ? 2 : 3;
@@ -2877,6 +2952,8 @@ function orderStockInfo(order, game = state) {
   return {
     owned,
     stockOwned,
+    mandatePrepared,
+    packed,
     prepared,
     missing: Math.max(0, order.amount - owned),
     ready: owned >= order.amount,
@@ -2904,10 +2981,111 @@ function marketDealCooldown(floor) {
   return Math.max(18, Math.round(42 - skill * 2.2 - network * 36 - clockworkTempoBonus(state) * 12));
 }
 
+function isActiveMarketParcel(floor) {
+  return floor?.type === "market" && floor.marketParcel && Number(floor.marketParcel.remaining || 0) > 0;
+}
+
+function currentMarketParcelPhase(floor) {
+  if (!isActiveMarketParcel(floor)) return MARKET_PARCEL_PHASES[0];
+  const total = Math.max(1, Number(floor.marketParcel.total || 1));
+  const progress = clamp(1 - Number(floor.marketParcel.remaining || 0) / total, 0, 1);
+  return MARKET_PARCEL_PHASES.slice()
+    .reverse()
+    .find((phase) => progress >= phase.threshold) || MARKET_PARCEL_PHASES[0];
+}
+
+function marketDealActionBlockReason(floor) {
+  if (!floor || floor.type !== "market") return "需要市集楼层";
+  if (!floor.workers?.length) return "市集需要员工撮合快单";
+  if ((floor.stock || 0) <= 0) return "市集货摊空了，先补货";
+  if (isActiveMarketParcel(floor)) return "市集包裹正在流转";
+  if ((floor.marketCooldown || 0) > 0) return `摊主还在谈价：${Math.ceil(floor.marketCooldown)}s`;
+  if ((state.orders || []).length >= orderCapacity(state)) return "订单栏已满，先交付一张";
+  if (!businessFloors(state).some((candidate) => candidate.type !== "market" && candidate.stock > 0)) return "需要其他经营楼层先备出可售现货";
+  return "";
+}
+
+function collectOrderStockForParcel(order, amount, game = state) {
+  let remaining = Math.max(0, Math.round(amount || 0));
+  if (!order || remaining <= 0) return 0;
+  let collected = 0;
+  businessFloors(game)
+    .filter((floor) => floor.type === order.type && floor.stock > 0)
+    .sort((a, b) => b.stock - a.stock || b.level - a.level || a.id - b.id)
+    .forEach((floor) => {
+      if (remaining <= 0) return;
+      const take = Math.min(floor.stock || 0, remaining);
+      floor.stock -= take;
+      remaining -= take;
+      collected += take;
+    });
+  return collected;
+}
+
+function applyMarketParcelStep(floor, order, scale = 1) {
+  if (!floor || !order) return { packed: 0, reward: 0 };
+  normalizeOrderLogistics(order);
+  const mandatePrepared = orderMandatePrepared(order);
+  const packedBefore = orderMarketPacked(order);
+  const canPack = Math.max(0, order.amount - mandatePrepared - packedBefore);
+  if (canPack <= 0) {
+    if (order.marketParcel) order.marketParcel.active = false;
+    return { packed: 0, reward: 0 };
+  }
+  const skill = averageSkill(floor.workers || [], "market");
+  const batch = Math.max(1, Math.round((1 + skill / 7 + (floor.level || 1) * 0.2) * scale));
+  const packed = collectOrderStockForParcel(order, Math.min(canPack, batch), state);
+  if (packed <= 0) return { packed: 0, reward: 0 };
+
+  const reward = Math.round((10 + (FLOOR_TYPES[order.type]?.price || 8) * packed * 0.34 + skill * 1.8) * (1 + marketTradeBonus(state) * 1.45));
+  order.marketParcel ||= { floorId: floor.id, packed: 0, rewardBonus: 0, active: true, shipped: false };
+  order.marketParcel.floorId = floor.id;
+  order.marketParcel.active = true;
+  order.marketParcel.packed = clamp(orderMarketPacked(order) + packed, 0, Math.max(0, order.amount - orderMandatePrepared(order)));
+  order.marketParcel.rewardBonus = Math.max(0, Number(order.marketParcel.rewardBonus || 0) + reward);
+  order.reward += reward;
+
+  if (floor.marketParcel) {
+    floor.marketParcel.packed = Math.max(0, Number(floor.marketParcel.packed || 0) + packed);
+    floor.marketParcel.earned = Math.max(0, Number(floor.marketParcel.earned || 0) + reward);
+    floor.marketParcel.phase = currentMarketParcelPhase(floor).id;
+  }
+  state.stats.marketParcelItemsPacked = (state.stats.marketParcelItemsPacked || 0) + packed;
+  return { packed, reward };
+}
+
+function startMarketParcel(floor, order) {
+  if (!floor || !order) return null;
+  const duration = randFloat(18, 25);
+  floor.marketParcel = {
+    id: `parcel-${floor.id}-${Date.now()}-${randInt(10, 99)}`,
+    orderId: order.id,
+    type: order.type,
+    remaining: duration,
+    total: duration,
+    pulseTimer: 0.2,
+    packed: 0,
+    earned: 0,
+    phase: "quote",
+  };
+  order.marketParcel = {
+    ...(order.marketParcel || {}),
+    floorId: floor.id,
+    packed: orderMarketPacked(order),
+    rewardBonus: Math.max(0, Number(order.marketParcel?.rewardBonus) || 0),
+    active: true,
+    shipped: false,
+  };
+  state.stats.marketParcelsDone = (state.stats.marketParcelsDone || 0) + 1;
+  applyMarketParcelStep(floor, order, 1);
+  return floor.marketParcel;
+}
+
 function brokerMarketOrder(floor, options = {}) {
   if (!floor || floor.type !== "market") return null;
   const capacity = orderCapacity(state);
   if ((state.orders || []).length >= capacity) return null;
+  if (isActiveMarketParcel(floor)) return null;
   const type = bestMarketOrderType(state);
   const stocked = businessFloors(state)
     .filter((candidate) => candidate.type === type)
@@ -2927,33 +3105,103 @@ function brokerMarketOrder(floor, options = {}) {
   if (!options.free) floor.stock = Math.max(0, (floor.stock || 0) - 1);
   if (!options.noCooldown) floor.marketCooldown = marketDealCooldown(floor);
   state.stats.marketDealsDone = (state.stats.marketDealsDone || 0) + 1;
+  startMarketParcel(floor, order);
   return order;
 }
 
 function startMarketDeal(floorId) {
   const floor = findFloor(floorId);
   if (!isBusiness(floor) || floor.type !== "market") return;
-  if (!floor.workers.length) {
-    showToast("市集需要员工撮合快单");
-    return;
-  }
-  if (floor.stock <= 0) {
-    showToast("市集货摊空了，先补货");
-    return;
-  }
-  if ((floor.marketCooldown || 0) > 0) {
-    showToast(`摊主还在谈价：${Math.ceil(floor.marketCooldown)}s`);
-    return;
-  }
-  if ((state.orders || []).length >= orderCapacity(state)) {
-    showToast("订单栏已满，先交付一张");
+  const reason = marketDealActionBlockReason(floor);
+  if (reason) {
+    showToast(reason);
     return;
   }
   const order = brokerMarketOrder(floor);
   if (!order) return;
-  showToast("市集撮合了一张快单");
-  addLog(`${floor.name} 撮合快单：${FLOOR_TYPES[order.type].label} ${order.amount}。`);
+  showToast("市集撮合快单，包裹开始流转");
+  addLog(`${floor.name} 撮合快单：${FLOOR_TYPES[order.type].label} ${order.amount}，摊位开始打包发货。`);
   render(true);
+}
+
+function updateMarketParcelFloor(floor, dt) {
+  if (floor?.type !== "market") return false;
+  const before = marketParcelMapKey(floor);
+  if (!isActiveMarketParcel(floor)) return before !== marketParcelMapKey(floor);
+  const order = state.orders.find((entry) => entry.id === floor.marketParcel.orderId);
+  if (!order) {
+    floor.marketParcel = null;
+    return true;
+  }
+  floor.marketParcel.remaining = Math.max(0, Number(floor.marketParcel.remaining || 0) - dt);
+  floor.marketParcel.pulseTimer = Math.max(0, Number(floor.marketParcel.pulseTimer || 0) - dt);
+  floor.marketParcel.phase = currentMarketParcelPhase(floor).id;
+  order.marketParcel ||= { floorId: floor.id, packed: 0, rewardBonus: 0, active: true, shipped: false };
+  order.marketParcel.active = true;
+  if (floor.marketParcel.pulseTimer <= 0 && floor.marketParcel.remaining > 0) {
+    const step = applyMarketParcelStep(floor, order, 1);
+    if (!step.packed && orderStockInfo(order).ready) {
+      order.marketParcel.active = false;
+      order.marketParcel.shipped = true;
+      addLog(`${floor.name} 的市集包裹提前备齐，订单已可交付。`);
+      floor.marketParcel = null;
+      return true;
+    }
+    floor.marketParcel.pulseTimer = randFloat(4.6, 6.4);
+  }
+  if (floor.marketParcel.remaining <= 0) {
+    order.marketParcel.active = false;
+    order.marketParcel.shipped = orderMarketPacked(order) > 0;
+    addLog(`${floor.name} 的包裹流转完成，已打包 ${orderMarketPacked(order)}/${order.amount} 件。`);
+    floor.marketParcel = null;
+  }
+  return before !== marketParcelMapKey(floor);
+}
+
+function renderMarketParcelPanel(floor) {
+  if (floor?.type !== "market") return "";
+  const active = isActiveMarketParcel(floor);
+  const order = active ? state.orders.find((entry) => entry.id === floor.marketParcel.orderId) : null;
+  const phase = active ? currentMarketParcelPhase(floor) : MARKET_PARCEL_PHASES[0];
+  const progress = active ? Math.round((1 - floor.marketParcel.remaining / Math.max(1, floor.marketParcel.total)) * 100) : 0;
+  const packed = order ? orderMarketPacked(order) : 0;
+  const status = active
+    ? `${phase.label} ${Math.ceil(floor.marketParcel.remaining)}s · ${FLOOR_TYPES[order?.type]?.label || "订单"}`
+    : (floor.marketCooldown || 0) > 0
+      ? `冷却 ${Math.ceil(floor.marketCooldown)}s`
+      : "等待撮合快单";
+  const detail = active
+    ? `已打包 ${packed}/${order?.amount || 0} · 加价 ${floor.marketParcel.earned || 0}`
+    : `包裹 ${state.stats.marketParcelsDone || 0} 次 · 打包 ${state.stats.marketParcelItemsPacked || 0} 件`;
+  return `
+    <div class="market-parcel-panel ${active ? "active" : ""}" data-phase="${escapeAttr(phase.id)}">
+      <div class="market-parcel-head">
+        <strong>市集包裹流</strong>
+        <em>${active ? phase.label : "待单"}</em>
+      </div>
+      <div class="market-parcel-track" style="--parcel-x:${progress}%" aria-hidden="true">
+        <i style="width:${progress}%"></i>
+        <b></b>
+      </div>
+      <span>${escapeHtml(status)}</span>
+      <small>${escapeHtml(detail)}</small>
+    </div>`;
+}
+
+function marketParcelMapKey(floor) {
+  if (floor?.type !== "market") return "";
+  const order = floor.marketParcel?.orderId ? state.orders.find((entry) => entry.id === floor.marketParcel.orderId) : null;
+  const packed = order ? orderMarketPacked(order) : 0;
+  return `parcel:${Math.ceil(floor.marketCooldown || 0)}:${Math.ceil(floor.marketParcel?.remaining || 0)}:${floor.marketParcel?.orderId || ""}:${floor.marketParcel?.phase || ""}:${floor.marketParcel?.packed || 0}:${floor.marketParcel?.earned || 0}:${packed}`;
+}
+
+function clearMarketParcelForOrder(orderId) {
+  businessFloors(state).forEach((floor) => {
+    if (floor.type === "market" && floor.marketParcel?.orderId === orderId) {
+      floor.marketParcel = null;
+    }
+  });
+  lastKingdomKey = "";
 }
 
 function isActiveRoyalMandate(floor) {
@@ -2995,7 +3243,7 @@ function bestRoyalMandateOrder(game = state, explicitOrderId = "") {
   return orders
     .map((order, index) => {
       const rawStock = orderRawStock(order, game);
-      const prepared = orderMandatePrepared(order);
+      const prepared = orderPreparedTotal(order);
       const missing = Math.max(0, order.amount - rawStock - prepared);
       const repeatPenalty = order.royalMandate?.active ? -100 : 0;
       const readyPenalty = missing <= 0 ? -4 : 0;
@@ -3022,7 +3270,7 @@ function applyRoyalMandateStep(floor, order, scale = 1) {
   normalizeOrderMandate(order);
   const skill = averageSkill(floor.workers || [], "kingdom");
   const rawStock = orderRawStock(order);
-  const preparedBefore = orderMandatePrepared(order);
+  const preparedBefore = orderPreparedTotal(order);
   const missing = Math.max(0, order.amount - rawStock - preparedBefore);
   if (missing <= 0) {
     if (order.royalMandate) order.royalMandate.active = false;
@@ -3033,7 +3281,7 @@ function applyRoyalMandateStep(floor, order, scale = 1) {
   order.royalMandate ||= { floorId: floor.id, prepared: 0, rewardBonus: 0, active: true, seal: false };
   order.royalMandate.floorId = floor.id;
   order.royalMandate.active = true;
-  order.royalMandate.prepared = clamp(orderMandatePrepared(order) + prepared, 0, order.amount);
+  order.royalMandate.prepared = clamp(orderMandatePrepared(order) + prepared, 0, Math.max(0, order.amount - orderMarketPacked(order)));
   order.royalMandate.rewardBonus = Math.max(0, Number(order.royalMandate.rewardBonus || 0) + reward);
   if (!order.royalMandate.seal && Math.random() < 0.16 + kingdomMandateBonus(state) * 0.55) {
     order.royalMandate.seal = true;
@@ -3132,7 +3380,7 @@ function renderRoyalMandatePanel(floor) {
       : order
         ? `候选：${order.title}`
         : "等待订单";
-  const prepared = info ? `预备 ${info.prepared}/${order.amount} · 缺 ${info.missing}` : "暂无订单";
+  const prepared = info ? `王令预备 ${info.mandatePrepared}/${order.amount} · 缺 ${info.missing}` : "暂无订单";
   const earned = active ? ` · 加赏 ${floor.royalMandate.earned || 0}` : "";
   return `
     <div class="royal-mandate-panel ${active ? "active" : ""}" data-phase="${escapeAttr(phase.id)}">
@@ -5015,7 +5263,9 @@ function fulfillOrder(orderId) {
     return;
   }
 
-  const prepared = orderMandatePrepared(order);
+  const mandatePrepared = orderMandatePrepared(order);
+  const packed = orderMarketPacked(order);
+  const prepared = orderPreparedTotal(order);
   let remaining = Math.max(0, order.amount - prepared);
   businessFloors(state)
     .filter((floor) => floor.type === order.type)
@@ -5032,8 +5282,8 @@ function fulfillOrder(orderId) {
   state.stats.commissionsDone += 1;
   state.happiness = clamp(state.happiness + (order.source === "market" ? 4 : 3), 0, 100);
   showFloat(`订单 +${order.reward}`);
-  const mandateText = prepared ? `，王令预备 ${prepared}` : "";
-  addLog(`${orderSourceLabel(order)}完成：${FLOOR_TYPES[order.type].label} ${order.amount}${mandateText}，奖励 ${order.reward} 金币。`);
+  const preparedText = [mandatePrepared ? `王令预备 ${mandatePrepared}` : "", packed ? `市集打包 ${packed}` : ""].filter(Boolean).join("，");
+  addLog(`${orderSourceLabel(order)}完成：${FLOOR_TYPES[order.type].label} ${order.amount}${preparedText ? `，${preparedText}` : ""}，奖励 ${order.reward} 金币。`);
   if (order.type === "craft") {
     const crateBonus = Math.round(18 + craftToolBonus(state) * 115);
     addCoins(crateBonus);
@@ -5043,6 +5293,7 @@ function fulfillOrder(orderId) {
     awardRelicPiece();
   }
   clearRoyalMandateForOrder(orderId);
+  clearMarketParcelForOrder(orderId);
   state.orders = state.orders.filter((entry) => entry.id !== orderId);
   ensureOrders(state);
   render(true);
@@ -5099,7 +5350,7 @@ function getKingdomRenderKey() {
       if (floor.type === "lobby") {
         return `${floor.id}:lobby:${state.queue.map((visitor) => `${visitor.id}:${visitor.need || ""}:${visitor.activity || ""}`).join("-")}:${state.selectedFloorId}`;
       }
-      return `${floor.id}:${floor.type}:${floor.level}:${floor.stock}:${floor.stockMax}:${floor.workers.length}:${Boolean(floor.production)}:${foodRushMapKey(floor)}:${royalMandateMapKey(floor)}:${comfortSessionMapKey(floor)}:${showtimeMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
+      return `${floor.id}:${floor.type}:${floor.level}:${floor.stock}:${floor.stockMax}:${floor.workers.length}:${Boolean(floor.production)}:${foodRushMapKey(floor)}:${marketParcelMapKey(floor)}:${royalMandateMapKey(floor)}:${comfortSessionMapKey(floor)}:${showtimeMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
     })
     .join("|");
   const arrivalKey = (state.arrivals || []).map((arrival) => `${arrival.id}:${arrival.floorId}`).join("-");
@@ -5143,6 +5394,10 @@ function renderFloor(floor) {
   const royalMandateAttrs = isActiveRoyalMandate(floor)
     ? ` data-royal-mandate-phase="${escapeAttr(currentRoyalMandatePhase(floor).id)}"`
     : "";
+  const marketParcelClass = isActiveMarketParcel(floor) ? "market-parcel-active" : "";
+  const marketParcelAttrs = isActiveMarketParcel(floor)
+    ? ` data-market-parcel-phase="${escapeAttr(currentMarketParcelPhase(floor).id)}" data-market-parcel-packed="${escapeAttr(floor.marketParcel.packed || 0)}"`
+    : "";
   const comfortClass = isActiveComfortSession(floor) ? "comfort-active" : "";
   const showtimeClass = isActiveShowtime(floor) ? "showtime-active" : "";
   const showtimeAttrs = isActiveShowtime(floor)
@@ -5150,7 +5405,7 @@ function renderFloor(floor) {
     : "";
   const zone = getFloorZone(floor);
   return `
-    <article class="floor ${selected} ${constructing} ${routeClass} ${foodRushClass} ${royalMandateClass} ${comfortClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${foodRushAttrs}${royalMandateAttrs}${showtimeAttrs}>
+    <article class="floor ${selected} ${constructing} ${routeClass} ${foodRushClass} ${marketParcelClass} ${royalMandateClass} ${comfortClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${foodRushAttrs}${marketParcelAttrs}${royalMandateAttrs}${showtimeAttrs}>
       ${renderFloorIndex(floor)}
       <div class="room" data-action="select-floor" data-floor-id="${floor.id}" title="${escapeAttr(floorMapLabel(floor))}" aria-label="${escapeAttr(floorMapLabel(floor))}">
         ${floor.status === "construction" ? renderConstruction(floor) : renderOpenFloor(floor)}
@@ -5376,6 +5631,10 @@ function renderRoomStateTag(floor) {
     const label = FOOD_RUSH_LABELS[floor.type] || "餐桌高峰";
     return `<span class="room-state-tag good icon-only" data-state="meal-rush" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"></span>`;
   }
+  if (isActiveMarketParcel(floor)) {
+    const phase = currentMarketParcelPhase(floor);
+    return `<span class="room-state-tag good icon-only" data-state="market-parcel" title="${escapeAttr(`包裹${phase.label}`)}" aria-label="${escapeAttr(`包裹${phase.label}`)}"></span>`;
+  }
   if (isActiveRoyalMandate(floor)) {
     const phase = currentRoyalMandatePhase(floor);
     return `<span class="room-state-tag good icon-only" data-state="royal-mandate" title="${escapeAttr(`王令${phase.label}`)}" aria-label="${escapeAttr(`王令${phase.label}`)}"></span>`;
@@ -5429,6 +5688,7 @@ function renderFloorStatusGlyph(floor) {
   else if (floor.type === "dwelling") stateName = floor.rentReady ? "rent" : "home";
   else if (isActiveComfortSession(floor)) stateName = "comfort";
   else if (isActiveFoodRush(floor)) stateName = "meal-rush";
+  else if (isActiveMarketParcel(floor)) stateName = "market-parcel";
   else if (isActiveRoyalMandate(floor)) stateName = "royal-mandate";
   else if (isActiveShowtime(floor)) stateName = "showtime";
   else if (floor.production) stateName = "stocking";
@@ -5632,6 +5892,10 @@ function renderFloorMeter(floor) {
     const progress = 1 - floor.royalMandate.remaining / Math.max(1, floor.royalMandate.total || 1);
     return `<div class="meter royal-mandate-inline-meter"><span style="width:${clamp(progress * 100, 0, 100)}%"></span></div>`;
   }
+  if (isActiveMarketParcel(floor)) {
+    const progress = 1 - floor.marketParcel.remaining / Math.max(1, floor.marketParcel.total || 1);
+    return `<div class="meter market-parcel-inline-meter"><span style="width:${clamp(progress * 100, 0, 100)}%"></span></div>`;
+  }
   const ratio = floor.stockMax ? floor.stock / floor.stockMax : 0;
   return `<div class="meter"><span style="width:${Math.round(ratio * 100)}%"></span></div>`;
 }
@@ -5666,6 +5930,7 @@ function renderFloorStatus(floor) {
   if (floor.type === "dwelling") return floor.rentReady ? `租金 ${floor.rentReady}` : "居住";
   if (isActiveComfortSession(floor)) return `${COMFORT_SESSION_LABELS[floor.type] || "休整"} ${Math.ceil(floor.comfortSession.remaining)}s`;
   if (isActiveFoodRush(floor)) return `${currentFoodRushPace(floor).label}${FOOD_RUSH_LABELS[floor.type] || "餐桌高峰"} · 上菜 ${floor.foodRush.served || 0}/${floor.foodRush.targetServings || 0}`;
+  if (isActiveMarketParcel(floor)) return `${currentMarketParcelPhase(floor).label}包裹 · 打包 ${floor.marketParcel.packed || 0}`;
   if (isActiveRoyalMandate(floor)) return `${currentRoyalMandatePhase(floor).label}王令 ${Math.ceil(floor.royalMandate.remaining)}s`;
   if (isActiveShowtime(floor)) return `${currentShowtimeBeat(floor).label}${SHOWTIME_LABELS[floor.type] || "小剧"} · 热度 ${Math.round(floor.showtime.heat || 0)}%`;
   if (floor.production) return `补货 ${Math.ceil(floor.production.remaining)}s`;
@@ -5842,6 +6107,11 @@ function renderFloorDetail() {
   const skill = averageSkill(floor.workers, floor.type);
   const dreamWorkers = countDreamWorkers(floor);
   const marketCooldown = floor.type === "market" ? Math.ceil(floor.marketCooldown || 0) : 0;
+  const marketParcelActive = floor.type === "market" && isActiveMarketParcel(floor);
+  const marketParcelTarget = marketParcelActive ? state.orders.find((order) => order.id === floor.marketParcel.orderId) : null;
+  const marketParcelReason = floor.type === "market" ? marketDealActionBlockReason(floor) : "";
+  const marketParcelStageValue = marketParcelActive ? currentMarketParcelPhase(floor).label : "待单";
+  const marketParcelPackedValue = marketParcelActive ? `${floor.marketParcel.packed || 0}/${marketParcelTarget?.amount || 0}` : `${state.stats.marketParcelItemsPacked || 0}`;
   const libraryCooldown = floor.type === "library" ? Math.ceil(floor.libraryCooldown || 0) : 0;
   const comfortCooldown = isComfortFloorType(floor.type) ? Math.ceil(floor.comfortCooldown || 0) : 0;
   const comfortActive = isActiveComfortSession(floor);
@@ -5869,7 +6139,7 @@ function renderFloorDetail() {
       : royalMandateTarget
         ? "就绪"
         : "无单";
-  const royalMandatePreparedValue = royalMandateInfo ? `${royalMandateInfo.prepared}/${royalMandateTarget.amount}` : "-";
+  const royalMandatePreparedValue = royalMandateInfo ? `${royalMandateInfo.mandatePrepared}/${royalMandateTarget.amount}` : "-";
   els.floorDetail.innerHTML = `
     <strong>${escapeHtml(floor.name)}</strong>
     <p>${FLOOR_TYPES[floor.type].desc}</p>
@@ -5880,18 +6150,19 @@ function renderFloorDetail() {
       <div class="stat"><b>${dreamWorkers}/3</b><span>理想岗位</span></div>
       <div class="stat"><b>${skill.toFixed(1)}</b><span>技能</span></div>
       <div class="stat"><b>${floor.production ? Math.ceil(floor.production.remaining) + "s" : "就绪"}</b><span>补货</span></div>
-      ${floor.type === "market" ? `<div class="stat"><b>${state.orders.length}/${orderCapacity(state)}</b><span>订单栏</span></div><div class="stat"><b>${marketCooldown ? marketCooldown + "s" : "就绪"}</b><span>撮合</span></div>` : ""}
+      ${floor.type === "market" ? `<div class="stat"><b>${state.orders.length}/${orderCapacity(state)}</b><span>订单栏</span></div><div class="stat"><b>${marketCooldown ? marketCooldown + "s" : "就绪"}</b><span>撮合</span></div><div class="stat"><b>${marketParcelStageValue}</b><span>包裹</span></div><div class="stat"><b>${marketParcelPackedValue}</b><span>打包</span></div><div class="stat"><b>${state.stats.marketParcelsDone || 0}</b><span>流转</span></div>` : ""}
       ${floor.type === "library" ? `<div class="stat"><b>${catalog.completed}/${COLLECTION_DEFS.length}</b><span>图鉴</span></div><div class="stat"><b>${libraryCooldown ? libraryCooldown + "s" : "就绪"}</b><span>编目</span></div>` : ""}
       ${isComfortFloorType(floor.type) ? `<div class="stat"><b>${comfortActive ? Math.ceil(floor.comfortSession.remaining) + "s" : comfortCooldown ? comfortCooldown + "s" : "就绪"}</b><span>休整</span></div>` : ""}
       ${isShowtimeFloorType(floor.type) ? `<div class="stat"><b>${showtimeActive ? Math.ceil(floor.showtime.remaining) + "s" : showtimeCooldownValue ? showtimeCooldownValue + "s" : "就绪"}</b><span>演出</span></div><div class="stat"><b>${showtimeBeatValue}</b><span>段落</span></div><div class="stat"><b>${showtimeHeatValue}</b><span>热度</span></div><div class="stat"><b>${state.stats.entertainmentShowsDone || 0}/${state.stats.showtimeReactionsDone || 0}</b><span>小剧/反应</span></div>` : ""}
     </div>
     ${renderFloorPerks(floor)}
+    ${renderMarketParcelPanel(floor)}
     ${renderComfortSessionPanel(floor)}
     ${renderShowtimePanel(floor)}
     ${renderResidentList(workers, floor.type)}
     <div class="detail-actions">
       <button class="detail-btn primary" data-action="stock" data-floor-id="${floor.id}">补货</button>
-      ${floor.type === "market" ? `<button class="detail-btn" data-action="market-deal" data-floor-id="${floor.id}" ${marketCooldown || !floor.workers.length || floor.stock <= 0 || state.orders.length >= orderCapacity(state) ? "disabled" : ""}>撮合订单</button>` : ""}
+      ${floor.type === "market" ? `<button class="detail-btn" data-action="market-deal" data-floor-id="${floor.id}" title="${escapeAttr(marketParcelReason || "撮合快单，并让市集摊位把现货打包发出")}" ${marketParcelReason ? "disabled" : ""}>撮合快单</button>` : ""}
       ${floor.type === "library" ? `<button class="detail-btn" data-action="library-study" data-floor-id="${floor.id}" ${libraryCooldown || !floor.workers.length || floor.stock <= 0 ? "disabled" : ""}>整理典藏</button>` : ""}
       ${isShowtimeFloorType(floor.type) ? `<button class="detail-btn" data-action="entertainment-show" data-floor-id="${floor.id}" title="${escapeAttr(showtimeReason || "组织演员与观众开演")}" ${showtimeReason ? "disabled" : ""}>${SHOWTIME_ACTIONS[floor.type] || "排演"}</button>` : ""}
       ${isComfortFloorType(floor.type) ? `<button class="detail-btn" data-action="comfort-session" data-floor-id="${floor.id}" title="${escapeAttr(comfortReason || "组织居民结伴休整")}" ${comfortReason ? "disabled" : ""}>${COMFORT_SESSION_ACTIONS[floor.type] || "组织休整"}</button>` : ""}
@@ -5923,6 +6194,9 @@ function renderFloorPerks(floor) {
     perks.push(`订单 +${Math.round((orderNetworkBonus(state) - 1) * 100)}%`);
     perks.push(`容量 ${state.orders.length}/${orderCapacity(state)}`);
     perks.push(`售卖 +${Math.round((businessIncomeMultiplier(floor, state) - 1) * 100)}%`);
+    perks.push(`包裹 ${state.stats.marketParcelsDone || 0}`);
+    perks.push(`打包 ${state.stats.marketParcelItemsPacked || 0}`);
+    if (isActiveMarketParcel(floor)) perks.push(`${currentMarketParcelPhase(floor).label} ${floor.marketParcel.packed || 0}件`);
   } else if (floor.type === "library") {
     const next = nextCollectionItem(state);
     perks.push(`探险碎片 +${Math.round(libraryResearchBonus(state) * 100)}%`);
@@ -6054,6 +6328,11 @@ function renderFloorDetail() {
   const skill = averageSkill(floor.workers, floor.type);
   const dreamWorkers = countDreamWorkers(floor);
   const marketCooldown = floor.type === "market" ? Math.ceil(floor.marketCooldown || 0) : 0;
+  const marketParcelActive = floor.type === "market" && isActiveMarketParcel(floor);
+  const marketParcelTarget = marketParcelActive ? state.orders.find((order) => order.id === floor.marketParcel.orderId) : null;
+  const marketParcelReason = floor.type === "market" ? marketDealActionBlockReason(floor) : "";
+  const marketParcelStageValue = marketParcelActive ? currentMarketParcelPhase(floor).label : "待单";
+  const marketParcelPackedValue = marketParcelActive ? `${floor.marketParcel.packed || 0}/${marketParcelTarget?.amount || 0}` : `${state.stats.marketParcelItemsPacked || 0}`;
   const libraryCooldown = floor.type === "library" ? Math.ceil(floor.libraryCooldown || 0) : 0;
   const foodRushCooldownValue = isFoodRushFloorType(floor.type) ? Math.ceil(floor.foodRushCooldown || 0) : 0;
   const foodRushActive = isActiveFoodRush(floor);
@@ -6087,7 +6366,7 @@ function renderFloorDetail() {
       : royalMandateTarget
         ? "就绪"
         : "无单";
-  const royalMandatePreparedValue = royalMandateInfo ? `${royalMandateInfo.prepared}/${royalMandateTarget.amount}` : "-";
+  const royalMandatePreparedValue = royalMandateInfo ? `${royalMandateInfo.mandatePrepared}/${royalMandateTarget.amount}` : "-";
 
   els.floorDetail.innerHTML = `
     <strong>${escapeHtml(floor.name)}</strong>
@@ -6100,13 +6379,14 @@ function renderFloorDetail() {
       <div class="stat"><b>${skill.toFixed(1)}</b><span>技能</span></div>
       <div class="stat"><b>${floor.production ? Math.ceil(floor.production.remaining) + "s" : "就绪"}</b><span>补货</span></div>
       ${isFoodRushFloorType(floor.type) ? `<div class="stat"><b>${foodRushActive ? Math.ceil(floor.foodRush.remaining) + "s" : foodRushCooldownValue ? foodRushCooldownValue + "s" : "就绪"}</b><span>高峰</span></div><div class="stat"><b>${foodRushPaceValue}</b><span>节奏</span></div><div class="stat"><b>${foodRushHeatValue}</b><span>忙场</span></div><div class="stat"><b>${foodRushServedValue}</b><span>上菜</span></div>` : ""}
-      ${floor.type === "market" ? `<div class="stat"><b>${state.orders.length}/${orderCapacity(state)}</b><span>订单栏</span></div><div class="stat"><b>${marketCooldown ? marketCooldown + "s" : "就绪"}</b><span>撮合</span></div>` : ""}
+      ${floor.type === "market" ? `<div class="stat"><b>${state.orders.length}/${orderCapacity(state)}</b><span>订单栏</span></div><div class="stat"><b>${marketCooldown ? marketCooldown + "s" : "就绪"}</b><span>撮合</span></div><div class="stat"><b>${marketParcelStageValue}</b><span>包裹</span></div><div class="stat"><b>${marketParcelPackedValue}</b><span>打包</span></div><div class="stat"><b>${state.stats.marketParcelsDone || 0}</b><span>流转</span></div>` : ""}
       ${floor.type === "kingdom" ? `<div class="stat"><b>${royalMandateStageValue}</b><span>王令</span></div><div class="stat"><b>${royalMandatePreparedValue}</b><span>预备</span></div><div class="stat"><b>${state.stats.royalMandatesDone || 0}</b><span>签发</span></div><div class="stat"><b>${royalMandateInfo ? royalMandateInfo.missing : "-"}</b><span>缺口</span></div>` : ""}
       ${floor.type === "library" ? `<div class="stat"><b>${catalog.completed}/${COLLECTION_DEFS.length}</b><span>图鉴</span></div><div class="stat"><b>${libraryCooldown ? libraryCooldown + "s" : "就绪"}</b><span>编目</span></div>` : ""}
       ${isComfortFloorType(floor.type) ? `<div class="stat"><b>${comfortActive ? Math.ceil(floor.comfortSession.remaining) + "s" : comfortCooldown ? comfortCooldown + "s" : "就绪"}</b><span>休整</span></div>` : ""}
       ${isShowtimeFloorType(floor.type) ? `<div class="stat"><b>${showtimeActive ? Math.ceil(floor.showtime.remaining) + "s" : showtimeCooldownValue ? showtimeCooldownValue + "s" : "就绪"}</b><span>演出</span></div><div class="stat"><b>${showtimeBeatValue}</b><span>段落</span></div><div class="stat"><b>${showtimeHeatValue}</b><span>热度</span></div><div class="stat"><b>${state.stats.entertainmentShowsDone || 0}/${state.stats.showtimeReactionsDone || 0}</b><span>小剧/反应</span></div>` : ""}
     </div>
     ${renderFloorPerks(floor)}
+    ${renderMarketParcelPanel(floor)}
     ${renderRoyalMandatePanel(floor)}
     ${renderFoodRushPanel(floor)}
     ${renderComfortSessionPanel(floor)}
@@ -6115,7 +6395,7 @@ function renderFloorDetail() {
     <div class="detail-actions">
       <button class="detail-btn primary" data-action="stock" data-floor-id="${floor.id}">补货</button>
       ${isFoodRushFloorType(floor.type) ? `<button class="detail-btn" data-action="food-rush" data-floor-id="${floor.id}" title="${escapeAttr(foodRushReason || "组织饥饿居民入座并完成一轮忙碌上菜")}" ${foodRushReason ? "disabled" : ""}>${FOOD_RUSH_ACTIONS[floor.type] || "组织用餐高峰"}</button>` : ""}
-      ${floor.type === "market" ? `<button class="detail-btn" data-action="market-deal" data-floor-id="${floor.id}" ${marketCooldown || !floor.workers.length || floor.stock <= 0 || state.orders.length >= orderCapacity(state) ? "disabled" : ""}>撮合订单</button>` : ""}
+      ${floor.type === "market" ? `<button class="detail-btn" data-action="market-deal" data-floor-id="${floor.id}" title="${escapeAttr(marketParcelReason || "撮合快单，并让市集摊位把现货打包发出")}" ${marketParcelReason ? "disabled" : ""}>撮合快单</button>` : ""}
       ${floor.type === "kingdom" ? `<button class="detail-btn" data-action="royal-mandate" data-floor-id="${floor.id}" title="${escapeAttr(royalMandateReason || "消耗 1 枚印信，为最缺货的订单预备物资并提高奖励")}" ${royalMandateReason ? "disabled" : ""}>签发王令</button>` : ""}
       ${floor.type === "library" ? `<button class="detail-btn" data-action="library-study" data-floor-id="${floor.id}" ${libraryCooldown || !floor.workers.length || floor.stock <= 0 ? "disabled" : ""}>整理典藏</button>` : ""}
       ${isShowtimeFloorType(floor.type) ? `<button class="detail-btn" data-action="entertainment-show" data-floor-id="${floor.id}" title="${escapeAttr(showtimeReason || "组织演员与观众开演")}" ${showtimeReason ? "disabled" : ""}>${SHOWTIME_ACTIONS[floor.type] || "排演"}</button>` : ""}
@@ -6151,6 +6431,9 @@ function renderFloorPerks(floor) {
     perks.push(`订单 +${Math.round((orderNetworkBonus(state) - 1) * 100)}%`);
     perks.push(`容量 ${state.orders.length}/${orderCapacity(state)}`);
     perks.push(`销售 +${Math.round((businessIncomeMultiplier(floor, state) - 1) * 100)}%`);
+    perks.push(`包裹 ${state.stats.marketParcelsDone || 0}`);
+    perks.push(`打包 ${state.stats.marketParcelItemsPacked || 0}`);
+    if (isActiveMarketParcel(floor)) perks.push(`${currentMarketParcelPhase(floor).label} ${floor.marketParcel.packed || 0}件`);
   } else if (floor.type === "library") {
     const next = nextCollectionItem(state);
     perks.push(`探险碎片 +${Math.round(libraryResearchBonus(state) * 100)}%`);
@@ -6347,6 +6630,10 @@ function renderOrders() {
       const pct = Math.min(100, Math.round((owned / order.amount) * 100));
       const ready = info.ready;
       const prepared = info.prepared || 0;
+      const mandatePrepared = info.mandatePrepared || 0;
+      const packed = info.packed || 0;
+      const parcelActive = Boolean(order.marketParcel?.active);
+      const parcelShipped = Boolean(order.marketParcel?.shipped);
       const mandateActive = Boolean(order.royalMandate?.active);
       const mandateReason = mandateActive
         ? "王令正在签发"
@@ -6355,12 +6642,16 @@ function renderOrders() {
           : mandateFloor
             ? royalMandateActionBlockReason(mandateFloor, order)
             : "暂无可签令的王国楼层";
-      const stockText = prepared
-        ? `库存 ${Math.min(info.stockOwned, order.amount)}/${order.amount} · 王令 ${prepared}`
+      const preparedParts = [
+        mandatePrepared ? `王令 ${mandatePrepared}` : "",
+        packed ? `市集打包 ${packed}` : "",
+      ].filter(Boolean);
+      const stockText = preparedParts.length
+        ? `库存 ${Math.min(info.stockOwned, order.amount)}/${order.amount} · ${preparedParts.join(" · ")}`
         : `${Math.min(owned, order.amount)}/${order.amount}`;
       const floorButton = info.floor ? `<button class="detail-btn" data-action="focus-order-floor" data-floor-id="${info.floor.id}">定位</button>` : "";
       return `
-        <div class="order ${ready ? "ready" : ""} ${order.source === "market" ? "market-order" : ""} ${prepared ? "mandated-order" : ""} ${mandateActive ? "mandate-active" : ""}">
+        <div class="order ${ready ? "ready" : ""} ${order.source === "market" ? "market-order" : ""} ${mandatePrepared ? "mandated-order" : ""} ${packed ? "parcel-order" : ""} ${parcelActive ? "parcel-active" : ""} ${mandateActive ? "mandate-active" : ""}">
           <div class="order-head">
             <span class="type-token">${FLOOR_TYPES[order.type].icon}</span>
             <span><strong>${escapeHtml(order.title)}</strong><small>${escapeHtml(order.note)}</small></span>
@@ -6368,7 +6659,10 @@ function renderOrders() {
           <div class="order-tags">
             <span>${orderSourceLabel(order)}</span>
             <span>${ready ? "可交付" : `缺 ${info.missing}`}</span>
-            ${prepared ? `<span class="mandate-tag">王令预备 ${prepared}</span>` : ""}
+            ${packed ? `<span class="parcel-tag">市集打包 ${packed}</span>` : ""}
+            ${parcelActive ? `<span class="parcel-tag active">发货中</span>` : ""}
+            ${parcelShipped && !parcelActive ? `<span class="parcel-tag shipped">已发货</span>` : ""}
+            ${mandatePrepared ? `<span class="mandate-tag">王令预备 ${mandatePrepared}</span>` : ""}
             ${mandateActive ? `<span class="mandate-tag active">签发中</span>` : ""}
             ${order.royalMandate?.seal ? `<span class="mandate-tag seal">御印</span>` : ""}
           </div>
