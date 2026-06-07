@@ -1,0 +1,7 @@
+Create a polished fantasy side-view room background for a cozy vertical tower management browser game.
+
+Scene: an old underground dwelling floor and shared corridor that now clearly supports resident life routes. Show a warm compact apartment cutaway with bunk beds, tiny shelves, soft lanterns, a small shoe rack, hanging cloaks, a quiet notice board made only of abstract shapes, and a clear front walkway where small character sprites can travel. Add subtle route-friendly environmental details such as floor inlays, stepping stones, tiny glowing wayfinding beads, and a gentle doorway leading toward other tower floors. The room should feel lived-in, readable, and calmer than a busy market.
+
+Style: painterly stylized 2D game background, no characters, no UI, no readable text, no letters, no numbers, no signage, no logos, no watermark. Keep the lower foreground clear for tiny sprites and a path overlay. Use warm amber lamplight, muted teal route accents, crisp silhouettes, soft atmospheric depth, and a clean horizontal front-cutaway layout suitable for a 16:9 room tile.
+
+Output: high quality raster illustration, web game asset, no transparent border.

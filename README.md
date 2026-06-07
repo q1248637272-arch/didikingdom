@@ -4,10 +4,10 @@
 
 ## 本地运行
 
-直接打开 `index.html` 可以游玩；最近一次 v61 本地验证使用：
+直接打开 `index.html` 可以游玩；最近一次 v62 本地验证使用：
 
 ```text
-http://127.0.0.1:8811
+http://127.0.0.1:8812
 ```
 
 ## 玩法切片
@@ -21,6 +21,7 @@ http://127.0.0.1:8811
 - 人物现在会持续模拟餐饮、娱乐、社交和休息动机，互动会回补需求并积累熟人关系；居民卡片和名册会用四色生活条显示当前状态。
 - 手机端会显示底部控制抽屉，可切换当前楼层、居民、任务、订单、图鉴、探险和日志。
 - 人物会根据需求和熟人关系结伴出门，去吃饭、看演出、找朋友或休息，不再只是原地摇晃。
+- v62 继续深化角色生活系统：居民外出现在会在出发楼层和目标楼层留下稳定的生活路线，完成后沉淀为“生活小故事”，地图、楼层详情、居民卡片和名册都会显示最近足迹与需求回补，不再用原地震动冒充互动。
 - v61 继续深化旧王国楼层：王令现在会显示信使路线、送达阶段和回执奖励，地图、详情面板和订单卡都会反馈信使进度；回执会提高订单奖励，交付时仍只扣除未被王令预备的真实库存。
 - v60 深化了旧市集楼层：撮合快单现在会进入“议价 / 打包 / 发货”的包裹流，地图、详情面板和订单卡会显示打包进度、发货状态与市集已打包数量；打包会先扣除真实经营库存，交付时只扣剩余未打包部分。
 - v59 深化了旧王国楼层：王国现在可以主动“签发王令”，消耗印信推进缺货订单、增加加赏和御印机会；订单卡会显示真实库存、王令预备量、签发中状态和“签令”按钮，交付时只扣除剩余真实库存。
@@ -44,6 +45,14 @@ http://127.0.0.1:8811
 - 键盘支持 `W / ↑`、`S / ↓` 移动升降梯，`Space / Enter` 下客，`B` 打开建设。
 - v54 进行了轻量化清理：发布包移除了已被新版替代的旧房间图和旧表演者 PNG，表演者素材改为无损 WebP；发布运行目录只保留当前必要资产，本地旧浏览器配置、旧截图、图像中间产物和过期生成记录已清理。
 - v55 深化了旧演艺玩法：新增小剧任务、演出冷却、观众需求撮合、掌声金币奖励和娱乐/社交恢复，并保留 `docs/v55-entertainment-showtime-image-prompt.txt` 供后续图像网关恢复后刷新演艺房间背景。
+
+## v62 Update
+
+- v62 deepens the old character-life system with visible life trails and short story receipts for completed outings.
+- Life visits now remember origin floor/type, target route, motive, progress, and completion outcome through `lifeStories`, `nextLifeStoryId`, `lifeStoriesDone`, and the new `生活足迹` quest.
+- Map rooms expose stable route state through `.life-trail-layer`, `.life-trail-route`, `.floor.life-trail-active`, `data-life-trail-count`, and `data-life-trail-need`; floor detail, resident cards, and the roster show `.life-story-panel`, `.life-story-card`, and `.life-trail-chip`.
+- Completed visits now produce readable story text and small happiness feedback, so player-visible character behavior is based on routes, needs, and receipts rather than fake in-place shaking.
+- Local verification for this pass used `http://127.0.0.1:8812/` with `tmp/verify-v62-life-trails.mjs`; `gpt-image-2` was attempted twice for refreshed dwelling/life-trail room art but the gateway returned upstream request failures, so the reusable prompt is saved at `docs/v62-life-trails-dwelling-image-prompt.txt`.
 
 ## v61 Update
 

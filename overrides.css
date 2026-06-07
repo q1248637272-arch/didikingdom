@@ -3315,3 +3315,250 @@ body.fullscreen-active .build-grid {
     transform: translateY(-2px);
   }
 }
+
+.floor.life-trail-active .room {
+  box-shadow:
+    inset 0 5px 0 rgba(255, 241, 192, 0.16),
+    inset 0 -24px 30px rgba(0, 0, 0, 0.34),
+    0 0 0 2px rgba(110, 168, 230, 0.2),
+    0 18px 34px rgba(0, 0, 0, 0.4);
+}
+
+.life-trail-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.life-trail-route {
+  --trail-a: #7fd7c5;
+  --trail-b: #ffe29b;
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: calc(20px + var(--trail-lane, 0) * 13px);
+  height: 24px;
+  opacity: 0.92;
+}
+
+.life-trail-route[data-need="food"] {
+  --trail-a: #ffbd67;
+  --trail-b: #fff0b6;
+}
+
+.life-trail-route[data-need="entertainment"] {
+  --trail-a: #b799ff;
+  --trail-b: #ffdf8a;
+}
+
+.life-trail-route[data-need="social"] {
+  --trail-a: #7fd7c5;
+  --trail-b: #b9d6ff;
+}
+
+.life-trail-route[data-need="energy"] {
+  --trail-a: #9ec7ff;
+  --trail-b: #d7e8ff;
+}
+
+.life-trail-route i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 7px;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.18) 0 10px, transparent 10px 16px);
+  box-shadow: 0 0 12px rgba(127, 215, 197, 0.16);
+}
+
+.life-trail-route i::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--trail-progress, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--trail-a), var(--trail-b));
+  box-shadow: 0 0 14px color-mix(in srgb, var(--trail-a) 52%, transparent);
+  transition: width 0.42s ease;
+}
+
+.life-trail-route--depart i::before {
+  left: auto;
+  right: 0;
+}
+
+.life-trail-route b {
+  position: absolute;
+  left: clamp(6%, var(--trail-progress, 0%), 94%);
+  bottom: 4px;
+  width: 15px;
+  height: 15px;
+  translate: -50% 0;
+  border-radius: 50% 50% 50% 12%;
+  rotate: -45deg;
+  background:
+    radial-gradient(circle at 58% 42%, rgba(255, 255, 255, 0.9) 0 18%, transparent 19%),
+    linear-gradient(135deg, var(--trail-b), var(--trail-a));
+  box-shadow:
+    0 0 14px color-mix(in srgb, var(--trail-a) 50%, transparent),
+    0 5px 10px rgba(0, 0, 0, 0.28);
+  transition: left 0.42s ease;
+}
+
+.life-trail-route--depart b {
+  left: clamp(6%, calc(100% - var(--trail-progress, 0%)), 94%);
+}
+
+.life-trail-route em {
+  position: absolute;
+  right: 0;
+  bottom: 14px;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--trail-a) 46%, rgba(255, 255, 255, 0.12));
+  border-radius: 999px;
+  color: #f8fbff;
+  background: rgba(15, 24, 36, 0.58);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.26);
+  font-size: 10px;
+  font-style: normal;
+  line-height: 1;
+}
+
+.life-visitor .need-badge,
+.life-companion .need-badge {
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.16),
+    0 0 12px rgba(127, 215, 197, 0.34);
+}
+
+.life-story-panel {
+  display: grid;
+  gap: 9px;
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid rgba(127, 215, 197, 0.28);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(127, 215, 197, 0.12), rgba(185, 214, 255, 0.08)),
+    rgba(255, 255, 255, 0.045);
+}
+
+.life-story-head,
+.life-story-routes,
+.life-story-list {
+  display: grid;
+  gap: 7px;
+}
+
+.life-story-head {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.life-story-head strong {
+  color: #dffbf5;
+}
+
+.life-story-head em {
+  color: #b9d6ff;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.life-story-route,
+.life-trail-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid rgba(127, 215, 197, 0.26);
+  border-radius: 999px;
+  color: #dffbf5;
+  background: rgba(127, 215, 197, 0.1);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.life-story-route {
+  padding: 6px 8px;
+}
+
+.life-trail-chip {
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 6px;
+  padding: 4px 7px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.life-trail-chip.active {
+  border-color: rgba(255, 226, 155, 0.34);
+  color: #fff0b6;
+  background: rgba(255, 226, 155, 0.12);
+}
+
+.life-story-card {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(12, 18, 28, 0.32);
+}
+
+.life-story-card strong {
+  color: #fff4cf;
+  font-size: 12px;
+}
+
+.life-story-card span {
+  color: #cdd9e8;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.life-story-card[data-tone="bright"] {
+  border-color: rgba(255, 226, 155, 0.28);
+  background: linear-gradient(135deg, rgba(255, 226, 155, 0.12), rgba(255, 255, 255, 0.04));
+}
+
+.life-story-card[data-tone="shared"] {
+  border-color: rgba(185, 214, 255, 0.3);
+  background: linear-gradient(135deg, rgba(185, 214, 255, 0.12), rgba(127, 215, 197, 0.08));
+}
+
+.resident-card.life-story-active,
+.roster-card.life-story-active {
+  border-color: rgba(127, 215, 197, 0.34);
+  background:
+    linear-gradient(120deg, rgba(127, 215, 197, 0.1), rgba(185, 214, 255, 0.06)),
+    rgba(255, 255, 255, 0.04);
+}
+
+@media (max-width: 620px) {
+  .life-trail-route {
+    left: 9%;
+    right: 9%;
+    bottom: calc(18px + var(--trail-lane, 0) * 11px);
+  }
+
+  .life-trail-route em {
+    display: none;
+  }
+
+  .life-story-panel {
+    padding: 9px;
+  }
+
+  .life-story-route,
+  .life-trail-chip {
+    font-size: 10px;
+  }
+}

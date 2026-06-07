@@ -882,6 +882,14 @@ const QUEST_DEFS = [
     text: "让王令信使送回 3 份回执",
   },
   {
+    id: "life_trails",
+    title: "生活足迹",
+    goal: 6,
+    metric: "lifeStoriesDone",
+    reward: { coins: 520, gems: 3 },
+    text: "让居民完成 6 段可读的生活小故事",
+  },
+  {
     id: "relics",
     title: "地底珍藏",
     goal: 3,
@@ -958,7 +966,7 @@ let guideReady = false;
 
 function makeNewGame() {
   const game = {
-    version: 16,
+    version: 17,
     coins: 560,
     gems: 7,
     happiness: 72,
@@ -970,6 +978,7 @@ function makeNewGame() {
     nextVisitorId: 1,
     nextLogId: 1,
     nextExpeditionId: 1,
+    nextLifeStoryId: 1,
     elevator: {
       position: 0,
       target: null,
@@ -1007,6 +1016,7 @@ function makeNewGame() {
       marketParcelItemsPacked: 0,
       royalMandatesDone: 0,
       royalCourierReceiptsDone: 0,
+      lifeStoriesDone: 0,
       libraryStudiesDone: 0,
       comfortSessionsDone: 0,
       entertainmentShowsDone: 0,
@@ -1027,6 +1037,7 @@ function makeNewGame() {
     orders: [],
     collection: makeEmptyCollection(),
     expeditions: [],
+    lifeStories: [],
     lastSavedAt: Date.now(),
     spawnTimer: 7.5 + Math.random() * 6.5,
     passiveTimer: 0,
@@ -1386,6 +1397,7 @@ function migrateGame(game) {
     marketParcelItemsPacked: 0,
     royalMandatesDone: 0,
     royalCourierReceiptsDone: 0,
+    lifeStoriesDone: 0,
     libraryStudiesDone: 0,
     comfortSessionsDone: 0,
     entertainmentShowsDone: 0,
@@ -1402,8 +1414,9 @@ function migrateGame(game) {
     aquariumFloorsBuilt: 0,
     festivalFloorsBuilt: 0,
   };
-  game.version = Math.max(Number(game.version) || 0, 16);
+  game.version = Math.max(Number(game.version) || 0, 17);
   game.nextExpeditionId ||= 1;
+  game.nextLifeStoryId ||= 1;
   game.quests ||= QUEST_DEFS.map((quest) => ({ id: quest.id, claimed: false }));
   game.stats ||= {};
   Object.keys(defaultStats).forEach((key) => {
@@ -1427,6 +1440,14 @@ function migrateGame(game) {
   game.orders ||= [];
   game.orders = game.orders.map((order) => normalizeOrderLogistics(order));
   game.expeditions = Array.isArray(game.expeditions) ? game.expeditions : [];
+  game.lifeStories = Array.isArray(game.lifeStories)
+    ? game.lifeStories.map((story) => normalizeLifeStory(story)).filter(Boolean).slice(0, 8)
+    : [];
+  game.nextLifeStoryId = Math.max(
+    game.nextLifeStoryId || 1,
+    ...game.lifeStories.map((story) => Number(story.id) + 1).filter(Number.isFinite),
+    1
+  );
   game.collection ||= makeEmptyCollection();
   game.floors = Array.isArray(game.floors) ? game.floors : [];
   COLLECTION_DEFS.forEach((item) => {
@@ -1674,6 +1695,7 @@ function resetGame() {
 function update(dt) {
   updateElevator(dt);
   updateLifeVisits(dt);
+  updateLifeStories(dt);
   updatePersonActivities(dt);
   updateFloorArrivals(dt);
   updateTimers(dt);
@@ -1743,14 +1765,14 @@ function updateLifeVisits(dt) {
     person.lifeVisitCooldown = Math.max(0, Number(person.lifeVisitCooldown || 0) - dt);
     person.routineCooldown = Math.max(0, Number(person.routineCooldown || 0) - dt);
     if (person.expeditionId) {
-      changed = endLifeVisit(person) || changed;
+      changed = endLifeVisit(person, { record: false }) || changed;
       return;
     }
     if (isActiveLifeVisit(person)) {
       const visit = person.lifeVisit;
       const floor = findFloor(visit.floorId);
       if (!floor || floor.status !== "open") {
-        changed = endLifeVisit(person) || changed;
+        changed = endLifeVisit(person, { record: false }) || changed;
         return;
       }
       visit.remaining = Math.max(0, Number(visit.remaining || 0) - dt);
@@ -1782,12 +1804,12 @@ function updateLifeVisits(dt) {
                 ? 88
                 : 78);
       if ((targetValue >= targetGoal && minimumStayDone) || visit.remaining <= 0) {
-        changed = endLifeVisit(person) || changed;
+        changed = endLifeVisit(person, { outcome: targetValue >= targetGoal ? "fulfilled" : "settled" }) || changed;
       }
       return;
     }
     if (person.lifeVisit) {
-      changed = endLifeVisit(person) || changed;
+      changed = endLifeVisit(person, { record: false }) || changed;
     }
     if (person.lifeVisitCooldown > 0 || person.socialPartnerId) return;
     const currentFloor = currentFloorForPerson(person);
@@ -1860,12 +1882,16 @@ function ensurePersonLife(person) {
     person.lifeVisit.total = Math.max(1, Number(person.lifeVisit.total) || person.lifeVisit.remaining || 1);
     person.lifeVisit.need = PERSON_MOTIVE_KEYS.includes(person.lifeVisit.need) ? person.lifeVisit.need : person.need;
     person.lifeVisit.floorType = person.lifeVisit.floorType || "default";
+    person.lifeVisit.originFloorId = Number.isFinite(Number(person.lifeVisit.originFloorId)) ? Number(person.lifeVisit.originFloorId) : null;
+    person.lifeVisit.originFloorType = person.lifeVisit.originFloorType || "";
     person.lifeVisit.label = person.lifeVisit.label || lifeVisitLabel(person.lifeVisit.need);
     person.lifeVisit.companionId = Number(person.lifeVisit.companionId) || null;
     person.lifeVisit.reason = person.lifeVisit.reason || "need";
     person.lifeVisit.sessionId = person.lifeVisit.sessionId || "";
     person.lifeVisit.minStay = Math.max(0, Number(person.lifeVisit.minStay) || 0);
     person.lifeVisit.targetGoal = clamp(Number(person.lifeVisit.targetGoal) || 0, 0, 100);
+    person.lifeVisit.trailId = person.lifeVisit.trailId || `life-${person.id || "guest"}-${Date.now()}`;
+    person.lifeVisit.startMotive = clamp(Number(person.lifeVisit.startMotive ?? person.motives?.[person.lifeVisit.need] ?? 0), 0, 100);
   }
   person.needTimer = Number.isFinite(Number(person.needTimer)) ? Math.max(0, Number(person.needTimer)) : randFloat(5, 13);
   person.socialCooldown = Math.max(0, Number(person.socialCooldown) || 0);
@@ -1973,12 +1999,16 @@ function chooseLifeVisitTarget(person, need, currentFloor = null) {
 function startLifeVisit(person, floor, need = "social", options = {}) {
   if (!person || !floor || person.expeditionId) return false;
   const previous = personLifeKey(person);
+  const origin = currentFloorForPerson(person);
+  const originFloorId = options.originFloorId !== undefined ? Number(options.originFloorId) : origin ? Number(origin.id) : null;
   endSocialForPerson(person);
   const duration = Math.max(8, Number(options.duration) || randFloat(16, 32));
   const activity = pick(LIFE_VISIT_ACTIVITIES[need] || NEED_ACTIVITY_POOL[need] || ["stroll"]);
   person.lifeVisit = {
     floorId: floor.id,
     floorType: floor.type,
+    originFloorId: Number.isFinite(originFloorId) ? originFloorId : null,
+    originFloorType: options.originFloorType || origin?.type || "",
     need,
     label: options.label || lifeVisitLabel(need),
     remaining: duration,
@@ -1988,6 +2018,8 @@ function startLifeVisit(person, floor, need = "social", options = {}) {
     sessionId: options.sessionId || "",
     minStay: Math.max(0, Number(options.minStay) || 0),
     targetGoal: clamp(Number(options.targetGoal) || 0, 0, 100),
+    trailId: options.trailId || `life-${person.id}-${Date.now()}-${randInt(10, 99)}`,
+    startMotive: clamp(Number(options.startMotive ?? person.motives?.[need] ?? 0), 0, 100),
   };
   person.lifeVisitCooldown = randFloat(42, 72);
   person.routineCooldown = randFloat(34, 58);
@@ -2058,10 +2090,11 @@ function chooseLifeVisitCompanion(person, floor, need = "social") {
   return chosen.candidate;
 }
 
-function endLifeVisit(person) {
+function endLifeVisit(person, options = {}) {
   if (!person?.lifeVisit) return false;
   const visit = person.lifeVisit;
   const companion = visit.companionId ? getResident(Number(visit.companionId)) : null;
+  if (options.record !== false) recordLifeStory(person, visit, options);
   delete person.lifeVisit;
   person.activityTimer = 0;
   person.lifeVisitCooldown = Math.max(Number(person.lifeVisitCooldown) || 0, randFloat(22, 44));
@@ -2073,6 +2106,213 @@ function endLifeVisit(person) {
   const home = currentFloorForPerson(person);
   if (home) assignPersonMotion(person, home.type, person.activity || "stroll");
   return Boolean(visit);
+}
+
+function normalizeLifeStory(story) {
+  if (!story || typeof story !== "object") return null;
+  const need = PERSON_MOTIVE_KEYS.includes(story.need) ? story.need : "social";
+  return {
+    id: Number(story.id) || 0,
+    personId: Number(story.personId) || 0,
+    personName: typeof story.personName === "string" ? story.personName.slice(0, 28) : "居民",
+    companionId: Number(story.companionId) || null,
+    companionName: typeof story.companionName === "string" ? story.companionName.slice(0, 28) : "",
+    need,
+    floorId: Number.isFinite(Number(story.floorId)) ? Number(story.floorId) : null,
+    floorType: FLOOR_TYPES[story.floorType] ? story.floorType : "default",
+    fromFloorId: Number.isFinite(Number(story.fromFloorId)) ? Number(story.fromFloorId) : null,
+    fromFloorType: FLOOR_TYPES[story.fromFloorType] ? story.fromFloorType : "",
+    label: typeof story.label === "string" ? story.label.slice(0, 34) : lifeVisitLabel(need),
+    title: typeof story.title === "string" ? story.title.slice(0, 72) : "生活足迹",
+    detail: typeof story.detail === "string" ? story.detail.slice(0, 120) : "",
+    motiveGain: clamp(Number(story.motiveGain) || 0, 0, 100),
+    tone: ["bright", "shared", "steady", "soft"].includes(story.tone) ? story.tone : "steady",
+    remaining: Number.isFinite(Number(story.remaining)) ? clamp(Number(story.remaining), 0, 180) : 80,
+    createdAt: Number(story.createdAt) || Date.now(),
+  };
+}
+
+function updateLifeStories(dt) {
+  if (!Array.isArray(state.lifeStories) || !state.lifeStories.length) return;
+  const before = state.lifeStories.length;
+  state.lifeStories = state.lifeStories
+    .map((story) => normalizeLifeStory({ ...story, remaining: Math.max(0, Number(story.remaining || 0) - dt) }))
+    .filter((story) => story && story.remaining > 0)
+    .slice(0, 8);
+  if (state.lifeStories.length !== before) lastKingdomKey = "";
+}
+
+function recordLifeStory(person, visit, options = {}) {
+  if (!person || !visit || !state?.stats) return null;
+  state.lifeStories = Array.isArray(state.lifeStories) ? state.lifeStories : [];
+  state.nextLifeStoryId ||= 1;
+  const need = PERSON_MOTIVE_KEYS.includes(visit.need) ? visit.need : person.need || "social";
+  const target = findFloor(visit.floorId);
+  const origin = Number.isFinite(Number(visit.originFloorId)) ? findFloor(Number(visit.originFloorId)) : null;
+  const companion = visit.companionId ? getResident(Number(visit.companionId)) : null;
+  const startMotive = clamp(Number(visit.startMotive ?? person.motives?.[need] ?? 0), 0, 100);
+  const endMotive = clamp(Number(person.motives?.[need] ?? startMotive), 0, 100);
+  const motiveGain = Math.max(0, Math.round(endMotive - startMotive));
+  const story = normalizeLifeStory({
+    id: state.nextLifeStoryId++,
+    personId: person.id,
+    personName: person.name,
+    companionId: companion?.id || null,
+    companionName: companion?.name || "",
+    need,
+    floorId: target?.id ?? Number(visit.floorId),
+    floorType: target?.type || visit.floorType || "default",
+    fromFloorId: origin?.id ?? visit.originFloorId ?? null,
+    fromFloorType: origin?.type || visit.originFloorType || "",
+    label: visit.label || lifeVisitLabel(need),
+    title: lifeStoryTitle(person, visit, target, companion),
+    detail: lifeStoryDetail(person, visit, origin, target, companion, motiveGain, options.outcome),
+    motiveGain,
+    tone: companion ? "shared" : motiveGain >= 22 ? "bright" : options.outcome === "settled" ? "soft" : "steady",
+    remaining: 96,
+    createdAt: Date.now(),
+  });
+  state.lifeStories.unshift(story);
+  state.lifeStories = state.lifeStories.slice(0, 8);
+  state.stats.lifeStoriesDone = (state.stats.lifeStoriesDone || 0) + 1;
+  if (motiveGain > 0) state.happiness = clamp(state.happiness + Math.min(1.1, 0.18 + motiveGain / 90), 0, 100);
+  if ((state.stats.lifeStoriesDone || 0) % 4 === 0) {
+    addLog(`${story.personName} 留下一段生活足迹：${story.detail}`);
+  }
+  return story;
+}
+
+function lifeStoryTitle(person, visit, target, companion) {
+  const needLabel = PERSON_NEED_LABELS[visit.need] || "生活";
+  if (companion) return `${person.name} 和 ${companion.name} 完成${needLabel}小出行`;
+  return `${person.name} 完成${needLabel}小出行`;
+}
+
+function lifeStoryDetail(person, visit, origin, target, companion, motiveGain = 0, outcome = "fulfilled") {
+  const from = origin ? `${formatFloorLabel(origin.id)} ${origin.name}` : "日常路线";
+  const to = target ? `${formatFloorLabel(target.id)} ${target.name}` : FLOOR_TYPES[visit.floorType]?.label || "附近楼层";
+  const needLabel = PERSON_NEED_LABELS[visit.need] || "生活";
+  const companionText = companion ? `，和 ${companion.name} 同行` : "";
+  const gainText = motiveGain > 0 ? `，${needLabel}+${motiveGain}` : "";
+  const doneText = outcome === "settled" ? "慢慢收尾" : "满足完成";
+  return `${from} → ${to}${companionText}，${doneText}${gainText}`;
+}
+
+function lifeVisitProgress(person) {
+  const visit = person?.lifeVisit;
+  if (!visit) return 0;
+  return clamp(1 - Number(visit.remaining || 0) / Math.max(1, Number(visit.total || 1)), 0, 1);
+}
+
+function lifeTrailsForFloor(floor) {
+  if (!floor || floor.status !== "open") return [];
+  return allResidents(state)
+    .filter((person) => isActiveLifeVisit(person))
+    .map((person) => {
+      const visit = person.lifeVisit;
+      const targetId = Number(visit.floorId);
+      const originId = Number.isFinite(Number(visit.originFloorId)) ? Number(visit.originFloorId) : null;
+      const isTarget = Number(floor.id) === targetId;
+      const isOrigin = originId !== null && Number(floor.id) === originId;
+      if (!isTarget && !isOrigin) return null;
+      const target = findFloor(targetId);
+      const origin = originId !== null ? findFloor(originId) : null;
+      const companion = visit.companionId ? getResident(Number(visit.companionId)) : null;
+      return {
+        person,
+        visit,
+        target,
+        origin,
+        companion,
+        need: PERSON_MOTIVE_KEYS.includes(visit.need) ? visit.need : person.need || "social",
+        progress: lifeVisitProgress(person),
+        mode: isTarget ? "arrive" : "depart",
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.progress - a.progress || a.person.id - b.person.id);
+}
+
+function lifeTrailMapKey(floor) {
+  return lifeTrailsForFloor(floor)
+    .map((trail) => `${trail.person.id}:${trail.mode}:${trail.need}:${Math.round(trail.progress * 10)}:${trail.companion?.id || 0}`)
+    .join(",");
+}
+
+function lifeTrailRouteText(trail) {
+  const from = trail.origin ? `${formatFloorLabel(trail.origin.id)} ${trail.origin.name}` : "日常路线";
+  const to = trail.target ? `${formatFloorLabel(trail.target.id)} ${trail.target.name}` : FLOOR_TYPES[trail.visit.floorType]?.label || "附近楼层";
+  const needLabel = PERSON_NEED_LABELS[trail.need] || "生活";
+  const companionText = trail.companion ? ` · 同行 ${trail.companion.name}` : "";
+  return `${trail.person.name}: ${from} → ${to} · ${needLabel}${companionText}`;
+}
+
+function renderLifeTrailLayer(floor) {
+  const trails = lifeTrailsForFloor(floor).slice(0, 4);
+  if (!trails.length) return "";
+  return `
+    <div class="life-trail-layer" data-count="${trails.length}" aria-hidden="true">
+      ${trails
+        .map((trail, index) => {
+          const progress = Math.round(trail.progress * 100);
+          const label = PERSON_NEED_LABELS[trail.need] || "生活";
+          return `
+            <span class="life-trail-route life-trail-route--${escapeAttr(trail.mode)}" data-need="${escapeAttr(trail.need)}" data-mode="${escapeAttr(trail.mode)}" style="--trail-progress:${progress}%; --trail-lane:${index}" title="${escapeAttr(lifeTrailRouteText(trail))}">
+              <i></i><b></b><em>${escapeHtml(label)}</em>
+            </span>`;
+        })
+        .join("")}
+    </div>`;
+}
+
+function latestLifeStoryForPerson(person) {
+  if (!person || !Array.isArray(state.lifeStories)) return null;
+  return state.lifeStories.find((story) => Number(story.personId) === Number(person.id)) || null;
+}
+
+function renderLifeTrailBadge(person) {
+  if (!person) return "";
+  if (isActiveLifeVisit(person)) {
+    const target = findFloor(person.lifeVisit.floorId);
+    const need = PERSON_NEED_LABELS[person.lifeVisit.need] || "生活";
+    return `<span class="life-trail-chip active" data-need="${escapeAttr(person.lifeVisit.need)}">${escapeHtml(need)}路线 · ${escapeHtml(target?.name || "外出")}</span>`;
+  }
+  const story = latestLifeStoryForPerson(person);
+  if (!story) return "";
+  const need = PERSON_NEED_LABELS[story.need] || "生活";
+  return `<span class="life-trail-chip" data-need="${escapeAttr(story.need)}">上次${escapeHtml(need)} · ${escapeHtml(story.detail)}</span>`;
+}
+
+function renderLifeStoryPanel(floor) {
+  if (!floor || floor.status !== "open") return "";
+  const active = lifeTrailsForFloor(floor).slice(0, 3);
+  const stories = (state.lifeStories || [])
+    .filter((story) => Number(story.floorId) === Number(floor.id) || Number(story.fromFloorId) === Number(floor.id))
+    .slice(0, 3);
+  if (!active.length && !stories.length) return "";
+  return `
+    <div class="life-story-panel">
+      <div class="life-story-head">
+        <strong>生活足迹</strong>
+        <em>${state.stats.lifeStoriesDone || 0} 段</em>
+      </div>
+      ${active.length
+        ? `<div class="life-story-routes">${active
+            .map((trail) => `<span class="life-story-route" data-need="${escapeAttr(trail.need)}">${escapeHtml(lifeTrailRouteText(trail))}</span>`)
+            .join("")}</div>`
+        : ""}
+      ${stories.length
+        ? `<div class="life-story-list">${stories
+            .map(
+              (story) => `
+                <article class="life-story-card" data-tone="${escapeAttr(story.tone)}" data-need="${escapeAttr(story.need)}">
+                  <strong>${escapeHtml(story.title)}</strong>
+                  <span>${escapeHtml(story.detail)}</span>
+                </article>`
+            )
+            .join("")}</div>`
+        : ""}
+    </div>`;
 }
 
 function endSocialForPerson(person) {
@@ -5469,12 +5709,12 @@ function getKingdomRenderKey() {
         return `${floor.id}:${floor.type}:build:${Math.ceil(floor.buildRemaining)}:${state.selectedFloorId}`;
       }
       if (floor.type === "dwelling") {
-        return `${floor.id}:dw:${floor.level}:${floor.residents.length}:${floor.capacity}:${floor.rentReady}:${floor.residents.map((resident) => resident.expeditionId || 0).join("-")}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
+        return `${floor.id}:dw:${floor.level}:${floor.residents.length}:${floor.capacity}:${floor.rentReady}:${floor.residents.map((resident) => resident.expeditionId || 0).join("-")}:${lifeTrailMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
       }
       if (floor.type === "lobby") {
         return `${floor.id}:lobby:${state.queue.map((visitor) => `${visitor.id}:${visitor.need || ""}:${visitor.activity || ""}`).join("-")}:${state.selectedFloorId}`;
       }
-      return `${floor.id}:${floor.type}:${floor.level}:${floor.stock}:${floor.stockMax}:${floor.workers.length}:${Boolean(floor.production)}:${foodRushMapKey(floor)}:${marketParcelMapKey(floor)}:${royalMandateMapKey(floor)}:${comfortSessionMapKey(floor)}:${showtimeMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
+      return `${floor.id}:${floor.type}:${floor.level}:${floor.stock}:${floor.stockMax}:${floor.workers.length}:${Boolean(floor.production)}:${foodRushMapKey(floor)}:${marketParcelMapKey(floor)}:${royalMandateMapKey(floor)}:${comfortSessionMapKey(floor)}:${showtimeMapKey(floor)}:${lifeTrailMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
     })
     .join("|");
   const arrivalKey = (state.arrivals || []).map((arrival) => `${arrival.id}:${arrival.floorId}`).join("-");
@@ -5510,6 +5750,11 @@ function renderFloor(floor) {
   const selected = floor.id === state.selectedFloorId ? "selected" : "";
   const constructing = floor.status === "construction" ? "constructing" : "";
   const routeClass = floorRouteClass(floor);
+  const lifeTrailItems = lifeTrailsForFloor(floor);
+  const lifeTrailClass = lifeTrailItems.length ? "life-trail-active" : "";
+  const lifeTrailAttrs = lifeTrailItems.length
+    ? ` data-life-trail-count="${lifeTrailItems.length}" data-life-trail-need="${escapeAttr(lifeTrailItems[0].need)}"`
+    : "";
   const foodRushClass = isActiveFoodRush(floor) ? "food-rush-active" : "";
   const foodRushAttrs = isActiveFoodRush(floor)
     ? ` data-food-rush-pace="${escapeAttr(currentFoodRushPace(floor).id)}" data-food-rush-heat="${escapeAttr(foodRushHeatTone(floor))}"`
@@ -5533,7 +5778,7 @@ function renderFloor(floor) {
     : "";
   const zone = getFloorZone(floor);
   return `
-    <article class="floor ${selected} ${constructing} ${routeClass} ${foodRushClass} ${marketParcelClass} ${royalMandateClass} ${royalCourierClass} ${comfortClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${foodRushAttrs}${marketParcelAttrs}${royalMandateAttrs}${royalCourierAttrs}${showtimeAttrs}>
+    <article class="floor ${selected} ${constructing} ${routeClass} ${lifeTrailClass} ${foodRushClass} ${marketParcelClass} ${royalMandateClass} ${royalCourierClass} ${comfortClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${lifeTrailAttrs}${foodRushAttrs}${marketParcelAttrs}${royalMandateAttrs}${royalCourierAttrs}${showtimeAttrs}>
       ${renderFloorIndex(floor)}
       <div class="room" data-action="select-floor" data-floor-id="${floor.id}" title="${escapeAttr(floorMapLabel(floor))}" aria-label="${escapeAttr(floorMapLabel(floor))}">
         ${floor.status === "construction" ? renderConstruction(floor) : renderOpenFloor(floor)}
@@ -5588,8 +5833,9 @@ function renderOpenFloor(floor) {
         </div>
         ${renderFloorBadge(floor)}
       </div>
-    <div class="room-scene">
+      <div class="room-scene">
         ${renderRoomStateTag(floor)}
+        ${renderLifeTrailLayer(floor)}
         ${renderRoyalCourierLayer(floor)}
         ${renderFloorArrivals(floor)}
         ${floor.type === "lobby" ? renderLobbyQueue() : renderFloorPeople(floor)}
@@ -6236,6 +6482,7 @@ function renderFloorDetail() {
         <div class="stat"><b>${floor.rentReady || 0}</b><span>待收租金</span></div>
       </div>
       ${renderFloorPerks(floor)}
+      ${renderLifeStoryPanel(floor)}
       ${renderResidentList(floor.residents)}
       <div class="detail-actions">
         <button class="detail-btn primary" data-action="collect-rent" data-floor-id="${floor.id}">收租</button>
@@ -6299,6 +6546,7 @@ function renderFloorDetail() {
       ${isShowtimeFloorType(floor.type) ? `<div class="stat"><b>${showtimeActive ? Math.ceil(floor.showtime.remaining) + "s" : showtimeCooldownValue ? showtimeCooldownValue + "s" : "就绪"}</b><span>演出</span></div><div class="stat"><b>${showtimeBeatValue}</b><span>段落</span></div><div class="stat"><b>${showtimeHeatValue}</b><span>热度</span></div><div class="stat"><b>${state.stats.entertainmentShowsDone || 0}/${state.stats.showtimeReactionsDone || 0}</b><span>小剧/反应</span></div>` : ""}
     </div>
     ${renderFloorPerks(floor)}
+    ${renderLifeStoryPanel(floor)}
     ${renderMarketParcelPanel(floor)}
     ${renderComfortSessionPanel(floor)}
     ${renderShowtimePanel(floor)}
@@ -6458,6 +6706,7 @@ function renderFloorDetail() {
         <div class="stat"><b>${floor.rentReady || 0}</b><span>待收租金</span></div>
       </div>
       ${renderFloorPerks(floor)}
+      ${renderLifeStoryPanel(floor)}
       ${renderResidentList(floor.residents)}
       <div class="detail-actions">
         <button class="detail-btn primary" data-action="collect-rent" data-floor-id="${floor.id}">收租</button>
@@ -6530,6 +6779,7 @@ function renderFloorDetail() {
       ${isShowtimeFloorType(floor.type) ? `<div class="stat"><b>${showtimeActive ? Math.ceil(floor.showtime.remaining) + "s" : showtimeCooldownValue ? showtimeCooldownValue + "s" : "就绪"}</b><span>演出</span></div><div class="stat"><b>${showtimeBeatValue}</b><span>段落</span></div><div class="stat"><b>${showtimeHeatValue}</b><span>热度</span></div><div class="stat"><b>${state.stats.entertainmentShowsDone || 0}/${state.stats.showtimeReactionsDone || 0}</b><span>小剧/反应</span></div>` : ""}
     </div>
     ${renderFloorPerks(floor)}
+    ${renderLifeStoryPanel(floor)}
     ${renderMarketParcelPanel(floor)}
     ${renderRoyalMandatePanel(floor)}
     ${renderFoodRushPanel(floor)}
@@ -6652,10 +6902,11 @@ function renderResidentList(residents, skillType = null) {
           const skill = skillType ? `<span class="skill-pill ${dreamFit}">技能 ${resident.skills[skillType] || 1}</span>` : "";
           const job = residentJobLabel(resident);
           const life = renderMotiveStrip(resident, skillType || "dwelling");
+          const trail = renderLifeTrailBadge(resident);
           return `
-            <div class="resident-card ${dreamFit}">
+            <div class="resident-card ${dreamFit} ${isActiveLifeVisit(resident) ? "life-story-active" : ""}">
               <span class="mini-person person-sprite person-sprite--${spriteVariantForPerson(resident)}" style="--person-art:url('${spriteArtForPerson(resident)}')"></span>
-              <span><strong>${escapeHtml(resident.name)}</strong><small>理想 ${dream} · ${job}</small>${life}</span>
+              <span><strong>${escapeHtml(resident.name)}</strong><small>理想 ${dream} · ${job}</small>${life}${trail}</span>
               ${skill}
             </div>`;
         })
@@ -6695,8 +6946,9 @@ function renderResidentRoster() {
       const mood = residentMoodClass(resident);
       const lifeFloor = resident.workFloorId ? findFloor(resident.workFloorId)?.type || "dwelling" : "dwelling";
       const life = renderMotiveStrip(resident, lifeFloor);
+      const trail = renderLifeTrailBadge(resident);
       return `
-        <article class="roster-card" data-dream="${resident.dreamType}" data-mood="${mood}">
+        <article class="roster-card ${isActiveLifeVisit(resident) ? "life-story-active" : ""}" data-dream="${resident.dreamType}" data-mood="${mood}">
           <span class="roster-portrait">
             <span class="mini-person person-sprite person-sprite--${spriteVariantForPerson(resident)}" style="--person-art:url('${spriteArtForPerson(resident)}')"></span>
             <i class="mood-mark" aria-hidden="true"></i>
@@ -6706,6 +6958,7 @@ function renderResidentRoster() {
             <small>理想 ${dream} · ${job}</small>
             ${renderSkillStrip(resident)}
             ${life}
+            ${trail}
           </span>
         </article>`;
     })
