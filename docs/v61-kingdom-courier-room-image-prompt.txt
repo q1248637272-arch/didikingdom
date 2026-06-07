@@ -1,0 +1,7 @@
+Create a polished fantasy side-view room background for a cozy vertical tower management browser game.
+
+Scene: a compact underground royal council chamber that has become an active mandate courier office. It should feel warmer and more functional than a throne room: a small throne alcove, a round council table, parchment scrolls, wax seals, courier satchels, a sealed dispatch tube, blue-and-gold banners, carved stone walls, lantern light, tiny shelves of ledgers, and an abstract route board made only of shapes with no readable writing. The lower foreground must remain clear for tiny character sprites and a visible courier path overlay.
+
+Style: painterly stylized 2D game background, no characters, no UI, no readable text, no letters, no numbers, no signage, no logos, no watermark. Keep the composition clean and readable at small mobile size. Use warm amber candlelight, muted royal blue accents, crisp silhouettes, soft atmospheric depth, and a clear horizontal front-cutaway layout suitable for a 16:9 room tile.
+
+Output: high quality raster illustration, web game asset, no transparent border.

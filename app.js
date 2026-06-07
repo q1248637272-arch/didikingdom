@@ -398,6 +398,12 @@ const ROYAL_MANDATE_PHASES = [
   { id: "seal", label: "盖印", threshold: 0.38 },
   { id: "dispatch", label: "传令", threshold: 0.72 },
 ];
+const ROYAL_COURIER_PHASES = [
+  { id: "desk", label: "备囊", threshold: 0 },
+  { id: "gate", label: "出门", threshold: 0.38 },
+  { id: "route", label: "送达", threshold: 0.72 },
+  { id: "receipt", label: "回执", threshold: 0.92 },
+];
 const MARKET_PARCEL_PHASES = [
   { id: "quote", label: "议价", threshold: 0 },
   { id: "pack", label: "打包", threshold: 0.34 },
@@ -500,7 +506,8 @@ const PERSON_ROOM_SPOTS = {
   kingdom: [
     { id: "desk", x: 47, y: 12, scale: 1, activities: ["work", "talk"] },
     { id: "throne", x: 70, y: 16, scale: 0.95, activities: ["look", "chat"] },
-    { id: "carpet", x: 31, y: 5, scale: 1.07, activities: ["wait", "wave"] },
+    { id: "carpet", x: 31, y: 5, scale: 1.07, activities: ["wait", "wave", "stroll"] },
+    { id: "courier", x: 22, y: 9, scale: 1.02, activities: ["stroll", "wave"] },
   ],
 };
 const PERSON_SOCIAL_SPOTS = {
@@ -867,6 +874,14 @@ const QUEST_DEFS = [
     text: "用王国楼层签发 3 次王令",
   },
   {
+    id: "royal_couriers",
+    title: "信使回执",
+    goal: 3,
+    metric: "royalCourierReceiptsDone",
+    reward: { coins: 640, gems: 3 },
+    text: "让王令信使送回 3 份回执",
+  },
+  {
     id: "relics",
     title: "地底珍藏",
     goal: 3,
@@ -943,7 +958,7 @@ let guideReady = false;
 
 function makeNewGame() {
   const game = {
-    version: 15,
+    version: 16,
     coins: 560,
     gems: 7,
     happiness: 72,
@@ -991,6 +1006,7 @@ function makeNewGame() {
       marketParcelsDone: 0,
       marketParcelItemsPacked: 0,
       royalMandatesDone: 0,
+      royalCourierReceiptsDone: 0,
       libraryStudiesDone: 0,
       comfortSessionsDone: 0,
       entertainmentShowsDone: 0,
@@ -1369,6 +1385,7 @@ function migrateGame(game) {
     marketParcelsDone: 0,
     marketParcelItemsPacked: 0,
     royalMandatesDone: 0,
+    royalCourierReceiptsDone: 0,
     libraryStudiesDone: 0,
     comfortSessionsDone: 0,
     entertainmentShowsDone: 0,
@@ -1385,7 +1402,7 @@ function migrateGame(game) {
     aquariumFloorsBuilt: 0,
     festivalFloorsBuilt: 0,
   };
-  game.version = Math.max(Number(game.version) || 0, 15);
+  game.version = Math.max(Number(game.version) || 0, 16);
   game.nextExpeditionId ||= 1;
   game.quests ||= QUEST_DEFS.map((quest) => ({ id: quest.id, claimed: false }));
   game.stats ||= {};
@@ -1511,6 +1528,10 @@ function migrateGame(game) {
                 pulseTimer: Math.max(0, Number(floor.royalMandate.pulseTimer) || 0),
                 prepared: Math.max(0, Number(floor.royalMandate.prepared) || 0),
                 earned: Math.max(0, Number(floor.royalMandate.earned) || 0),
+                receiptBonus: Math.max(0, Number(floor.royalMandate.receiptBonus) || 0),
+                courierProgress: clamp(Number(floor.royalMandate.courierProgress) || 0, 0, 1),
+                courierPhase: floor.royalMandate.courierPhase || "desk",
+                routeLabel: floor.royalMandate.routeLabel || "",
                 phase: floor.royalMandate.phase || "draft",
               }
             : null;
@@ -2877,7 +2898,9 @@ function normalizeOrderMandate(order) {
   }
   const prepared = clamp(Number(order.royalMandate.prepared) || 0, 0, amount);
   const rewardBonus = Math.max(0, Number(order.royalMandate.rewardBonus) || 0);
-  if (!prepared && !rewardBonus && !order.royalMandate.active) {
+  const receiptBonus = Math.max(0, Number(order.royalMandate.receiptBonus) || 0);
+  const delivered = Boolean(order.royalMandate.delivered);
+  if (!prepared && !rewardBonus && !receiptBonus && !order.royalMandate.active && !delivered) {
     delete order.royalMandate;
     return order;
   }
@@ -2885,8 +2908,11 @@ function normalizeOrderMandate(order) {
     floorId: Number(order.royalMandate.floorId) || 0,
     prepared,
     rewardBonus,
+    receiptBonus,
     active: Boolean(order.royalMandate.active),
     seal: Boolean(order.royalMandate.seal),
+    delivered,
+    routeLabel: typeof order.royalMandate.routeLabel === "string" ? order.royalMandate.routeLabel.slice(0, 48) : "",
   };
   return order;
 }
@@ -3217,6 +3243,79 @@ function currentRoyalMandatePhase(floor) {
     .find((phase) => progress >= phase.threshold) || ROYAL_MANDATE_PHASES[0];
 }
 
+function royalCourierProgress(floor) {
+  if (!isActiveRoyalMandate(floor)) return 0;
+  const total = Math.max(1, Number(floor.royalMandate.total || 1));
+  return clamp(1 - Number(floor.royalMandate.remaining || 0) / total, 0, 1);
+}
+
+function currentRoyalCourierPhase(floor) {
+  if (!isActiveRoyalMandate(floor)) return ROYAL_COURIER_PHASES[0];
+  const progress = royalCourierProgress(floor);
+  return ROYAL_COURIER_PHASES.slice()
+    .reverse()
+    .find((phase) => progress >= phase.threshold) || ROYAL_COURIER_PHASES[0];
+}
+
+function royalCourierRouteLabel(floor, order) {
+  const targetFloor = order ? orderStockInfo(order).floor : null;
+  const from = floor ? formatFloorLabel(floor.id) : "王令";
+  const to = targetFloor ? `${formatFloorLabel(targetFloor.id)} ${FLOOR_TYPES[targetFloor.type]?.label || "楼层"}` : `${FLOOR_TYPES[order?.type]?.label || "订单"}缺口`;
+  return `${from}→${to}`;
+}
+
+function royalCourierReceiptBonus(floor, order) {
+  const skill = averageSkill(floor?.workers || [], "kingdom");
+  const prepared = orderMandatePrepared(order);
+  return Math.round((18 + prepared * 3.2 + skill * 2.4 + (floor?.level || 1) * 4) * (1 + kingdomMandateBonus(state) * 1.45));
+}
+
+function applyRoyalCourierMotion(floor) {
+  if (!isActiveRoyalMandate(floor)) return;
+  const phase = currentRoyalCourierPhase(floor);
+  (floor.workers || [])
+    .map((id) => getResident(id))
+    .filter(Boolean)
+    .forEach((worker, index) => {
+      const activities = {
+        desk: ["work", "look", "talk"],
+        gate: ["wave", "stroll", "look"],
+        route: ["stroll", "wave", "work"],
+        receipt: ["wave", "talk", "work"],
+      }[phase.id] || ["work"];
+      worker.activity = activities[index % activities.length];
+      worker.lifeWish = `${phase.label}王令信使`;
+      assignPersonMotion(worker, floor.type, worker.activity);
+    });
+}
+
+function completeRoyalMandateDelivery(floor, order, options = {}) {
+  if (!floor || !order) return 0;
+  normalizeOrderMandate(order);
+  order.royalMandate ||= { floorId: floor.id, prepared: 0, rewardBonus: 0, active: false, seal: false };
+  if (order.royalMandate.delivered) {
+    order.royalMandate.active = false;
+    return 0;
+  }
+  const routeLabel = order.royalMandate.routeLabel || floor.royalMandate?.routeLabel || royalCourierRouteLabel(floor, order);
+  const bonus = royalCourierReceiptBonus(floor, order);
+  order.royalMandate.active = false;
+  order.royalMandate.delivered = true;
+  order.royalMandate.routeLabel = routeLabel;
+  order.royalMandate.receiptBonus = Math.max(0, Number(order.royalMandate.receiptBonus || 0) + bonus);
+  order.royalMandate.rewardBonus = Math.max(0, Number(order.royalMandate.rewardBonus || 0) + bonus);
+  order.reward += bonus;
+  if (floor.royalMandate) {
+    floor.royalMandate.courierProgress = 1;
+    floor.royalMandate.courierPhase = "receipt";
+    floor.royalMandate.receiptBonus = bonus;
+    floor.royalMandate.routeLabel = routeLabel;
+  }
+  state.stats.royalCourierReceiptsDone = (state.stats.royalCourierReceiptsDone || 0) + 1;
+  state.happiness = clamp(state.happiness + (options.early ? 2 : 1), 0, 100);
+  return bonus;
+}
+
 function royalMandateCooldown(floor) {
   const skill = averageSkill(floor.workers || [], "kingdom");
   return Math.max(22, Math.round(54 - skill * 2.2 - kingdomMandateBonus(state) * 42 - clockworkTempoBonus(state) * 10));
@@ -3304,6 +3403,7 @@ function startRoyalMandate(floorId, orderId = "") {
     return;
   }
   const duration = randFloat(28, 38);
+  const routeLabel = royalCourierRouteLabel(floor, target);
   floor.stock = Math.max(0, (floor.stock || 0) - 1);
   floor.royalMandateCooldown = royalMandateCooldown(floor);
   floor.royalMandate = {
@@ -3315,6 +3415,10 @@ function startRoyalMandate(floorId, orderId = "") {
     pulseTimer: 0.2,
     prepared: 0,
     earned: 0,
+    receiptBonus: 0,
+    courierProgress: 0,
+    courierPhase: "desk",
+    routeLabel,
     phase: "draft",
   };
   target.royalMandate = {
@@ -3324,9 +3428,13 @@ function startRoyalMandate(floorId, orderId = "") {
     rewardBonus: Math.max(0, Number(target.royalMandate?.rewardBonus) || 0),
     active: true,
     seal: Boolean(target.royalMandate?.seal),
+    delivered: false,
+    receiptBonus: Math.max(0, Number(target.royalMandate?.receiptBonus) || 0),
+    routeLabel,
   };
   state.stats.royalMandatesDone = (state.stats.royalMandatesDone || 0) + 1;
   applyRoyalMandateStep(floor, target, 1);
+  applyRoyalCourierMotion(floor);
   showToast(`王令已签发：${FLOOR_TYPES[target.type].label}`);
   addLog(`${floor.name} 签发王令，优先推进「${target.title}」。`);
   lastKingdomKey = "";
@@ -3346,12 +3454,17 @@ function updateRoyalMandateFloor(floor, dt) {
   floor.royalMandate.remaining = Math.max(0, Number(floor.royalMandate.remaining || 0) - dt);
   floor.royalMandate.pulseTimer = Math.max(0, Number(floor.royalMandate.pulseTimer || 0) - dt);
   floor.royalMandate.phase = currentRoyalMandatePhase(floor).id;
+  floor.royalMandate.courierProgress = royalCourierProgress(floor);
+  floor.royalMandate.courierPhase = currentRoyalCourierPhase(floor).id;
+  floor.royalMandate.routeLabel ||= royalCourierRouteLabel(floor, order);
   order.royalMandate ||= { floorId: floor.id, prepared: 0, rewardBonus: 0, active: true, seal: false };
   order.royalMandate.active = true;
+  order.royalMandate.routeLabel ||= floor.royalMandate.routeLabel;
+  applyRoyalCourierMotion(floor);
   if (floor.royalMandate.pulseTimer <= 0 && floor.royalMandate.remaining > 0) {
     const step = applyRoyalMandateStep(floor, order, 1);
     if (!step.prepared && orderStockInfo(order).ready) {
-      order.royalMandate.active = false;
+      completeRoyalMandateDelivery(floor, order, { early: true });
       addLog(`${floor.name} 的王令提前送达，订单已可交付。`);
       delete floor.royalMandate;
       return true;
@@ -3359,7 +3472,7 @@ function updateRoyalMandateFloor(floor, dt) {
     floor.royalMandate.pulseTimer = randFloat(6.4, 8.8);
   }
   if (floor.royalMandate.remaining <= 0) {
-    order.royalMandate.active = false;
+    completeRoyalMandateDelivery(floor, order);
     addLog(`${floor.name} 的王令传达完毕，订单已预备 ${orderMandatePrepared(order)}/${order.amount}。`);
     delete floor.royalMandate;
   }
@@ -3373,6 +3486,10 @@ function renderRoyalMandatePanel(floor) {
   const phase = active ? currentRoyalMandatePhase(floor) : ROYAL_MANDATE_PHASES[0];
   const info = order ? orderStockInfo(order) : null;
   const progress = active ? Math.round((1 - floor.royalMandate.remaining / Math.max(1, floor.royalMandate.total)) * 100) : 0;
+  const courierPhase = active ? currentRoyalCourierPhase(floor) : ROYAL_COURIER_PHASES[0];
+  const courierProgress = active ? Math.round(royalCourierProgress(floor) * 100) : 0;
+  const routeLabel = active ? floor.royalMandate.routeLabel || royalCourierRouteLabel(floor, order) : order?.royalMandate?.routeLabel || "";
+  const receipts = state.stats.royalCourierReceiptsDone || 0;
   const status = active
     ? `${phase.label} ${Math.ceil(floor.royalMandate.remaining)}s · ${FLOOR_TYPES[order?.type]?.label || "订单"}`
     : (floor.royalMandateCooldown || 0) > 0
@@ -3383,14 +3500,16 @@ function renderRoyalMandatePanel(floor) {
   const prepared = info ? `王令预备 ${info.mandatePrepared}/${order.amount} · 缺 ${info.missing}` : "暂无订单";
   const earned = active ? ` · 加赏 ${floor.royalMandate.earned || 0}` : "";
   return `
-    <div class="royal-mandate-panel ${active ? "active" : ""}" data-phase="${escapeAttr(phase.id)}">
+    <div class="royal-mandate-panel ${active ? "active" : ""}" data-phase="${escapeAttr(phase.id)}" data-courier-phase="${escapeAttr(courierPhase.id)}">
       <div class="royal-mandate-head">
         <strong>王令签发</strong>
         <em>${active ? phase.label : "待令"}</em>
       </div>
       <div class="royal-mandate-meter" aria-hidden="true"><i style="width:${progress}%"></i></div>
+      <div class="royal-courier-track" style="--courier-progress:${courierProgress}%" aria-hidden="true"><i></i><b></b></div>
+      <span class="royal-courier-status">${escapeHtml(active ? `${courierPhase.label} · ${routeLabel}` : routeLabel ? `上次路线 ${routeLabel}` : `信使回执 ${receipts} 份`)}</span>
       <span>${escapeHtml(status)}</span>
-      <small>${escapeHtml(prepared)}${earned} · 已签发 ${state.stats.royalMandatesDone || 0} 次</small>
+      <small>${escapeHtml(prepared)}${earned} · 签发 ${state.stats.royalMandatesDone || 0} 次 · 回执 ${receipts} 份</small>
     </div>`;
 }
 
@@ -3398,7 +3517,7 @@ function royalMandateMapKey(floor) {
   if (floor?.type !== "kingdom") return "";
   const order = floor.royalMandate?.orderId ? state.orders.find((entry) => entry.id === floor.royalMandate.orderId) : null;
   const prepared = order ? orderMandatePrepared(order) : 0;
-  return `mandate:${Math.ceil(floor.royalMandateCooldown || 0)}:${Math.ceil(floor.royalMandate?.remaining || 0)}:${floor.royalMandate?.orderId || ""}:${floor.royalMandate?.phase || ""}:${floor.royalMandate?.prepared || 0}:${floor.royalMandate?.earned || 0}:${prepared}`;
+  return `mandate:${Math.ceil(floor.royalMandateCooldown || 0)}:${Math.ceil(floor.royalMandate?.remaining || 0)}:${floor.royalMandate?.orderId || ""}:${floor.royalMandate?.phase || ""}:${floor.royalMandate?.courierPhase || ""}:${Math.round((floor.royalMandate?.courierProgress || 0) * 100)}:${floor.royalMandate?.routeLabel || ""}:${floor.royalMandate?.prepared || 0}:${floor.royalMandate?.earned || 0}:${floor.royalMandate?.receiptBonus || 0}:${prepared}`;
 }
 
 function clearRoyalMandateForOrder(orderId) {
@@ -5266,6 +5385,7 @@ function fulfillOrder(orderId) {
   const mandatePrepared = orderMandatePrepared(order);
   const packed = orderMarketPacked(order);
   const prepared = orderPreparedTotal(order);
+  const receiptBonus = Math.max(0, Number(order.royalMandate?.receiptBonus) || 0);
   let remaining = Math.max(0, order.amount - prepared);
   businessFloors(state)
     .filter((floor) => floor.type === order.type)
@@ -5282,7 +5402,11 @@ function fulfillOrder(orderId) {
   state.stats.commissionsDone += 1;
   state.happiness = clamp(state.happiness + (order.source === "market" ? 4 : 3), 0, 100);
   showFloat(`订单 +${order.reward}`);
-  const preparedText = [mandatePrepared ? `王令预备 ${mandatePrepared}` : "", packed ? `市集打包 ${packed}` : ""].filter(Boolean).join("，");
+  const preparedText = [
+    mandatePrepared ? `王令预备 ${mandatePrepared}` : "",
+    order.royalMandate?.delivered ? `信使回执 +${receiptBonus}` : "",
+    packed ? `市集打包 ${packed}` : "",
+  ].filter(Boolean).join("，");
   addLog(`${orderSourceLabel(order)}完成：${FLOOR_TYPES[order.type].label} ${order.amount}${preparedText ? `，${preparedText}` : ""}，奖励 ${order.reward} 金币。`);
   if (order.type === "craft") {
     const crateBonus = Math.round(18 + craftToolBonus(state) * 115);
@@ -5394,6 +5518,10 @@ function renderFloor(floor) {
   const royalMandateAttrs = isActiveRoyalMandate(floor)
     ? ` data-royal-mandate-phase="${escapeAttr(currentRoyalMandatePhase(floor).id)}"`
     : "";
+  const royalCourierClass = isActiveRoyalMandate(floor) ? "royal-courier-active" : "";
+  const royalCourierAttrs = isActiveRoyalMandate(floor)
+    ? ` data-royal-courier-phase="${escapeAttr(currentRoyalCourierPhase(floor).id)}" data-royal-courier-progress="${escapeAttr(Math.round(royalCourierProgress(floor) * 100))}"`
+    : "";
   const marketParcelClass = isActiveMarketParcel(floor) ? "market-parcel-active" : "";
   const marketParcelAttrs = isActiveMarketParcel(floor)
     ? ` data-market-parcel-phase="${escapeAttr(currentMarketParcelPhase(floor).id)}" data-market-parcel-packed="${escapeAttr(floor.marketParcel.packed || 0)}"`
@@ -5405,7 +5533,7 @@ function renderFloor(floor) {
     : "";
   const zone = getFloorZone(floor);
   return `
-    <article class="floor ${selected} ${constructing} ${routeClass} ${foodRushClass} ${marketParcelClass} ${royalMandateClass} ${comfortClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${foodRushAttrs}${marketParcelAttrs}${royalMandateAttrs}${showtimeAttrs}>
+    <article class="floor ${selected} ${constructing} ${routeClass} ${foodRushClass} ${marketParcelClass} ${royalMandateClass} ${royalCourierClass} ${comfortClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${foodRushAttrs}${marketParcelAttrs}${royalMandateAttrs}${royalCourierAttrs}${showtimeAttrs}>
       ${renderFloorIndex(floor)}
       <div class="room" data-action="select-floor" data-floor-id="${floor.id}" title="${escapeAttr(floorMapLabel(floor))}" aria-label="${escapeAttr(floorMapLabel(floor))}">
         ${floor.status === "construction" ? renderConstruction(floor) : renderOpenFloor(floor)}
@@ -5462,6 +5590,7 @@ function renderOpenFloor(floor) {
       </div>
     <div class="room-scene">
         ${renderRoomStateTag(floor)}
+        ${renderRoyalCourierLayer(floor)}
         ${renderFloorArrivals(floor)}
         ${floor.type === "lobby" ? renderLobbyQueue() : renderFloorPeople(floor)}
         ${renderFixture(floor)}
@@ -5617,6 +5746,20 @@ function renderFixture(floor) {
   };
   const type = floor.type === "lobby" ? "lobby kingdom" : floor.type;
   return `<span class="fixture ${type}" aria-hidden="true">${extras[floor.type] || ""}</span>`;
+}
+
+function renderRoyalCourierLayer(floor) {
+  if (!isActiveRoyalMandate(floor)) return "";
+  const phase = currentRoyalCourierPhase(floor);
+  const progress = Math.round(royalCourierProgress(floor) * 100);
+  const order = state.orders.find((entry) => entry.id === floor.royalMandate.orderId);
+  const routeLabel = floor.royalMandate.routeLabel || royalCourierRouteLabel(floor, order);
+  return `
+    <span class="royal-courier-route" data-phase="${escapeAttr(phase.id)}" style="--courier-progress:${progress}%" title="${escapeAttr(`${phase.label} · ${routeLabel}`)}" aria-label="${escapeAttr(`${phase.label} · ${routeLabel}`)}">
+      <i></i>
+      <b></b>
+      <em></em>
+    </span>`;
 }
 
 function renderRoomStateTag(floor) {
@@ -5904,7 +6047,7 @@ function renderFloorStatus(floor) {
   if (floor.type === "lobby") return state.queue.length ? "待接待" : "自然待客";
   if (floor.type === "dwelling") return floor.rentReady ? `租金 ${floor.rentReady}` : "居住";
   if (isActiveComfortSession(floor)) return `${COMFORT_SESSION_LABELS[floor.type] || "休整"} ${Math.ceil(floor.comfortSession.remaining)}s`;
-  if (isActiveRoyalMandate(floor)) return `${currentRoyalMandatePhase(floor).label}王令 ${Math.ceil(floor.royalMandate.remaining)}s`;
+  if (isActiveRoyalMandate(floor)) return `${currentRoyalMandatePhase(floor).label}王令 · ${currentRoyalCourierPhase(floor).label} ${Math.ceil(floor.royalMandate.remaining)}s`;
   if (isActiveShowtime(floor)) return `${currentShowtimeBeat(floor).label}${SHOWTIME_LABELS[floor.type] || "小剧"} · 热度 ${Math.round(floor.showtime.heat || 0)}%`;
   if (floor.production) return `补货 ${Math.ceil(floor.production.remaining)}s`;
   if (floor.stock <= 0) return "缺货";
@@ -5931,7 +6074,7 @@ function renderFloorStatus(floor) {
   if (isActiveComfortSession(floor)) return `${COMFORT_SESSION_LABELS[floor.type] || "休整"} ${Math.ceil(floor.comfortSession.remaining)}s`;
   if (isActiveFoodRush(floor)) return `${currentFoodRushPace(floor).label}${FOOD_RUSH_LABELS[floor.type] || "餐桌高峰"} · 上菜 ${floor.foodRush.served || 0}/${floor.foodRush.targetServings || 0}`;
   if (isActiveMarketParcel(floor)) return `${currentMarketParcelPhase(floor).label}包裹 · 打包 ${floor.marketParcel.packed || 0}`;
-  if (isActiveRoyalMandate(floor)) return `${currentRoyalMandatePhase(floor).label}王令 ${Math.ceil(floor.royalMandate.remaining)}s`;
+  if (isActiveRoyalMandate(floor)) return `${currentRoyalMandatePhase(floor).label}王令 · ${currentRoyalCourierPhase(floor).label} ${Math.ceil(floor.royalMandate.remaining)}s`;
   if (isActiveShowtime(floor)) return `${currentShowtimeBeat(floor).label}${SHOWTIME_LABELS[floor.type] || "小剧"} · 热度 ${Math.round(floor.showtime.heat || 0)}%`;
   if (floor.production) return `补货 ${Math.ceil(floor.production.remaining)}s`;
   if (floor.stock <= 0) return "缺货";
@@ -6207,6 +6350,7 @@ function renderFloorPerks(floor) {
     perks.push(`王令订单 +${Math.round(kingdomMandateBonus(state) * 55)}%`);
     perks.push(`全城声望 +${Math.round(kingdomMandateBonus(state) * 100)}%`);
     perks.push(`签发 ${state.stats.royalMandatesDone || 0}`);
+    perks.push(`回执 ${state.stats.royalCourierReceiptsDone || 0}`);
     if (isActiveRoyalMandate(floor)) perks.push(`${currentRoyalMandatePhase(floor).label} ${Math.ceil(floor.royalMandate.remaining)}s`);
   } else if (floor.type === "garden") {
     perks.push("快乐缓慢恢复");
@@ -6380,7 +6524,7 @@ function renderFloorDetail() {
       <div class="stat"><b>${floor.production ? Math.ceil(floor.production.remaining) + "s" : "就绪"}</b><span>补货</span></div>
       ${isFoodRushFloorType(floor.type) ? `<div class="stat"><b>${foodRushActive ? Math.ceil(floor.foodRush.remaining) + "s" : foodRushCooldownValue ? foodRushCooldownValue + "s" : "就绪"}</b><span>高峰</span></div><div class="stat"><b>${foodRushPaceValue}</b><span>节奏</span></div><div class="stat"><b>${foodRushHeatValue}</b><span>忙场</span></div><div class="stat"><b>${foodRushServedValue}</b><span>上菜</span></div>` : ""}
       ${floor.type === "market" ? `<div class="stat"><b>${state.orders.length}/${orderCapacity(state)}</b><span>订单栏</span></div><div class="stat"><b>${marketCooldown ? marketCooldown + "s" : "就绪"}</b><span>撮合</span></div><div class="stat"><b>${marketParcelStageValue}</b><span>包裹</span></div><div class="stat"><b>${marketParcelPackedValue}</b><span>打包</span></div><div class="stat"><b>${state.stats.marketParcelsDone || 0}</b><span>流转</span></div>` : ""}
-      ${floor.type === "kingdom" ? `<div class="stat"><b>${royalMandateStageValue}</b><span>王令</span></div><div class="stat"><b>${royalMandatePreparedValue}</b><span>预备</span></div><div class="stat"><b>${state.stats.royalMandatesDone || 0}</b><span>签发</span></div><div class="stat"><b>${royalMandateInfo ? royalMandateInfo.missing : "-"}</b><span>缺口</span></div>` : ""}
+      ${floor.type === "kingdom" ? `<div class="stat"><b>${royalMandateStageValue}</b><span>王令</span></div><div class="stat"><b>${royalMandatePreparedValue}</b><span>预备</span></div><div class="stat"><b>${state.stats.royalMandatesDone || 0}</b><span>签发</span></div><div class="stat"><b>${state.stats.royalCourierReceiptsDone || 0}</b><span>回执</span></div><div class="stat"><b>${royalMandateInfo ? royalMandateInfo.missing : "-"}</b><span>缺口</span></div>` : ""}
       ${floor.type === "library" ? `<div class="stat"><b>${catalog.completed}/${COLLECTION_DEFS.length}</b><span>图鉴</span></div><div class="stat"><b>${libraryCooldown ? libraryCooldown + "s" : "就绪"}</b><span>编目</span></div>` : ""}
       ${isComfortFloorType(floor.type) ? `<div class="stat"><b>${comfortActive ? Math.ceil(floor.comfortSession.remaining) + "s" : comfortCooldown ? comfortCooldown + "s" : "就绪"}</b><span>休整</span></div>` : ""}
       ${isShowtimeFloorType(floor.type) ? `<div class="stat"><b>${showtimeActive ? Math.ceil(floor.showtime.remaining) + "s" : showtimeCooldownValue ? showtimeCooldownValue + "s" : "就绪"}</b><span>演出</span></div><div class="stat"><b>${showtimeBeatValue}</b><span>段落</span></div><div class="stat"><b>${showtimeHeatValue}</b><span>热度</span></div><div class="stat"><b>${state.stats.entertainmentShowsDone || 0}/${state.stats.showtimeReactionsDone || 0}</b><span>小剧/反应</span></div>` : ""}
@@ -6444,6 +6588,7 @@ function renderFloorPerks(floor) {
     perks.push(`王令订单 +${Math.round(kingdomMandateBonus(state) * 55)}%`);
     perks.push(`全城声望 +${Math.round(kingdomMandateBonus(state) * 100)}%`);
     perks.push(`签发 ${state.stats.royalMandatesDone || 0}`);
+    perks.push(`回执 ${state.stats.royalCourierReceiptsDone || 0}`);
     if (isActiveRoyalMandate(floor)) perks.push(`${currentRoyalMandatePhase(floor).label} ${Math.ceil(floor.royalMandate.remaining)}s`);
   } else if (floor.type === "garden") {
     perks.push("快乐缓慢恢复");
@@ -6635,6 +6780,8 @@ function renderOrders() {
       const parcelActive = Boolean(order.marketParcel?.active);
       const parcelShipped = Boolean(order.marketParcel?.shipped);
       const mandateActive = Boolean(order.royalMandate?.active);
+      const mandateDelivered = Boolean(order.royalMandate?.delivered);
+      const receiptBonus = Math.max(0, Number(order.royalMandate?.receiptBonus) || 0);
       const mandateReason = mandateActive
         ? "王令正在签发"
         : ready
@@ -6651,7 +6798,7 @@ function renderOrders() {
         : `${Math.min(owned, order.amount)}/${order.amount}`;
       const floorButton = info.floor ? `<button class="detail-btn" data-action="focus-order-floor" data-floor-id="${info.floor.id}">定位</button>` : "";
       return `
-        <div class="order ${ready ? "ready" : ""} ${order.source === "market" ? "market-order" : ""} ${mandatePrepared ? "mandated-order" : ""} ${packed ? "parcel-order" : ""} ${parcelActive ? "parcel-active" : ""} ${mandateActive ? "mandate-active" : ""}">
+        <div class="order ${ready ? "ready" : ""} ${order.source === "market" ? "market-order" : ""} ${mandatePrepared ? "mandated-order" : ""} ${mandateDelivered ? "mandate-delivered royal-courier-order" : ""} ${packed ? "parcel-order" : ""} ${parcelActive ? "parcel-active" : ""} ${mandateActive ? "mandate-active" : ""}">
           <div class="order-head">
             <span class="type-token">${FLOOR_TYPES[order.type].icon}</span>
             <span><strong>${escapeHtml(order.title)}</strong><small>${escapeHtml(order.note)}</small></span>
@@ -6664,6 +6811,8 @@ function renderOrders() {
             ${parcelShipped && !parcelActive ? `<span class="parcel-tag shipped">已发货</span>` : ""}
             ${mandatePrepared ? `<span class="mandate-tag">王令预备 ${mandatePrepared}</span>` : ""}
             ${mandateActive ? `<span class="mandate-tag active">签发中</span>` : ""}
+            ${mandateDelivered ? `<span class="mandate-tag delivered">信使送达</span>` : ""}
+            ${receiptBonus ? `<span class="mandate-tag receipt">回执 +${receiptBonus}</span>` : ""}
             ${order.royalMandate?.seal ? `<span class="mandate-tag seal">御印</span>` : ""}
           </div>
           <div class="meter"><span style="width:${pct}%"></span></div>
