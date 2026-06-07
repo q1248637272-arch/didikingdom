@@ -1,0 +1,7 @@
+Create a polished fantasy side-view room background for a cozy vertical tower management browser game.
+
+Scene: an old sky garden floor after a resident tea gathering has ended, showing a soft readable "comfort afterglow" without any characters. Use a horizontal cutaway room with hanging planters, flower beds, a tiny tea table, warm lanterns, pale sunbeams, a few abstract glowing pollen motes, and a clear lower walkway for small sprites and UI overlays. The room should communicate calm recovery, rent happiness, and expedition preparation through environmental cues only: folded blankets, packed little travel satchels, gentle path stones, and a faint golden-green aura on the floor.
+
+Style: painterly stylized 2D game background, no characters, no UI, no readable text, no letters, no numbers, no signage, no logos, no watermark. Keep the lower foreground clear for tiny sprites. Use warm amber lamplight, fresh leaf greens, muted teal shadows, crisp silhouettes, soft atmospheric depth, and a clean 16:9 side-view room tile composition.
+
+Output: high quality raster illustration, web game asset, no transparent border.

@@ -366,6 +366,14 @@ const COMFORT_SESSION_ACTIONS = {
   garden: "组织茶会",
   bathhouse: "安排休整",
 };
+const COMFORT_AFTERGLOW_LABELS = {
+  garden: "花香余韵",
+  bathhouse: "暖雾余韵",
+};
+const COMFORT_AFTERGLOW_TOTALS = {
+  garden: 105,
+  bathhouse: 120,
+};
 const SHOWTIME_FLOOR_TYPES = ["entertainment"];
 const SHOWTIME_LABELS = {
   entertainment: "烛光小剧",
@@ -826,6 +834,14 @@ const QUEST_DEFS = [
     text: "用花园或温泉组织 3 次居民休整",
   },
   {
+    id: "comfort_echoes",
+    title: "舒缓余韵",
+    goal: 3,
+    metric: "comfortEchoesDone",
+    reward: { coins: 620, gems: 3 },
+    text: "让花园或温泉留下 3 次可读余韵",
+  },
+  {
     id: "moon_clinic",
     title: "星露医馆",
     goal: 1,
@@ -966,7 +982,7 @@ let guideReady = false;
 
 function makeNewGame() {
   const game = {
-    version: 17,
+    version: 18,
     coins: 560,
     gems: 7,
     happiness: 72,
@@ -1019,6 +1035,7 @@ function makeNewGame() {
       lifeStoriesDone: 0,
       libraryStudiesDone: 0,
       comfortSessionsDone: 0,
+      comfortEchoesDone: 0,
       entertainmentShowsDone: 0,
       showtimeReactionsDone: 0,
       entertainmentFloorsBuilt: 0,
@@ -1103,6 +1120,7 @@ function createFloor(game, type, options = {}) {
     libraryCooldown: type === "library" ? 0 : undefined,
     comfortCooldown: isComfortFloorType(type) ? 0 : undefined,
     comfortSession: isComfortFloorType(type) ? null : undefined,
+    comfortAfterglow: isComfortFloorType(type) ? null : undefined,
     showtimeCooldown: isShowtimeFloorType(type) ? 0 : undefined,
     showtime: isShowtimeFloorType(type) ? null : undefined,
   };
@@ -1165,6 +1183,7 @@ function finalizeConstruction(floor) {
     libraryCooldown: floor.type === "library" ? 0 : undefined,
     comfortCooldown: isComfortFloorType(floor.type) ? 0 : undefined,
     comfortSession: isComfortFloorType(floor.type) ? null : undefined,
+    comfortAfterglow: isComfortFloorType(floor.type) ? null : undefined,
     showtimeCooldown: isShowtimeFloorType(floor.type) ? 0 : undefined,
     showtime: isShowtimeFloorType(floor.type) ? null : undefined,
     rentReady: 0,
@@ -1400,6 +1419,7 @@ function migrateGame(game) {
     lifeStoriesDone: 0,
     libraryStudiesDone: 0,
     comfortSessionsDone: 0,
+    comfortEchoesDone: 0,
     entertainmentShowsDone: 0,
     showtimeReactionsDone: 0,
     entertainmentFloorsBuilt: 0,
@@ -1414,7 +1434,7 @@ function migrateGame(game) {
     aquariumFloorsBuilt: 0,
     festivalFloorsBuilt: 0,
   };
-  game.version = Math.max(Number(game.version) || 0, 17);
+  game.version = Math.max(Number(game.version) || 0, 18);
   game.nextExpeditionId ||= 1;
   game.nextLifeStoryId ||= 1;
   game.quests ||= QUEST_DEFS.map((quest) => ({ id: quest.id, claimed: false }));
@@ -1571,6 +1591,7 @@ function migrateGame(game) {
                   : [],
               }
             : null;
+        floor.comfortAfterglow = normalizeComfortAfterglow(floor.comfortAfterglow, floor);
       }
       if (isShowtimeFloorType(floor.type)) {
         floor.showtimeCooldown = Math.max(0, Number(floor.showtimeCooldown) || 0);
@@ -1642,6 +1663,12 @@ function applyOfflineProgress(game) {
           floor.comfortSession = null;
         }
       }
+      if (floor.comfortAfterglow) {
+        floor.comfortAfterglow.remaining = Math.max(0, Number(floor.comfortAfterglow.remaining || 0) - elapsed);
+        if (floor.comfortAfterglow.remaining <= 0) {
+          floor.comfortAfterglow = null;
+        }
+      }
     }
     if (FOOD_RUSH_FLOOR_TYPES.includes(floor.type)) {
       floor.foodRushCooldown = Math.max(0, (floor.foodRushCooldown || 0) - elapsed * (1 + clockworkTempoBonus(game) * 0.14));
@@ -1655,7 +1682,7 @@ function applyOfflineProgress(game) {
     if (floor.type === "dwelling") {
       const cycles = Math.floor((elapsed + (floor.rentTotal - floor.rentTimer)) / floor.rentTotal);
       if (cycles > 0) {
-        const rent = cycles * Math.max(8, Math.round(floor.residents.length * (9 + floor.level * 2) * (1 + dwellingJourneyBonus(game) * 0.3) + floor.bonus));
+        const rent = cycles * Math.max(8, Math.round(floor.residents.length * (9 + floor.level * 2) * (1 + dwellingJourneyBonus(game) * 0.3 + comfortRentEchoBonus(game)) + floor.bonus));
         floor.rentReady = Math.min(360, (floor.rentReady || 0) + rent);
         floor.rentTimer = floor.rentTotal;
       }
@@ -1892,6 +1919,25 @@ function ensurePersonLife(person) {
     person.lifeVisit.targetGoal = clamp(Number(person.lifeVisit.targetGoal) || 0, 0, 100);
     person.lifeVisit.trailId = person.lifeVisit.trailId || `life-${person.id || "guest"}-${Date.now()}`;
     person.lifeVisit.startMotive = clamp(Number(person.lifeVisit.startMotive ?? person.motives?.[person.lifeVisit.need] ?? 0), 0, 100);
+  }
+  if (person.comfortMemory && typeof person.comfortMemory !== "object") person.comfortMemory = null;
+  if (person.comfortMemory) {
+    const type = isComfortFloorType(person.comfortMemory.type) ? person.comfortMemory.type : "garden";
+    const remaining = Math.max(0, Number(person.comfortMemory.remaining) || 0);
+    if (remaining <= 0) {
+      delete person.comfortMemory;
+    } else {
+      person.comfortMemory = {
+        id: person.comfortMemory.id || `comfort-memory-${person.id || "resident"}-${Date.now()}`,
+        type,
+        label: person.comfortMemory.label || COMFORT_AFTERGLOW_LABELS[type] || "舒缓余韵",
+        sourceFloorId: Number.isFinite(Number(person.comfortMemory.sourceFloorId)) ? Number(person.comfortMemory.sourceFloorId) : null,
+        remaining,
+        total: Math.max(1, Number(person.comfortMemory.total) || remaining || 1),
+        power: clamp(Number(person.comfortMemory.power) || 0.08, 0, 0.24),
+        expeditionBonus: clamp(Number(person.comfortMemory.expeditionBonus) || 0.04, 0, 0.18),
+      };
+    }
   }
   person.needTimer = Number.isFinite(Number(person.needTimer)) ? Math.max(0, Number(person.needTimer)) : randFloat(5, 13);
   person.socialCooldown = Math.max(0, Number(person.socialCooldown) || 0);
@@ -2283,6 +2329,16 @@ function renderLifeTrailBadge(person) {
   return `<span class="life-trail-chip" data-need="${escapeAttr(story.need)}">上次${escapeHtml(need)} · ${escapeHtml(story.detail)}</span>`;
 }
 
+function renderComfortMemoryBadge(person) {
+  if (!person?.comfortMemory) return "";
+  const memory = person.comfortMemory;
+  const label = memory.label || COMFORT_AFTERGLOW_LABELS[memory.type] || "舒缓余韵";
+  const left = Math.ceil(memory.remaining || 0);
+  const floor = Number.isFinite(Number(memory.sourceFloorId)) ? findFloor(memory.sourceFloorId) : null;
+  const source = floor?.name || FLOOR_TYPES[memory.type]?.label || "休整";
+  return `<span class="comfort-memory-chip" data-type="${escapeAttr(memory.type || "garden")}">${escapeHtml(label)} · ${left}s · ${escapeHtml(source)}</span>`;
+}
+
 function renderLifeStoryPanel(floor) {
   if (!floor || floor.status !== "open") return "";
   const active = lifeTrailsForFloor(floor).slice(0, 3);
@@ -2327,6 +2383,7 @@ function updatePersonLife(person, floorType = "default", dt = 0) {
   const before = personLifeKey(person);
   ensurePersonLife(person);
   if (dt > 0) {
+    updateComfortMemory(person, dt);
     person.needTimer = Math.max(0, Number(person.needTimer || 0) - dt);
     applyMotiveDecay(person, floorType, dt);
     applyActivityMotiveGain(person, floorType, dt);
@@ -2350,13 +2407,32 @@ function updatePersonLife(person, floorType = "default", dt = 0) {
 function applyMotiveDecay(person, floorType = "default", dt = 0) {
   const motives = ensurePersonLife(person).motives;
   const workLoad = isBusiness({ type: floorType, status: "open" }) && person.workFloorId ? 1.16 : 1;
-  const comfortEase = Math.min(0.22, gardenComfortBonus(state) * 0.28 + bathhouseRestBonus(state) * 0.18 + clinicCareBonus(state) * 0.14);
+  const comfortEase = Math.min(0.32, gardenComfortBonus(state) * 0.28 + bathhouseRestBonus(state) * 0.18 + clinicCareBonus(state) * 0.14 + personComfortMemoryBonus(person));
   PERSON_MOTIVE_KEYS.forEach((key) => {
     const base = PERSON_MOTIVE_DECAY[key] || 0.1;
     const socialPressure = key === "social" && floorType === "lobby" ? 0.82 : 1;
     const roomEase = floorType === "dwelling" && key === "energy" ? 0.78 : 1;
     motives[key] = clamp(motives[key] - dt * base * workLoad * socialPressure * roomEase * (1 - comfortEase), 0, 100);
   });
+}
+
+function updateComfortMemory(person, dt = 0) {
+  if (!person?.comfortMemory) return false;
+  const before = Math.ceil(person.comfortMemory.remaining || 0);
+  person.comfortMemory.remaining = Math.max(0, Number(person.comfortMemory.remaining || 0) - dt);
+  if (person.comfortMemory.remaining <= 0) {
+    delete person.comfortMemory;
+  }
+  return before !== Math.ceil(person.comfortMemory?.remaining || 0);
+}
+
+function personComfortMemoryBonus(person) {
+  if (!person?.comfortMemory) return 0;
+  const remaining = Math.max(0, Number(person.comfortMemory.remaining) || 0);
+  const total = Math.max(1, Number(person.comfortMemory.total) || remaining || 1);
+  if (remaining <= 0) return 0;
+  const ratio = clamp(remaining / total, 0, 1);
+  return Math.min(0.2, (Number(person.comfortMemory.power) || 0.08) * (0.42 + ratio * 0.58));
 }
 
 function applyActivityMotiveGain(person, floorType = "default", dt = 0) {
@@ -2440,6 +2516,9 @@ function personLifeWish(person, floorType = "default") {
   if (isActiveLifeVisit(person)) {
     return lifeVisitProgressLabel(person);
   }
+  if (person.comfortMemory) {
+    return `带着${person.comfortMemory.label || "舒缓余韵"}`;
+  }
   const need = person.need || dominantNeedForPerson(person, floorType);
   const label = PERSON_NEED_LABELS[need] || "生活";
   const supported = (NEED_VISIT_TYPES[need] || []).includes(floorType);
@@ -2452,7 +2531,8 @@ function personLifeKey(person) {
   if (!person || typeof person !== "object") return "";
   const motiveKey = PERSON_MOTIVE_KEYS.map((key) => Math.round(Number(person.motives?.[key] || 0) / 12)).join("-");
   const visitKey = person.lifeVisit ? `${person.lifeVisit.floorId || ""}:${person.lifeVisit.need || ""}:${person.lifeVisit.companionId || ""}` : "";
-  return `${person.need || ""}:${person.needIntensity || 0}:${person.lifeMood || ""}:${person.lifeWish || ""}:${visitKey}:${person.socialPhase || ""}:${motiveKey}`;
+  const comfortKey = person.comfortMemory ? `${person.comfortMemory.type || ""}:${Math.ceil(person.comfortMemory.remaining || 0)}` : "";
+  return `${person.need || ""}:${person.needIntensity || 0}:${person.lifeMood || ""}:${person.lifeWish || ""}:${visitKey}:${comfortKey}:${person.socialPhase || ""}:${motiveKey}`;
 }
 
 function floorSocialScope(floor) {
@@ -2921,7 +3001,7 @@ function updateTimers(dt) {
       floor.rentTimer -= dt;
       if (floor.rentTimer <= 0) {
         floor.rentTimer = floor.rentTotal;
-        const income = Math.max(8, Math.round(floor.residents.length * 11 * (1 + dwellingJourneyBonus(state) * 0.3) + floor.bonus));
+        const income = Math.max(8, Math.round(floor.residents.length * 11 * (1 + dwellingJourneyBonus(state) * 0.3 + comfortRentEchoBonus(state)) + floor.bonus));
         floor.rentReady = Math.min(180, floor.rentReady + income);
       }
       return floor;
@@ -3853,8 +3933,60 @@ function isActiveComfortSession(floor) {
   return Boolean(isComfortFloorType(floor?.type) && floor.comfortSession && Number(floor.comfortSession.remaining) > 0);
 }
 
+function normalizeComfortAfterglow(glow, floor = null) {
+  if (!glow || typeof glow !== "object") return null;
+  const type = isComfortFloorType(glow.type) ? glow.type : isComfortFloorType(floor?.type) ? floor.type : "garden";
+  const remaining = Math.max(0, Number(glow.remaining) || 0);
+  if (remaining <= 0) return null;
+  const total = Math.max(1, Number(glow.total) || COMFORT_AFTERGLOW_TOTALS[type] || remaining || 1);
+  return {
+    id: glow.id || `comfort-echo-${floor?.id || type}-${Date.now()}`,
+    type,
+    label: glow.label || COMFORT_AFTERGLOW_LABELS[type] || "舒缓余韵",
+    remaining,
+    total,
+    participantIds: Array.isArray(glow.participantIds) ? glow.participantIds.map(Number).filter(Boolean) : [],
+    rentBonus: Math.max(0, Number(glow.rentBonus) || 0),
+    expeditionBonus: clamp(Number(glow.expeditionBonus) || 0.06, 0, 0.22),
+    motiveEase: clamp(Number(glow.motiveEase) || 0.08, 0, 0.24),
+  };
+}
+
+function isActiveComfortAfterglow(floor) {
+  return Boolean(isComfortFloorType(floor?.type) && floor.comfortAfterglow && Number(floor.comfortAfterglow.remaining) > 0);
+}
+
 function comfortSessionBonus(game = state) {
   return Math.min(0.1, (game.stats?.comfortSessionsDone || 0) * 0.0035);
+}
+
+function comfortEchoPracticeBonus(game = state) {
+  return Math.min(0.06, (game.stats?.comfortEchoesDone || 0) * 0.0025);
+}
+
+function activeComfortAfterglowBonus(game = state) {
+  return Math.min(
+    0.12,
+    businessFloors(game).reduce((sum, floor) => {
+      if (!isActiveComfortAfterglow(floor)) return sum;
+      const glow = floor.comfortAfterglow;
+      const ratio = clamp(Number(glow.remaining) / Math.max(1, Number(glow.total) || 1), 0, 1);
+      return sum + (Number(glow.motiveEase) || 0.08) * (0.45 + ratio * 0.55);
+    }, 0)
+  );
+}
+
+function comfortRentEchoBonus(game = state) {
+  return Math.min(0.16, activeComfortAfterglowBonus(game) * 0.9 + comfortEchoPracticeBonus(game) * 0.55);
+}
+
+function comfortExpeditionPrepBonus(game = state) {
+  return Math.min(
+    0.18,
+    activeComfortAfterglowBonus(game) * 0.75 +
+      comfortEchoPracticeBonus(game) * 0.48 +
+      businessFloors(game).reduce((sum, floor) => sum + (isActiveComfortAfterglow(floor) ? floor.comfortAfterglow.expeditionBonus || 0 : 0), 0) * 0.22
+  );
 }
 
 function isFoodRushFloorType(type) {
@@ -4611,6 +4743,66 @@ function comfortParticipants(floor) {
   });
 }
 
+function grantComfortMemory(person, floor, glow) {
+  if (!person || !glow) return;
+  ensurePersonLife(person);
+  const remaining = Math.max(48, Math.round((glow.total || 90) * 0.78));
+  person.comfortMemory = {
+    id: `${glow.id}-${person.id}`,
+    type: glow.type,
+    label: glow.label,
+    sourceFloorId: floor.id,
+    remaining,
+    total: remaining,
+    power: glow.motiveEase,
+    expeditionBonus: glow.expeditionBonus,
+  };
+  person.lifeWish = personLifeWish(person, floor.type);
+}
+
+function finishComfortSession(floor, participants = []) {
+  if (!isComfortFloorType(floor?.type) || !floor.comfortSession) return null;
+  const session = floor.comfortSession;
+  const participantIds = Array.from(
+    new Set([...(session.participantIds || []), ...participants.map((person) => person.id)].map(Number).filter(Boolean))
+  );
+  const resolvedParticipants = participantIds.map((id) => getResident(id)).filter(Boolean);
+  if (!resolvedParticipants.length) return null;
+  const count = resolvedParticipants.length;
+  const type = floor.type;
+  const label = COMFORT_AFTERGLOW_LABELS[type] || "舒缓余韵";
+  const total = Math.round((COMFORT_AFTERGLOW_TOTALS[type] || 100) + count * (type === "bathhouse" ? 7 : 6) + (floor.level || 1) * 3);
+  const rentBonus = Math.round((type === "bathhouse" ? 9 : 6) + count * (type === "bathhouse" ? 4 : 3) + (floor.level || 1) * 2);
+  const expeditionBonus = clamp(0.045 + count * 0.012 + (type === "bathhouse" ? 0.026 : 0.012) + (floor.level || 1) * 0.004, 0.05, 0.18);
+  const motiveEase = clamp(0.07 + count * 0.012 + (type === "bathhouse" ? 0.02 : 0.012), 0.07, 0.19);
+  const glow = normalizeComfortAfterglow(
+    {
+      id: `comfort-echo-${floor.id}-${Date.now()}-${randInt(10, 99)}`,
+      type,
+      label,
+      remaining: total,
+      total,
+      participantIds,
+      rentBonus,
+      expeditionBonus,
+      motiveEase,
+    },
+    floor
+  );
+  floor.comfortAfterglow = glow;
+  state.stats.comfortEchoesDone = (state.stats.comfortEchoesDone || 0) + 1;
+  resolvedParticipants.forEach((person) => {
+    grantComfortMemory(person, floor, glow);
+    applyComfortMotiveBurst(floor, person, 0.5);
+    const home = findFloor(person.homeFloorId);
+    if (home?.type === "dwelling") {
+      home.rentReady = Math.min(420, (home.rentReady || 0) + Math.round(rentBonus * 0.55));
+    }
+  });
+  state.happiness = clamp(state.happiness + Math.min(5, 1 + Math.ceil(count / 2)), 0, 100);
+  return glow;
+}
+
 function startComfortSession(floorId) {
   const floor = findFloor(floorId);
   if (!isBusiness(floor) || !isComfortFloorType(floor.type)) return;
@@ -4666,44 +4858,60 @@ function startComfortSession(floorId) {
 
 function updateComfortFloor(floor, dt) {
   if (!isComfortFloorType(floor?.type)) return false;
-  const before = `${Math.ceil(floor.comfortCooldown || 0)}:${Math.ceil(floor.comfortSession?.remaining || 0)}`;
+  const before = comfortSessionMapKey(floor);
   floor.comfortCooldown = Math.max(0, (floor.comfortCooldown || 0) - dt * (1 + clockworkTempoBonus(state) * 0.18));
-  if (!isActiveComfortSession(floor)) return before !== `${Math.ceil(floor.comfortCooldown || 0)}:0`;
-  floor.comfortSession.remaining = Math.max(0, Number(floor.comfortSession.remaining || 0) - dt);
+  if (isActiveComfortAfterglow(floor)) {
+    floor.comfortAfterglow.remaining = Math.max(0, Number(floor.comfortAfterglow.remaining || 0) - dt);
+    if (floor.comfortAfterglow.remaining <= 0) floor.comfortAfterglow = null;
+  }
+  if (!isActiveComfortSession(floor)) return before !== comfortSessionMapKey(floor);
   const participants = comfortParticipants(floor);
+  floor.comfortSession.remaining = Math.max(0, Number(floor.comfortSession.remaining || 0) - dt);
   floor.comfortSession.participantIds = participants.map((person) => person.id);
   participants.forEach((person) => applyComfortMotiveBurst(floor, person, dt * 0.055));
   if (floor.comfortSession.remaining <= 0 || !participants.length) {
     const label = COMFORT_SESSION_LABELS[floor.type] || "休整";
+    const glow = finishComfortSession(floor, participants);
     delete floor.comfortSession;
-    if (participants.length) addLog(`${floor.name} 的${label}结束，居民们精神好了许多。`);
+    if (glow) {
+      addLog(`${floor.name} 的${label}结束，留下${glow.label}：租金 +${glow.rentBonus}，探险准备 +${Math.round(glow.expeditionBonus * 100)}%。`);
+    } else if (participants.length) {
+      addLog(`${floor.name} 的${label}结束，居民们精神好了许多。`);
+    }
   }
-  return before !== `${Math.ceil(floor.comfortCooldown || 0)}:${Math.ceil(floor.comfortSession?.remaining || 0)}`;
+  return before !== comfortSessionMapKey(floor);
 }
 
 function renderComfortSessionPanel(floor) {
   if (!isComfortFloorType(floor?.type)) return "";
   const active = isActiveComfortSession(floor);
+  const afterglow = isActiveComfortAfterglow(floor) ? floor.comfortAfterglow : null;
   const participants = active ? comfortParticipants(floor) : [];
   const participantNames = participants.length ? participants.map((person) => person.name).slice(0, 4).join("、") : "等待居民参加";
   const status = active
     ? `${Math.ceil(floor.comfortSession.remaining)}s · ${participantNames}`
-    : (floor.comfortCooldown || 0) > 0
-      ? `冷却 ${Math.ceil(floor.comfortCooldown)}s`
-      : "就绪";
+    : afterglow
+      ? `${afterglow.label} ${Math.ceil(afterglow.remaining)}s`
+      : (floor.comfortCooldown || 0) > 0
+        ? `冷却 ${Math.ceil(floor.comfortCooldown)}s`
+        : "就绪";
   const needs = floor.type === "bathhouse" ? "优先恢复休息与社交" : "优先恢复社交、娱乐与餐饮";
+  const echoText = afterglow
+    ? `<small class="comfort-afterglow-readout">回租 +${afterglow.rentBonus} · 探险准备 +${Math.round(afterglow.expeditionBonus * 100)}% · 余韵 ${state.stats.comfortEchoesDone || 0} 次</small>`
+    : `<small>${needs} · 已组织 ${state.stats.comfortSessionsDone || 0} 次</small>`;
   return `
-    <div class="comfort-session-panel ${active ? "active" : ""}">
+    <div class="comfort-session-panel ${active ? "active" : ""} ${afterglow ? "afterglow" : ""}">
       <strong>${COMFORT_SESSION_LABELS[floor.type] || "结伴休整"}</strong>
       <span>${escapeHtml(status)}</span>
-      <small>${needs} · 已组织 ${state.stats.comfortSessionsDone || 0} 次</small>
+      ${echoText}
     </div>`;
 }
 
 function comfortSessionMapKey(floor) {
   if (!isComfortFloorType(floor?.type)) return "";
   const participants = floor.comfortSession?.participantIds || [];
-  return `comfort:${Math.ceil(floor.comfortCooldown || 0)}:${Math.ceil(floor.comfortSession?.remaining || 0)}:${participants.join("-")}`;
+  const glow = floor.comfortAfterglow;
+  return `comfort:${Math.ceil(floor.comfortCooldown || 0)}:${Math.ceil(floor.comfortSession?.remaining || 0)}:${participants.join("-")}:echo:${Math.ceil(glow?.remaining || 0)}:${glow?.participantIds?.join("-") || ""}:${glow?.rentBonus || 0}:${Math.round((glow?.expeditionBonus || 0) * 100)}`;
 }
 
 function collectionOrderBonus(game) {
@@ -4780,7 +4988,7 @@ function kingdomMandateBonus(game = state) {
 }
 
 function gardenComfortBonus(game = state) {
-  return Math.min(0.24, floorTypeInfluence(game, "garden") * 0.045 + comfortSessionBonus(game) * 0.34);
+  return Math.min(0.27, floorTypeInfluence(game, "garden") * 0.045 + comfortSessionBonus(game) * 0.34 + comfortEchoPracticeBonus(game) * 0.3 + activeComfortAfterglowBonus(game) * 0.28);
 }
 
 function serviceCareBonus(game = state) {
@@ -4792,7 +5000,7 @@ function observatoryStarBonus(game = state) {
 }
 
 function bathhouseRestBonus(game = state) {
-  return Math.min(0.26, floorTypeInfluence(game, "bathhouse") * 0.05 + comfortSessionBonus(game) * 0.42);
+  return Math.min(0.29, floorTypeInfluence(game, "bathhouse") * 0.05 + comfortSessionBonus(game) * 0.42 + comfortEchoPracticeBonus(game) * 0.36 + activeComfortAfterglowBonus(game) * 0.34);
 }
 
 function clinicCareBonus(game = state) {
@@ -4895,6 +5103,8 @@ function reconcileExpeditions(game) {
         rewardCoins: expedition.rewardCoins || randInt(def.coins[0], def.coins[1]),
         rewardGems: expedition.rewardGems || 0,
         relicChance: expedition.relicChance ?? def.relicChance,
+        comfortPrepBonus: clamp(Number(expedition.comfortPrepBonus) || 0, 0, 0.28),
+        comfortPrepLabel: expedition.comfortPrepLabel || "",
       };
     });
   residents.forEach((resident) => {
@@ -5000,11 +5210,12 @@ function startExpedition(type, preferredResident = null, options = {}) {
   const foodBonus = foodWarmthBonus(state);
   const craftBonus = craftToolBonus(state);
   const homeBonus = dwellingJourneyBonus(state);
-  const speedBonus = Math.min(0.56, (power - 3) * 0.025 + state.elevator.upgrades * 0.015 + researchBonus * 0.45 + starBonus * 0.38 + restBonus * 0.18 + homeBonus * 0.24 + foodBonus * 0.22 + craftBonus * 0.24 + clockBonus * 0.28 + routeBonus * 0.32 + buzzBonus * 0.2);
+  const comfortPrep = Math.min(0.24, comfortExpeditionPrepBonus(state) + (resident.comfortMemory?.expeditionBonus || 0) * 0.72);
+  const speedBonus = Math.min(0.58, (power - 3) * 0.025 + state.elevator.upgrades * 0.015 + researchBonus * 0.45 + starBonus * 0.38 + restBonus * 0.18 + homeBonus * 0.24 + foodBonus * 0.22 + craftBonus * 0.24 + clockBonus * 0.28 + routeBonus * 0.32 + buzzBonus * 0.2 + comfortPrep * 0.28);
   const total = Math.max(14, Math.round(def.duration * (1 - speedBonus)));
-  const rewardCoins = Math.round((randInt(def.coins[0], def.coins[1]) + power * 8) * (1 + starBonus * 0.55 + wonderBonus * 0.32 + routeBonus * 0.42 + buzzBonus * 0.24 + homeBonus * 0.18 + foodBonus * 0.2 + craftBonus * 0.2));
-  const rewardGems = Math.random() < def.gemChance + power * 0.01 + starBonus * 0.22 + wonderBonus * 0.12 + routeBonus * 0.18 + buzzBonus * 0.1 + craftBonus * 0.08 ? 1 : 0;
-  const relicChance = clamp(def.relicChance + power * 0.012 + collectionMapBonus() + researchBonus + starBonus + wonderBonus * 0.4 + routeBonus * 0.22 + buzzBonus * 0.16 + homeBonus * 0.1 + craftBonus * 0.18 + alchemyPotionBonus(state) * 0.12 + treasureVaultBonus(state) * 0.12, 0, 0.84);
+  const rewardCoins = Math.round((randInt(def.coins[0], def.coins[1]) + power * 8) * (1 + starBonus * 0.55 + wonderBonus * 0.32 + routeBonus * 0.42 + buzzBonus * 0.24 + homeBonus * 0.18 + foodBonus * 0.2 + craftBonus * 0.2 + comfortPrep * 0.26));
+  const rewardGems = Math.random() < def.gemChance + power * 0.01 + starBonus * 0.22 + wonderBonus * 0.12 + routeBonus * 0.18 + buzzBonus * 0.1 + craftBonus * 0.08 + comfortPrep * 0.08 ? 1 : 0;
+  const relicChance = clamp(def.relicChance + power * 0.012 + collectionMapBonus() + researchBonus + starBonus + wonderBonus * 0.4 + routeBonus * 0.22 + buzzBonus * 0.16 + homeBonus * 0.1 + craftBonus * 0.18 + comfortPrep * 0.12 + alchemyPotionBonus(state) * 0.12 + treasureVaultBonus(state) * 0.12, 0, 0.84);
   const expedition = {
     id: `exp-${state.nextExpeditionId++}`,
     type: def.id,
@@ -5017,10 +5228,13 @@ function startExpedition(type, preferredResident = null, options = {}) {
     rewardCoins,
     rewardGems,
     relicChance,
+    comfortPrepBonus: comfortPrep,
+    comfortPrepLabel: resident.comfortMemory?.label || (comfortPrep > 0 ? "舒缓余韵" : ""),
   };
   resident.expeditionId = expedition.id;
   state.expeditions.push(expedition);
-  addLog(`${resident.name} 出发执行「${def.title}」${options.originFloorId !== undefined ? "，宿舍完成远行整备" : ""}。`);
+  const comfortText = comfortPrep > 0 ? `，${expedition.comfortPrepLabel}让准备 +${Math.round(comfortPrep * 100)}%` : "";
+  addLog(`${resident.name} 出发执行「${def.title}」${options.originFloorId !== undefined ? "，宿舍完成远行整备" : ""}${comfortText}。`);
   render(true);
 }
 
@@ -5068,12 +5282,13 @@ function completeExpedition(game, expeditionId, noisy = game === state) {
   const relicText = relicFound ? "，还带回珍藏碎片" : "";
   const provisionText = provisionJoy ? "，暖锅补给让队伍精神更足" : "";
   const toolText = craftToolBonus(game) > 0 ? "，工坊工具包让路线更稳" : "";
+  const comfortText = expedition.comfortPrepBonus > 0 ? `，${expedition.comfortPrepLabel || "舒缓余韵"}让路线更安稳` : "";
   const homeFloor = game.floors.find((floor) => floor.id === expedition.originFloorId && floor.type === "dwelling");
   if (homeFloor) {
     const homeShare = Math.round(coins * (0.08 + dwellingJourneyBonus(game) * 0.24));
     homeFloor.rentReady = Math.min(420, (homeFloor.rentReady || 0) + homeShare);
   }
-  addLogToGame(game, `${expedition.residentName || resident?.name || "斥候"} 完成「${expedition.title}」，带回 ${coins} 金币${gemText}${relicText}${provisionText}${toolText}。`);
+  addLogToGame(game, `${expedition.residentName || resident?.name || "斥候"} 完成「${expedition.title}」，带回 ${coins} 金币${gemText}${relicText}${provisionText}${toolText}${comfortText}。`);
   if (noisy) {
     showFloat(`探险 +${coins}`);
     if (gems || relicFound) showToast(relicFound ? "探险发现珍藏碎片" : `探险带回 ${gems} 宝石`);
@@ -5772,13 +5987,17 @@ function renderFloor(floor) {
     ? ` data-market-parcel-phase="${escapeAttr(currentMarketParcelPhase(floor).id)}" data-market-parcel-packed="${escapeAttr(floor.marketParcel.packed || 0)}"`
     : "";
   const comfortClass = isActiveComfortSession(floor) ? "comfort-active" : "";
+  const comfortEchoClass = isActiveComfortAfterglow(floor) ? "comfort-afterglow-active" : "";
+  const comfortEchoAttrs = isActiveComfortAfterglow(floor)
+    ? ` data-comfort-echo="${escapeAttr(floor.comfortAfterglow.type)}" data-comfort-echo-power="${escapeAttr(Math.round((floor.comfortAfterglow.expeditionBonus || 0) * 100))}"`
+    : "";
   const showtimeClass = isActiveShowtime(floor) ? "showtime-active" : "";
   const showtimeAttrs = isActiveShowtime(floor)
     ? ` data-showtime-beat="${escapeAttr(currentShowtimeBeat(floor).id)}" data-showtime-heat="${escapeAttr(showtimeHeatTone(floor))}"`
     : "";
   const zone = getFloorZone(floor);
   return `
-    <article class="floor ${selected} ${constructing} ${routeClass} ${lifeTrailClass} ${foodRushClass} ${marketParcelClass} ${royalMandateClass} ${royalCourierClass} ${comfortClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${lifeTrailAttrs}${foodRushAttrs}${marketParcelAttrs}${royalMandateAttrs}${royalCourierAttrs}${showtimeAttrs}>
+    <article class="floor ${selected} ${constructing} ${routeClass} ${lifeTrailClass} ${foodRushClass} ${marketParcelClass} ${royalMandateClass} ${royalCourierClass} ${comfortClass} ${comfortEchoClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${lifeTrailAttrs}${foodRushAttrs}${marketParcelAttrs}${royalMandateAttrs}${royalCourierAttrs}${comfortEchoAttrs}${showtimeAttrs}>
       ${renderFloorIndex(floor)}
       <div class="room" data-action="select-floor" data-floor-id="${floor.id}" title="${escapeAttr(floorMapLabel(floor))}" aria-label="${escapeAttr(floorMapLabel(floor))}">
         ${floor.status === "construction" ? renderConstruction(floor) : renderOpenFloor(floor)}
@@ -5836,6 +6055,7 @@ function renderOpenFloor(floor) {
       <div class="room-scene">
         ${renderRoomStateTag(floor)}
         ${renderLifeTrailLayer(floor)}
+        ${renderComfortAfterglowLayer(floor)}
         ${renderRoyalCourierLayer(floor)}
         ${renderFloorArrivals(floor)}
         ${floor.type === "lobby" ? renderLobbyQueue() : renderFloorPeople(floor)}
@@ -6008,6 +6228,19 @@ function renderRoyalCourierLayer(floor) {
     </span>`;
 }
 
+function renderComfortAfterglowLayer(floor) {
+  if (!isActiveComfortAfterglow(floor)) return "";
+  const glow = floor.comfortAfterglow;
+  const progress = Math.round((Number(glow.remaining) / Math.max(1, Number(glow.total) || 1)) * 100);
+  const count = clamp((glow.participantIds || []).length || 1, 1, 5);
+  return `
+    <span class="comfort-afterglow-layer" data-type="${escapeAttr(glow.type)}" style="--comfort-echo:${progress}%" title="${escapeAttr(`${glow.label} · ${Math.ceil(glow.remaining)}s`)}" aria-label="${escapeAttr(`${glow.label} · ${Math.ceil(glow.remaining)}s`)}">
+      <i></i>
+      ${Array.from({ length: count }, (_, index) => `<b style="--echo-left:${14 + index * 17}%; --echo-lift:${index % 2 ? 8 : 0}px"></b>`).join("")}
+      <em>${escapeHtml(glow.label)}</em>
+    </span>`;
+}
+
 function renderRoomStateTag(floor) {
   if ((state.arrivals || []).some((arrival) => arrival.floorId === floor.id)) {
     return `<span class="room-state-tag good icon-only" data-state="arrival" title="到站" aria-label="到站"></span>`;
@@ -6015,6 +6248,10 @@ function renderRoomStateTag(floor) {
   if (isActiveComfortSession(floor)) {
     const label = COMFORT_SESSION_LABELS[floor.type] || "休整";
     return `<span class="room-state-tag good icon-only" data-state="comfort" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"></span>`;
+  }
+  if (isActiveComfortAfterglow(floor)) {
+    const label = floor.comfortAfterglow.label || "舒缓余韵";
+    return `<span class="room-state-tag good icon-only" data-state="comfort-echo" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"></span>`;
   }
   if (isActiveFoodRush(floor)) {
     const label = FOOD_RUSH_LABELS[floor.type] || "餐桌高峰";
@@ -6076,6 +6313,7 @@ function renderFloorStatusGlyph(floor) {
   if (floor.type === "lobby") stateName = state.queue.length ? "queue" : "idle";
   else if (floor.type === "dwelling") stateName = floor.rentReady ? "rent" : "home";
   else if (isActiveComfortSession(floor)) stateName = "comfort";
+  else if (isActiveComfortAfterglow(floor)) stateName = "comfort-echo";
   else if (isActiveFoodRush(floor)) stateName = "meal-rush";
   else if (isActiveMarketParcel(floor)) stateName = "market-parcel";
   else if (isActiveRoyalMandate(floor)) stateName = "royal-mandate";
@@ -6182,9 +6420,10 @@ function renderPersonDot(person, className, floorType = "default", socialSide = 
   const exploring = person.expeditionId ? "exploring" : "";
   const visiting = isActiveLifeVisit(person) ? "life-visitor" : "";
   const companion = visiting && person.lifeVisit?.companionId ? "life-companion" : "";
+  const comfortMemory = person.comfortMemory ? "comfort-memory-person" : "";
   const mood = person.lifeMood || personMotiveMood(person);
   const label = `${person.name} / 理想 ${FLOOR_TYPES[person.dreamType]?.label || "岗位"} / ${personLifeSummary(person, floorType)}`;
-  return `<span class="${className} person-sprite person-sprite--${spriteVariantForPerson(person)} ${personActivityClass(person, floorType)} person-mood--${escapeAttr(mood)} ${socialSide ? `social-${socialSide}` : ""} ${unemployed} ${exploring} ${visiting} ${companion}" style="${personActivityStyle(person)}" title="${escapeAttr(label)}"><span class="need-badge" data-need="${escapeAttr(person.need || "social")}" data-urgency="${escapeAttr(motiveLevel(100 - personNeedUrgency(person, person.need) * 100))}" aria-hidden="true"></span></span>`;
+  return `<span class="${className} person-sprite person-sprite--${spriteVariantForPerson(person)} ${personActivityClass(person, floorType)} person-mood--${escapeAttr(mood)} ${socialSide ? `social-${socialSide}` : ""} ${unemployed} ${exploring} ${visiting} ${companion} ${comfortMemory}" style="${personActivityStyle(person)}" title="${escapeAttr(label)}"><span class="need-badge" data-need="${escapeAttr(person.need || "social")}" data-urgency="${escapeAttr(motiveLevel(100 - personNeedUrgency(person, person.need) * 100))}" aria-hidden="true"></span></span>`;
 }
 
 function spriteVariantForPerson(person) {
@@ -6224,7 +6463,8 @@ function personLifeSummary(person, floorType = "default") {
   const wish = person.lifeWish || personLifeWish(person, floorType);
   const motives = PERSON_MOTIVE_KEYS.map((key) => `${PERSON_NEED_LABELS[key]} ${Math.round(person.motives[key] || 0)}`).join(" / ");
   const friend = bestRelationshipLabel(person);
-  return `${wish} · ${label}优先 · ${motives}${friend ? ` · ${friend}` : ""}`;
+  const comfort = person.comfortMemory ? ` · ${person.comfortMemory.label || "舒缓余韵"}剩余 ${Math.ceil(person.comfortMemory.remaining || 0)}s` : "";
+  return `${wish} · ${label}优先 · ${motives}${friend ? ` · ${friend}` : ""}${comfort}`;
 }
 
 function renderMotiveStrip(person, floorType = "default") {
@@ -6293,6 +6533,7 @@ function renderFloorStatus(floor) {
   if (floor.type === "lobby") return state.queue.length ? "待接待" : "自然待客";
   if (floor.type === "dwelling") return floor.rentReady ? `租金 ${floor.rentReady}` : "居住";
   if (isActiveComfortSession(floor)) return `${COMFORT_SESSION_LABELS[floor.type] || "休整"} ${Math.ceil(floor.comfortSession.remaining)}s`;
+  if (isActiveComfortAfterglow(floor)) return `${floor.comfortAfterglow.label || "余韵"} ${Math.ceil(floor.comfortAfterglow.remaining)}s`;
   if (isActiveRoyalMandate(floor)) return `${currentRoyalMandatePhase(floor).label}王令 · ${currentRoyalCourierPhase(floor).label} ${Math.ceil(floor.royalMandate.remaining)}s`;
   if (isActiveShowtime(floor)) return `${currentShowtimeBeat(floor).label}${SHOWTIME_LABELS[floor.type] || "小剧"} · 热度 ${Math.round(floor.showtime.heat || 0)}%`;
   if (floor.production) return `补货 ${Math.ceil(floor.production.remaining)}s`;
@@ -6318,6 +6559,7 @@ function renderFloorStatus(floor) {
   if (floor.type === "lobby") return state.queue.length ? "等候接待" : "自然待客";
   if (floor.type === "dwelling") return floor.rentReady ? `租金 ${floor.rentReady}` : "居住";
   if (isActiveComfortSession(floor)) return `${COMFORT_SESSION_LABELS[floor.type] || "休整"} ${Math.ceil(floor.comfortSession.remaining)}s`;
+  if (isActiveComfortAfterglow(floor)) return `${floor.comfortAfterglow.label || "余韵"} ${Math.ceil(floor.comfortAfterglow.remaining)}s`;
   if (isActiveFoodRush(floor)) return `${currentFoodRushPace(floor).label}${FOOD_RUSH_LABELS[floor.type] || "餐桌高峰"} · 上菜 ${floor.foodRush.served || 0}/${floor.foodRush.targetServings || 0}`;
   if (isActiveMarketParcel(floor)) return `${currentMarketParcelPhase(floor).label}包裹 · 打包 ${floor.marketParcel.packed || 0}`;
   if (isActiveRoyalMandate(floor)) return `${currentRoyalMandatePhase(floor).label}王令 · ${currentRoyalCourierPhase(floor).label} ${Math.ceil(floor.royalMandate.remaining)}s`;
@@ -6735,7 +6977,10 @@ function renderFloorDetail() {
   const foodRushServedValue = foodRushActive ? `${floor.foodRush.served || 0}/${floor.foodRush.targetServings || 0}` : `${state.stats.foodServingsDone || 0}`;
   const comfortCooldown = isComfortFloorType(floor.type) ? Math.ceil(floor.comfortCooldown || 0) : 0;
   const comfortActive = isActiveComfortSession(floor);
+  const comfortAfterglow = isActiveComfortAfterglow(floor) ? floor.comfortAfterglow : null;
   const comfortReason = isComfortFloorType(floor.type) ? comfortActionBlockReason(floor) : "";
+  const comfortEchoValue = comfortAfterglow ? `${Math.ceil(comfortAfterglow.remaining)}s` : `${state.stats.comfortEchoesDone || 0}`;
+  const comfortPrepValue = comfortAfterglow ? `+${Math.round((comfortAfterglow.expeditionBonus || 0) * 100)}%` : `+${Math.round(comfortExpeditionPrepBonus(state) * 100)}%`;
   const showtimeCooldownValue = isShowtimeFloorType(floor.type) ? Math.ceil(floor.showtimeCooldown || 0) : 0;
   const showtimeActive = isActiveShowtime(floor);
   const showtimeReason = isShowtimeFloorType(floor.type) ? showtimeActionBlockReason(floor) : "";
@@ -6775,7 +7020,7 @@ function renderFloorDetail() {
       ${floor.type === "market" ? `<div class="stat"><b>${state.orders.length}/${orderCapacity(state)}</b><span>订单栏</span></div><div class="stat"><b>${marketCooldown ? marketCooldown + "s" : "就绪"}</b><span>撮合</span></div><div class="stat"><b>${marketParcelStageValue}</b><span>包裹</span></div><div class="stat"><b>${marketParcelPackedValue}</b><span>打包</span></div><div class="stat"><b>${state.stats.marketParcelsDone || 0}</b><span>流转</span></div>` : ""}
       ${floor.type === "kingdom" ? `<div class="stat"><b>${royalMandateStageValue}</b><span>王令</span></div><div class="stat"><b>${royalMandatePreparedValue}</b><span>预备</span></div><div class="stat"><b>${state.stats.royalMandatesDone || 0}</b><span>签发</span></div><div class="stat"><b>${state.stats.royalCourierReceiptsDone || 0}</b><span>回执</span></div><div class="stat"><b>${royalMandateInfo ? royalMandateInfo.missing : "-"}</b><span>缺口</span></div>` : ""}
       ${floor.type === "library" ? `<div class="stat"><b>${catalog.completed}/${COLLECTION_DEFS.length}</b><span>图鉴</span></div><div class="stat"><b>${libraryCooldown ? libraryCooldown + "s" : "就绪"}</b><span>编目</span></div>` : ""}
-      ${isComfortFloorType(floor.type) ? `<div class="stat"><b>${comfortActive ? Math.ceil(floor.comfortSession.remaining) + "s" : comfortCooldown ? comfortCooldown + "s" : "就绪"}</b><span>休整</span></div>` : ""}
+      ${isComfortFloorType(floor.type) ? `<div class="stat"><b>${comfortActive ? Math.ceil(floor.comfortSession.remaining) + "s" : comfortCooldown ? comfortCooldown + "s" : "就绪"}</b><span>休整</span></div><div class="stat"><b>${comfortEchoValue}</b><span>余韵</span></div><div class="stat"><b>${comfortPrepValue}</b><span>探险准备</span></div>` : ""}
       ${isShowtimeFloorType(floor.type) ? `<div class="stat"><b>${showtimeActive ? Math.ceil(floor.showtime.remaining) + "s" : showtimeCooldownValue ? showtimeCooldownValue + "s" : "就绪"}</b><span>演出</span></div><div class="stat"><b>${showtimeBeatValue}</b><span>段落</span></div><div class="stat"><b>${showtimeHeatValue}</b><span>热度</span></div><div class="stat"><b>${state.stats.entertainmentShowsDone || 0}/${state.stats.showtimeReactionsDone || 0}</b><span>小剧/反应</span></div>` : ""}
     </div>
     ${renderFloorPerks(floor)}
@@ -6844,6 +7089,8 @@ function renderFloorPerks(floor) {
     perks.push("快乐缓慢恢复");
     perks.push(`贵客 +${Math.round(gardenComfortBonus(state) * 36)}%`);
     perks.push(`休整 ${state.stats.comfortSessionsDone || 0}`);
+    perks.push(`余韵 ${state.stats.comfortEchoesDone || 0}`);
+    if (isActiveComfortAfterglow(floor)) perks.push(`${floor.comfortAfterglow.label} ${Math.ceil(floor.comfortAfterglow.remaining)}s`);
   } else if (floor.type === "entertainment") {
     perks.push("快乐稳定恢复");
     perks.push(`掌声奖励 +${Math.round(entertainmentJoyBonus(state) * 55)}%`);
@@ -6866,6 +7113,8 @@ function renderFloorPerks(floor) {
     perks.push(`补货加速 +${Math.round(bathhouseRestBonus(state) * 42)}%`);
     perks.push(`休整回租 +${Math.round(bathhouseRestBonus(state) * 26)}%`);
     perks.push(`休整 ${state.stats.comfortSessionsDone || 0}`);
+    perks.push(`余韵 ${state.stats.comfortEchoesDone || 0}`);
+    if (isActiveComfortAfterglow(floor)) perks.push(`${floor.comfortAfterglow.label} ${Math.ceil(floor.comfortAfterglow.remaining)}s`);
   } else if (floor.type === "clinic") {
     perks.push(`容错护理 +${Math.round(clinicCareBonus(state) * 100)}%`);
     perks.push(`情绪修复 +${Math.round(clinicCareBonus(state) * 42)}%`);
@@ -6903,10 +7152,12 @@ function renderResidentList(residents, skillType = null) {
           const job = residentJobLabel(resident);
           const life = renderMotiveStrip(resident, skillType || "dwelling");
           const trail = renderLifeTrailBadge(resident);
+          const comfort = renderComfortMemoryBadge(resident);
+          const comfortClass = resident.comfortMemory ? "comfort-memory-active" : "";
           return `
-            <div class="resident-card ${dreamFit} ${isActiveLifeVisit(resident) ? "life-story-active" : ""}">
+            <div class="resident-card ${dreamFit} ${isActiveLifeVisit(resident) ? "life-story-active" : ""} ${comfortClass}">
               <span class="mini-person person-sprite person-sprite--${spriteVariantForPerson(resident)}" style="--person-art:url('${spriteArtForPerson(resident)}')"></span>
-              <span><strong>${escapeHtml(resident.name)}</strong><small>理想 ${dream} · ${job}</small>${life}${trail}</span>
+              <span><strong>${escapeHtml(resident.name)}</strong><small>理想 ${dream} · ${job}</small>${life}${trail}${comfort}</span>
               ${skill}
             </div>`;
         })
@@ -6947,8 +7198,10 @@ function renderResidentRoster() {
       const lifeFloor = resident.workFloorId ? findFloor(resident.workFloorId)?.type || "dwelling" : "dwelling";
       const life = renderMotiveStrip(resident, lifeFloor);
       const trail = renderLifeTrailBadge(resident);
+      const comfort = renderComfortMemoryBadge(resident);
+      const comfortClass = resident.comfortMemory ? "comfort-memory-active" : "";
       return `
-        <article class="roster-card ${isActiveLifeVisit(resident) ? "life-story-active" : ""}" data-dream="${resident.dreamType}" data-mood="${mood}">
+        <article class="roster-card ${isActiveLifeVisit(resident) ? "life-story-active" : ""} ${comfortClass}" data-dream="${resident.dreamType}" data-mood="${mood}">
           <span class="roster-portrait">
             <span class="mini-person person-sprite person-sprite--${spriteVariantForPerson(resident)}" style="--person-art:url('${spriteArtForPerson(resident)}')"></span>
             <i class="mood-mark" aria-hidden="true"></i>
@@ -6959,6 +7212,7 @@ function renderResidentRoster() {
             ${renderSkillStrip(resident)}
             ${life}
             ${trail}
+            ${comfort}
           </span>
         </article>`;
     })
@@ -6992,6 +7246,7 @@ function residentJobLabel(resident) {
 function residentMoodClass(resident) {
   if (resident.expeditionId) return "away";
   if (isActiveLifeVisit(resident)) return "visiting";
+  if (resident.comfortMemory) return "bright";
   const lifeMood = personMotiveMood(resident);
   if (lifeMood === "strained" || lifeMood === "seeking") return lifeMood;
   if (!resident.workFloorId) return "idle";
@@ -7129,10 +7384,11 @@ function renderExpeditions() {
     .map((expedition) => {
       const pct = Math.round((1 - expedition.remaining / expedition.total) * 100);
       const resident = getResident(expedition.residentId);
+      const comfortPrep = expedition.comfortPrepBonus > 0 ? ` · ${expedition.comfortPrepLabel || "舒缓余韵"} +${Math.round(expedition.comfortPrepBonus * 100)}%` : "";
       return `
         <div class="expedition-card active">
           <div class="expedition-head">
-            <span><strong>${escapeHtml(expedition.title)}</strong><small>${escapeHtml(expedition.residentName || resident?.name || "斥候")} · 剩余 ${Math.ceil(expedition.remaining)}s</small></span>
+            <span><strong>${escapeHtml(expedition.title)}</strong><small>${escapeHtml(expedition.residentName || resident?.name || "斥候")} · 剩余 ${Math.ceil(expedition.remaining)}s${escapeHtml(comfortPrep)}</small></span>
             <span class="expedition-tag">进行中</span>
           </div>
           <div class="meter"><span style="width:${clamp(pct, 0, 100)}%"></span></div>
@@ -7145,8 +7401,9 @@ function renderExpeditions() {
     const full = state.expeditions.length >= capacity;
     const disabled = Boolean(lock) || full || !explorers.length;
     const best = explorers[0];
+    const prep = best ? Math.min(0.24, comfortExpeditionPrepBonus(state) + (best.comfortMemory?.expeditionBonus || 0) * 0.72) : comfortExpeditionPrepBonus(state);
     const estimate = best ? `${def.coins[0] + Math.round(explorerPower(best) * 8)}-${def.coins[1] + Math.round(explorerPower(best) * 8)}` : `${def.coins[0]}-${def.coins[1]}`;
-    const note = lock || (full ? "探险队已满" : explorers.length ? `${explorers.length} 位空闲居民` : "需要空闲居民");
+    const note = lock || (full ? "探险队已满" : explorers.length ? `${explorers.length} 位空闲居民${prep > 0 ? ` · 舒缓准备 +${Math.round(prep * 100)}%` : ""}` : "需要空闲居民");
     return `
       <button class="expedition-card option" data-action="start-expedition" data-expedition-id="${def.id}" ${disabled ? "disabled" : ""}>
         <div class="expedition-head">
@@ -7157,6 +7414,7 @@ function renderExpeditions() {
           <span>${def.duration}s</span>
           <span>${estimate} 金币</span>
           <span>${Math.round(def.relicChance * 100)}% 碎片</span>
+          ${prep > 0 ? `<span class="comfort-prep-tag">舒缓 +${Math.round(prep * 100)}%</span>` : ""}
         </div>
         <small>${note}</small>
       </button>`;

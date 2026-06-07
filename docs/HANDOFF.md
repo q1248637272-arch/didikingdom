@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v62`
-- Latest preview deployment: `https://861189e8.little-depths.pages.dev/`
-- Local server used for v62 verification: `http://127.0.0.1:8812/`
+- Latest deployed version: `v63`
+- Latest preview deployment: `https://6971228b.little-depths.pages.dev/`
+- Local server used for v63 verification: `http://127.0.0.1:8813/`
 
 ## Current State
 
@@ -22,11 +22,22 @@ wrangler pages deploy dist --project-name little-depths
 ```
 
 - GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`, but current release practice is to deploy Cloudflare with local Wrangler OAuth from `dist`, then sync GitHub separately. Use `[skip ci]` when pushing documentation/code sync commits that should not ask GitHub Actions to deploy Cloudflare.
-- Current caveat: v62 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
+- Current caveat: v63 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v63 Comfort Afterglow / Readable Recovery
+
+- Deepened the old `garden` / `bathhouse` comfort loop so sessions now leave readable afterglow instead of ending as hidden recovery math.
+- Added comfort afterglow state and migration support: save version `18`, `comfortAfterglow`, participant `comfortMemory`, `comfortEchoesDone`, `comfort_echoes` quest, `normalizeComfortAfterglow()`, active afterglow bonuses, rent echo bonus, and expedition preparation bonus.
+- Completed comfort sessions now snapshot participants before the timer clears, create `花香余韵` or `暖雾余韵`, grant participant memory chips, add readable dwelling rent feedback, and feed motive decay easing while the memory lasts.
+- Garden and bathhouse rooms expose stable state through `.comfort-afterglow-active`, `.comfort-afterglow-layer`, `data-comfort-echo`, `data-comfort-echo-power`, `.comfort-session-panel.afterglow`, `.comfort-afterglow-readout`, and `data-state="comfort-echo"`.
+- Resident detail cards, roster cards, and map sprites show `.comfort-memory-chip`, `.comfort-memory-active`, and `.comfort-memory-person`; expedition option/active cards expose `.comfort-prep-tag` and retain `comfortPrepBonus` on active expeditions.
+- Visual feedback uses stable glows, pollen/steam motes, cards, and tags. This pass keeps the no fake in-place character shaking rule.
+- Added `tmp/verify-v63-comfort-afterglow.mjs`, bumped `index.html` / `sw.js` to v63, synced `dist`, rebuilt `cloudflare-pages-upload.zip`, verified local desktop/mobile with Edge CDP, and deployed with local Wrangler direct upload.
+- `gpt-image-2` was attempted for refreshed no-text comfort-afterglow garden room art, but the configured gateway did not return within 360 seconds. No unstable bitmap was connected; the reusable prompt is tracked at `docs/v63-comfort-afterglow-garden-image-prompt.txt`.
 
 ### v62 Life Trails / Story Receipts
 
@@ -244,6 +255,25 @@ wrangler pages deploy dist --project-name little-depths
 - Elevator passenger delivery now includes real waiting/door time before the visitor exits from the destination side.
 
 ## Verification Already Done
+
+- v63 local comfort-afterglow verification:
+  - `node --check app.js`
+  - `node --check dist/app.js`
+  - `node --check sw.js`
+  - `node --check dist/sw.js`
+  - `node --check tmp/verify-v63-comfort-afterglow.mjs`
+  - `node tmp/verify-v63-comfort-afterglow.mjs`
+  - Local preview URL: `http://127.0.0.1:8813/?v63-comfort-afterglow=1`
+  - Desktop screenshot: `verification-v63-comfort-afterglow-local.png`
+  - Mobile screenshot: `verification-v63-comfort-afterglow-mobile-local.png`
+  - Assertions confirmed save version `18`, `app.js?v=63`, `overrides.css?v=63`, `little-depths-v63`, the `comfort_echoes` quest, active comfort session UI, completed `comfortAfterglow`, `.comfort-afterglow-layer`, `.comfort-session-panel.afterglow`, `.comfort-afterglow-readout`, `.floor.comfort-afterglow-active`, `data-comfort-echo`, `data-comfort-echo-power`, `comfortMemory`, `.comfort-memory-chip`, `.roster-card.comfort-memory-active`, `comfortExpeditionPrepBonus()`, `comfortRentEchoBonus()`, `.comfort-prep-tag`, active expedition `comfortPrepBonus`, mobile roster chips, and no runtime errors.
+  - Latest local run returned `glowLabel: "花香余韵"`, `echoesDone: 1`, `memoryCount: 5`, and `expeditionPrep: 0.21246`.
+- Cloudflare v63 checks:
+  - Local Wrangler OAuth deploy from `dist` succeeded and produced `https://6971228b.little-depths.pages.dev/`.
+  - Production `https://little-depths.pages.dev/` and preview `https://6971228b.little-depths.pages.dev/` both load `app.js?v=63` and `overrides.css?v=63`.
+  - Both `sw.js` files use `little-depths-v63`.
+  - Both `app.js?v=63` files contain `comfortEchoesDone`, `comfortAfterglow`, and `comfortExpeditionPrepBonus`; both `overrides.css?v=63` files contain `.comfort-afterglow-layer`, `.comfort-memory-chip`, and `.comfort-prep-tag`.
+  - `cloudflare-pages-upload.zip` was rebuilt from `dist`; size was `8095092` bytes.
 
 - v62 local life-trails verification:
   - `node --check app.js`
@@ -595,6 +625,7 @@ wrangler pages deploy dist --project-name little-depths
 - The user wants image work to use `gpt-image-2` through their configured gateway.
 - Read credentials only from `GPT_IMAGE_2_API_KEY`, `GPT_IMAGE_2_BASE_URL`, and `GPT_IMAGE_2_MODEL`.
 - Never print, echo, commit, or store API keys.
+- v63 attempted refreshed comfort-afterglow garden room art through the configured `gpt-image-2` gateway at `1280x720` low quality, but the request did not return within 360 seconds. No unstable image was connected; the saved web-ready prompt is `docs/v63-comfort-afterglow-garden-image-prompt.txt`.
 - v62 attempted refreshed dwelling/life-trail room art through the configured `gpt-image-2` gateway at `1280x720` medium and `1024x1024` low settings, but the gateway returned upstream `do_request_failed` errors. No unstable image was connected; the saved web-ready prompt is `docs/v62-life-trails-dwelling-image-prompt.txt`.
 - v61 attempted refreshed kingdom courier room art through the configured `gpt-image-2` gateway at high and medium settings, but the gateway returned upstream `do_request_failed` errors. No unstable image was connected; the saved web-ready prompt is `docs/v61-kingdom-courier-room-image-prompt.txt`.
 - v60 did not call `gpt-image-2`; the pass improved the existing market room through gameplay state, order UI, and CSS package/track visuals over `assets/art/room-market-v2.webp`.
@@ -610,7 +641,9 @@ wrangler pages deploy dist --project-name little-depths
 
 - Continue improving older floors instead of only adding new floors. Good next targets:
   - `character life`: add short interruptions, route conflicts, remembered preferences, or player-clickable story follow-ups now that visible trails and receipts exist.
+  - `garden/bathhouse`: deepen afterglow follow-up decisions, such as spending余韵 to prioritize rent, expedition prep, or motive recovery.
   - `dwelling`: refresh the dwelling/life-trail room art when the `gpt-image-2` gateway is healthy, using `docs/v62-life-trails-dwelling-image-prompt.txt`.
+  - `garden`: refresh the comfort-afterglow garden art when the image gateway is healthy, using `docs/v63-comfort-afterglow-garden-image-prompt.txt`.
   - `kingdom`: deepen downstream city effects, courier specialization, or refreshed council-room art now that signing and receipt follow-through exist.
   - `food`: deepen dining needs with table rushes, staff serving feedback, and clearer kitchen UI.
   - `garden/bathhouse`: make happiness, rest, rent, and expedition preparation more visible and interactive.
@@ -632,8 +665,8 @@ wrangler pages deploy dist --project-name little-depths
 继续开发 C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4 里的迪迪王国项目。
 
 线上地址：https://little-depths.pages.dev/
-最新部署版本：v62
-最新预览：https://861189e8.little-depths.pages.dev/
+最新部署版本：v63
+最新预览：https://6971228b.little-depths.pages.dev/
 交接文档：docs/HANDOFF.md
 
 请先读取项目代码、README.md、docs/HANDOFF.md 和最近状态，再继续优化。方向：从游戏内容、玩法、画面、图像质量等层面更新迭代，不只新增内容，也要把旧楼层和旧系统做得更好。涉及图像绘制时使用 gpt-image-2；如果网关不可用，不要写入或打印密钥，改为保存可直接用于网页端生成的提示词。
