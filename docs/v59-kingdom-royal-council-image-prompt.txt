@@ -1,0 +1,7 @@
+Create a polished fantasy side-view room background for a cozy vertical tower management browser game.
+
+Scene: a compact underground royal council chamber used for signing royal mandates. It should feel warmer and more functional than a throne room: a small throne alcove, a round council table, parchment scrolls, wax seals, courier satchels, blue-and-gold banners, carved stone walls, lantern light, and tiny shelves of ledgers. The room must read clearly at small mobile size.
+
+Style: painterly stylized 2D game background, no characters, no UI, no readable text, no letters, no numbers, no signage, no logos, no watermark. Keep the composition clean so small sprites can stand in the lower middle foreground. Use warm amber candlelight, muted royal blue accents, crisp silhouettes, and soft atmospheric depth. Horizontal room layout, front-cutaway perspective, suitable for a 16:9 room tile.
+
+Output: high quality raster illustration, web game asset, no transparent border.

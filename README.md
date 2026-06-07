@@ -4,10 +4,10 @@
 
 ## 本地运行
 
-直接打开 `index.html` 可以游玩；最近一次 v56 本地验证使用：
+直接打开 `index.html` 可以游玩；最近一次 v59 本地验证使用：
 
 ```text
-http://127.0.0.1:8806
+http://127.0.0.1:8809
 ```
 
 ## 玩法切片
@@ -21,6 +21,8 @@ http://127.0.0.1:8806
 - 人物现在会持续模拟餐饮、娱乐、社交和休息动机，互动会回补需求并积累熟人关系；居民卡片和名册会用四色生活条显示当前状态。
 - 手机端会显示底部控制抽屉，可切换当前楼层、居民、任务、订单、图鉴、探险和日志。
 - 人物会根据需求和熟人关系结伴出门，去吃饭、看演出、找朋友或休息，不再只是原地摇晃。
+- v59 深化了旧王国楼层：王国现在可以主动“签发王令”，消耗印信推进缺货订单、增加加赏和御印机会；订单卡会显示真实库存、王令预备量、签发中状态和“签令”按钮，交付时只扣除剩余真实库存。
+- v58 重制了角色互动表现：社交场景会经历靠近、互动、收束三个阶段，使用稳定站位、朝向、姿态和小道具焦点来表达互动，不再用原地震动冒充角色行为。
 - 花园和温泉现在可以主动组织“花园茶会”与“温泉休整”，消耗准备库存邀请低需求居民结伴放松，地图会显示休整光效、状态图标和详情面板；花园与温泉背景已更新为无文字的 `room-garden-v2.webp`、`room-bathhouse-v2.webp`。
 - 演艺楼层现在可以主动排演“烛光小剧”，会消耗道具库存邀请娱乐/社交需求高的居民入座，演员与观众会在房间里形成表演、鼓掌、合演等互动，并通过详情面板、状态图标和舞台光效反馈演出进度。
 - v56 继续把演艺楼层做成“会热起来的现场”：新增段落、热度、现场反应和收益沉淀，演出面板会直接显示进度条和反应数；这次图像网关超时，所以先保留 `docs/v56-entertainment-theater-image-prompt.txt` 作为后续刷新演艺房间背景的提示词。
@@ -40,6 +42,21 @@ http://127.0.0.1:8806
 - 键盘支持 `W / ↑`、`S / ↓` 移动升降梯，`Space / Enter` 下客，`B` 打开建设。
 - v54 进行了轻量化清理：发布包移除了已被新版替代的旧房间图和旧表演者 PNG，表演者素材改为无损 WebP；发布运行目录只保留当前必要资产，本地旧浏览器配置、旧截图、图像中间产物和过期生成记录已清理。
 - v55 深化了旧演艺玩法：新增小剧任务、演出冷却、观众需求撮合、掌声金币奖励和娱乐/社交恢复，并保留 `docs/v55-entertainment-showtime-image-prompt.txt` 供后续图像网关恢复后刷新演艺房间背景。
+
+## v59 Update
+
+- v59 turns the old kingdom floor into an active royal mandate hub instead of a passive reward bonus.
+- Kingdom floors can now spend one seal stock to sign a mandate for a missing-stock order; mandate phases move through draft, seal, and dispatch while adding prepared progress and reward bonus.
+- Order cards now show raw stock versus mandate preparation, active signing tags, seal tags, and a direct `签令` button; fulfillment consumes only the remaining real stock after mandate preparation.
+- The map and detail UI now expose `.royal-mandate-panel`, `.floor.royal-mandate-active`, `data-royal-mandate-phase`, `data-state="royal-mandate"`, and mandate order tags so the old room reads as a working council chamber.
+- Local verification for this pass used `http://127.0.0.1:8809/` with `tmp/verify-v59-kingdom-mandates.mjs`; refreshed kingdom room art was attempted through `gpt-image-2`, but the gateway timed out, so the reusable prompt is saved at `docs/v59-kingdom-royal-council-image-prompt.txt`.
+
+## v58 Update
+
+- v58 rebuilds character interactions so paired scenes read as staged behavior instead of in-place shaking.
+- Social scenes now progress through `approach`, `engage`, and `settle`, keep a stable `socialAnchor`, and update person activities/motion modes by phase.
+- Room sprites now rely on readable pose, facing, spacing, social focus props, and smooth location transitions; direct person/speech-bubble animations are disabled through the v58 override layer.
+- Local verification for this pass used `http://127.0.0.1:8808/` with `tmp/verify-v58-character-interactions.mjs`.
 
 ## v57 Update
 

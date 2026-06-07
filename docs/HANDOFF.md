@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v57`
-- Latest preview deployment: `https://17dab29c.little-depths.pages.dev/`
-- Local server used for v57 verification: `http://127.0.0.1:8807/`
+- Latest deployed version: `v59`
+- Latest preview deployment: `https://476d7f48.little-depths.pages.dev/`
+- Local server used for v59 verification: `http://127.0.0.1:8809/`
 
 ## Current State
 
@@ -22,11 +22,33 @@ wrangler pages deploy dist --project-name little-depths
 ```
 
 - GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`, but current release practice is to deploy Cloudflare with local Wrangler OAuth from `dist`, then sync GitHub separately. Use `[skip ci]` when pushing documentation/code sync commits that should not ask GitHub Actions to deploy Cloudflare.
-- Current caveat: v57 was deployed successfully with local Wrangler OAuth. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
+- Current caveat: v59 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v59 Kingdom Royal Mandates
+
+- Deepened the old `kingdom` floor into an active royal mandate hub rather than leaving it as a passive order/reward bonus.
+- Added mandate state and migration support: `royalMandateCooldown`, `royalMandate`, `royalMandatesDone`, `ROYAL_MANDATE_PHASES`, the `royal_seals` quest, and save version `14`.
+- Added order preparation helpers with mandate-aware readiness: `normalizeOrderMandate()`, `orderMandatePrepared()`, `orderRawStock()`, and expanded `orderStockInfo()` to report `stockOwned`, `prepared`, `missing`, and `ready`.
+- Added the royal mandate flow: `availableRoyalMandateFloor()`, `bestRoyalMandateOrder()`, `royalMandateActionBlockReason()`, `startRoyalMandate()`, `updateRoyalMandateFloor()`, `renderRoyalMandatePanel()`, `royalMandateMapKey()`, and `clearRoyalMandateForOrder()`.
+- Royal mandates consume one kingdom stock seal, move through `draft` / `seal` / `dispatch`, add prepared progress only to genuinely short orders, increase the order reward, and can add a seal gem reward chance.
+- `fulfillOrder()` now consumes only `order.amount - orderMandatePrepared(order)` from real floor stock, so mandate progress counts as prepared fulfillment without creating inventory.
+- Kingdom floor detail now shows mandate stage, prepared amount, missing amount, signed count, a dedicated mandate panel, and a `签发王令` button; order cards now show mandate tags, prepared progress, active signing state, seal state, and a direct `签令` button.
+- Map/status UI now exposes `.floor.royal-mandate-active`, `data-royal-mandate-phase`, `data-state="royal-mandate"`, `.royal-mandate-panel`, `.mandated-order`, and `.royal-order-btn` with stable document/seal lighting rather than shaking sprites.
+- Added `tmp/verify-v59-kingdom-mandates.mjs`, bumped `index.html` / `sw.js` to v59, and synced `dist`.
+- Attempted refreshed no-text kingdom council room art with `gpt-image-2`, but the configured gateway timed out after 300 seconds. No unstable image was connected; the reusable prompt is tracked at `docs/v59-kingdom-royal-council-image-prompt.txt`.
+
+### v58 Character Interaction Rebuild
+
+- Rebuilt the character interaction presentation so paired scenes no longer depend on in-place shaking/bobbing for readability.
+- Added staged social phases with `socialPhaseForProgress()`, `socialActivitiesForPhase()`, and `updateSocialScenePhase()`: interactions now move through `approach`, `engage`, and `settle` instead of staying in one looping pose.
+- `applySocialScene()` now records `socialTotal`, `socialPhase`, and a stable `socialAnchor`; `assignSocialMotion()` reuses that anchor and changes spacing, y-position, facing, and motion mode by phase.
+- `renderSocialPair()` now exposes `data-phase` / `data-need` and renders a `.social-focus` prop layer so meals, chats, performances, and bathhouse scenes have a readable shared focus instead of two sprites jittering together.
+- Added the v58 override layer to disable direct `.person-activity` / `.social-bubble` animations, replacing them with stable pose transforms, smooth stage-position transitions, phase opacity, and scene-specific focus shapes.
+- Bumped the save version to `13`, bumped `index.html` and `sw.js` to v58, synced `dist`, and added `tmp/verify-v58-character-interactions.mjs`.
 
 ### v57 Food Floor Dining Rush
 
@@ -189,6 +211,33 @@ wrangler pages deploy dist --project-name little-depths
 - Elevator passenger delivery now includes real waiting/door time before the visitor exits from the destination side.
 
 ## Verification Already Done
+
+- v59 local kingdom mandate verification:
+  - `node --check app.js`
+  - `node --check dist/app.js`
+  - `node --check sw.js`
+  - `node --check dist/sw.js`
+  - `node --check tmp/verify-v59-kingdom-mandates.mjs`
+  - `node tmp/verify-v59-kingdom-mandates.mjs`
+  - Local preview URL: `http://127.0.0.1:8809/?v59-kingdom-mandates=1`
+  - Desktop screenshot: `verification-v59-kingdom-mandates-local.png`
+  - Mobile screenshot: `verification-v59-kingdom-mandates-mobile-local.png`
+  - Assertions confirmed save version `14`, `app.js?v=59`, `overrides.css?v=59`, `little-depths-v59`, active `.royal-mandate-panel`, `.floor.royal-mandate-active`, `data-royal-mandate-phase`, `data-state="royal-mandate"`, order mandate tags/buttons, kingdom stock seal consumption, reward increase, mobile orders drawer visibility, and real-stock-only fulfillment after mandate preparation.
+- Cloudflare v59 checks:
+  - Local Wrangler OAuth deploy from `dist` succeeded and produced `https://476d7f48.little-depths.pages.dev/`.
+  - Production `https://little-depths.pages.dev/` and preview `https://476d7f48.little-depths.pages.dev/` both load `app.js?v=59` and `overrides.css?v=59`.
+  - Both `sw.js` files use `little-depths-v59`.
+  - Both `app.js?v=59` files contain `startRoyalMandate`, `orderMandatePrepared`, and `royalMandatesDone`; both `overrides.css?v=59` files contain `royal-mandate-panel`, `mandated-order`, and `royal-order-btn`.
+
+- v58 local interaction verification:
+  - `node --check app.js`
+  - `node --check dist/app.js`
+  - `node --check sw.js`
+  - `node --check dist/sw.js`
+  - `node --check tmp/verify-v58-character-interactions.mjs`
+  - `node tmp/verify-v58-character-interactions.mjs`
+  - Local preview URL: `http://127.0.0.1:8808/`
+  - Playwright observed active `.person-activity` nodes, detected all three social phases (`approach`, `engage`, `settle`), confirmed no `.social-wiggle` nodes, confirmed all `.person-activity` and `.social-bubble` computed animation names are `none`, verified social focus props are visible, and saved `tmp/v58-character-interactions.png`.
 
 - Bundled runtime syntax checks:
   - `node --check app.js`
@@ -457,6 +506,7 @@ wrangler pages deploy dist --project-name little-depths
 - The user wants image work to use `gpt-image-2` through their configured gateway.
 - Read credentials only from `GPT_IMAGE_2_API_KEY`, `GPT_IMAGE_2_BASE_URL`, and `GPT_IMAGE_2_MODEL`.
 - Never print, echo, commit, or store API keys.
+- v59 attempted refreshed kingdom royal council room art through the configured `gpt-image-2` gateway, but the request timed out after 300 seconds. No new art was connected; the saved web-ready prompt is `docs/v59-kingdom-royal-council-image-prompt.txt`.
 - v56 attempted refreshed entertainment theater room art, but the configured gateway timed out before returning an image. No new art was connected; the saved web-ready prompt is `docs/v56-entertainment-theater-image-prompt.txt`.
 - v55 attempted refreshed entertainment showtime room art, but the configured gateway returned 404 for the Images API paths. No new art was generated; the saved web-ready prompt is `docs/v55-entertainment-showtime-image-prompt.txt`.
 - v54 did not generate new art with `gpt-image-2`; it converted the old `person-performer.png` asset into lossless `assets/art/person-performer.webp`.
@@ -468,7 +518,7 @@ wrangler pages deploy dist --project-name little-depths
 
 - Continue improving older floors instead of only adding new floors. Good next targets:
   - `character life`: add visible path/outing traces, short interruptions, and player-readable mini stories now that companions and mobile UI exist.
-  - `kingdom`: make royal orders and mandates more physical in the room detail flow.
+  - `kingdom`: deepen mandate follow-through with visible courier trails, council-room art, or order parcel movement now that the core signing loop exists.
   - `food`: deepen dining needs with table rushes, staff serving feedback, and clearer kitchen UI.
   - `garden/bathhouse`: make happiness, rest, rent, and expedition preparation more visible and interactive.
   - `alchemy/training/treasure`: give the late-game floors stronger decision hooks beyond passive bonuses.
@@ -489,8 +539,8 @@ wrangler pages deploy dist --project-name little-depths
 继续开发 C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4 里的迪迪王国项目。
 
 线上地址：https://little-depths.pages.dev/
-最新部署版本：v57
-最新预览：https://17dab29c.little-depths.pages.dev/
+最新部署版本：v59
+最新预览：https://476d7f48.little-depths.pages.dev/
 交接文档：docs/HANDOFF.md
 
 请先读取项目代码、README.md、docs/HANDOFF.md 和最近状态，再继续优化。方向：从游戏内容、玩法、画面、图像质量等层面更新迭代，不只新增内容，也要把旧楼层和旧系统做得更好。涉及图像绘制时使用 gpt-image-2；如果网关不可用，不要写入或打印密钥，改为保存可直接用于网页端生成的提示词。

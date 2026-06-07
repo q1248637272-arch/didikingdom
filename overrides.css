@@ -2480,3 +2480,458 @@ body.fullscreen-active .build-grid {
     transform: translateY(0) scale(1);
   }
 }
+
+/* v58 character interaction pass: stable poses, staged social motion, no in-place shaking. */
+.person-activity,
+.life-stage .person-activity,
+.social-pair .person-activity {
+  animation: none !important;
+  translate: 0 0;
+  rotate: 0deg;
+  scale: 1;
+  transition:
+    translate 0.42s ease,
+    rotate 0.42s ease,
+    scale 0.42s ease,
+    filter 0.24s ease,
+    opacity 0.24s ease;
+}
+
+.life-stage > .resident-dot,
+.life-stage > .worker-dot,
+.life-stage > .social-pair {
+  transition:
+    left 1.12s cubic-bezier(0.2, 0.9, 0.18, 1),
+    bottom 1.12s cubic-bezier(0.2, 0.9, 0.18, 1),
+    transform 0.5s ease,
+    filter 0.24s ease,
+    opacity 0.24s ease;
+}
+
+.person-activity--wait,
+.person-activity--idle {
+  rotate: -1deg;
+}
+
+.person-activity--look,
+.person-activity--watch {
+  rotate: 2deg;
+}
+
+.person-activity--stroll {
+  translate: 1px 0;
+  rotate: -1.5deg;
+}
+
+.person-activity--work {
+  translate: 0 1px;
+  rotate: -4deg;
+  scale: 0.99 1.01;
+}
+
+.person-activity--serve {
+  translate: 2px 0;
+  rotate: -5deg;
+}
+
+.person-activity--eat,
+.person-activity--snack {
+  translate: 0 2px;
+  rotate: -3deg;
+  scale: 1.02 0.99;
+}
+
+.person-activity--talk,
+.person-activity--chat {
+  rotate: 2deg;
+  scale: 1.02;
+}
+
+.person-activity--wave {
+  rotate: -7deg;
+}
+
+.person-activity--applaud {
+  rotate: 3deg;
+  scale: 1.035 1;
+}
+
+.person-activity--dance {
+  translate: 2px 0;
+  rotate: -6deg;
+}
+
+.person-activity--rest {
+  translate: 0 3px;
+  rotate: -2deg;
+  scale: 1.03 0.98;
+}
+
+.person-motion--walk {
+  filter: drop-shadow(0 9px 5px rgba(0, 0, 0, 0.46));
+}
+
+.person-motion--social,
+.person-motion--use {
+  filter: drop-shadow(0 8px 5px rgba(0, 0, 0, 0.42));
+}
+
+.social-pair {
+  min-width: 96px;
+}
+
+.social-pair[data-phase="approach"] {
+  opacity: 0.94;
+}
+
+.social-pair[data-phase="settle"] {
+  opacity: 0.98;
+}
+
+.social-pair .social-bubble {
+  animation: none !important;
+  opacity: 0.92;
+  transition:
+    opacity 0.24s ease,
+    transform 0.24s ease,
+    scale 0.24s ease;
+}
+
+.social-pair[data-phase="approach"] .social-bubble {
+  opacity: 0.4;
+  scale: 0.82;
+}
+
+.social-pair[data-phase="settle"] .social-bubble {
+  opacity: 0.72;
+  scale: 0.92;
+}
+
+.social-focus {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  z-index: 1;
+  width: 30px;
+  height: 12px;
+  border-radius: 999px;
+  translate: -50% 0;
+  opacity: 0.86;
+  background: rgba(255, 230, 154, 0.18);
+  border: 1px solid rgba(255, 230, 154, 0.22);
+  box-shadow: 0 0 12px rgba(255, 210, 120, 0.14);
+  transition:
+    opacity 0.24s ease,
+    scale 0.24s ease,
+    translate 0.24s ease;
+  pointer-events: none;
+}
+
+.social-pair[data-phase="approach"] .social-focus {
+  opacity: 0;
+  scale: 0.72;
+}
+
+.social-pair[data-phase="settle"] .social-focus {
+  opacity: 0.58;
+  scale: 0.92;
+}
+
+.social-pair--meal .social-focus,
+.social-pair--snack .social-focus,
+.social-pair--toast .social-focus {
+  width: 38px;
+  height: 14px;
+  bottom: 12px;
+  border-radius: 10px 10px 5px 5px;
+  background:
+    radial-gradient(circle at 52% 36%, #fff1bd 0 20%, transparent 21%),
+    linear-gradient(180deg, rgba(255, 193, 108, 0.48), rgba(94, 200, 174, 0.16));
+  border-color: rgba(255, 193, 108, 0.34);
+}
+
+.social-pair--chat .social-focus,
+.social-pair--steam .social-focus {
+  width: 28px;
+  height: 18px;
+  bottom: 28px;
+  border-radius: 50% 50% 50% 12px;
+  background: rgba(100, 196, 176, 0.22);
+  border-color: rgba(100, 196, 176, 0.34);
+  box-shadow: 0 0 12px rgba(100, 196, 176, 0.18);
+}
+
+.social-pair--show .social-focus,
+.social-pair--duet .social-focus {
+  width: 44px;
+  height: 22px;
+  bottom: 13px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 50%, rgba(255, 207, 126, 0.38), transparent 70%);
+  border-color: transparent;
+  box-shadow: 0 0 18px rgba(255, 207, 126, 0.22);
+}
+
+.social-pair--soak .social-focus {
+  width: 48px;
+  height: 18px;
+  bottom: 10px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 50%, rgba(128, 229, 232, 0.28), transparent 68%);
+  border-color: rgba(128, 229, 232, 0.22);
+}
+
+.social-pair[data-phase="approach"] .person-sprite.social-left {
+  translate: -2px 0;
+  rotate: -2deg;
+}
+
+.social-pair[data-phase="approach"] .person-sprite.social-right {
+  translate: 2px 0;
+  rotate: 2deg;
+}
+
+.social-pair[data-phase="engage"] .person-sprite.social-left {
+  rotate: -3deg;
+}
+
+.social-pair[data-phase="engage"] .person-sprite.social-right {
+  rotate: 3deg;
+}
+
+.social-pair[data-phase="settle"] .person-sprite.social-left,
+.social-pair[data-phase="settle"] .person-sprite.social-right {
+  translate: 0 1px;
+  rotate: 0deg;
+  scale: 1;
+}
+
+/* v59 royal mandate pass: visible order preparation without fake character shaking. */
+.royal-mandate-panel {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 214, 126, 0.28);
+  background:
+    linear-gradient(115deg, rgba(255, 214, 126, 0.16), rgba(123, 169, 224, 0.1)),
+    rgba(255, 255, 255, 0.05);
+}
+
+.royal-mandate-panel.active {
+  border-color: rgba(255, 214, 126, 0.56);
+  box-shadow:
+    inset 0 0 0 1px rgba(123, 169, 224, 0.16),
+    0 0 20px rgba(255, 214, 126, 0.14);
+}
+
+.royal-mandate-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.royal-mandate-panel strong {
+  font-size: 12px;
+  color: #ffe29b;
+}
+
+.royal-mandate-panel em {
+  min-width: 48px;
+  text-align: right;
+  color: #b9d6ff;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.royal-mandate-panel span,
+.royal-mandate-panel small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.royal-mandate-meter {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(10, 16, 24, 0.56);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.royal-mandate-meter i,
+.royal-mandate-inline-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #b9d6ff, #ffdf8a 58%, #ffad5f);
+  box-shadow: 0 0 14px rgba(255, 214, 126, 0.36);
+  transition: width 0.35s ease;
+}
+
+.royal-mandate-panel[data-phase="seal"] {
+  border-color: rgba(255, 223, 138, 0.66);
+}
+
+.royal-mandate-panel[data-phase="dispatch"] {
+  background:
+    linear-gradient(115deg, rgba(255, 214, 126, 0.2), rgba(123, 169, 224, 0.16), rgba(255, 173, 95, 0.1)),
+    rgba(255, 255, 255, 0.06);
+}
+
+.status-glyph[data-state="royal-mandate"],
+.room-state-tag[data-state="royal-mandate"] {
+  color: #ffdf8a;
+}
+
+.status-glyph[data-state="royal-mandate"]::before,
+.room-state-tag[data-state="royal-mandate"]::before {
+  width: 14px;
+  height: 16px;
+  border-radius: 3px 3px 8px 8px;
+  background:
+    radial-gradient(circle at 70% 76%, #ffad5f 0 18%, transparent 19%),
+    linear-gradient(145deg, #fff2bd, #ffdf8a 55%, #b9d6ff);
+  box-shadow:
+    0 0 12px rgba(255, 223, 138, 0.74),
+    inset 0 -2px 0 rgba(61, 47, 28, 0.18);
+  rotate: -8deg;
+}
+
+.floor.royal-mandate-active[data-type="kingdom"] .room {
+  box-shadow:
+    inset 0 5px 0 rgba(255, 241, 192, 0.24),
+    inset 0 -24px 30px rgba(0, 0, 0, 0.34),
+    0 0 0 2px rgba(255, 214, 126, 0.32),
+    0 18px 34px rgba(0, 0, 0, 0.42),
+    0 0 34px rgba(255, 214, 126, 0.24);
+}
+
+.floor.royal-mandate-active[data-type="kingdom"] .life-stage::before {
+  content: "";
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 18px;
+  height: 32px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 50%, rgba(255, 214, 126, 0.28), rgba(123, 169, 224, 0.08) 54%, transparent 72%);
+  filter: blur(2px);
+  animation: royal-mandate-glow 2.15s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.floor.royal-mandate-active[data-type="kingdom"] .life-stage::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 43px;
+  width: 34px;
+  height: 22px;
+  border-radius: 4px 4px 10px 10px;
+  translate: -50% 0;
+  background:
+    radial-gradient(circle at 72% 70%, rgba(202, 76, 51, 0.86) 0 14%, transparent 15%),
+    linear-gradient(145deg, rgba(255, 242, 189, 0.92), rgba(255, 214, 126, 0.5));
+  box-shadow:
+    0 0 16px rgba(255, 214, 126, 0.32),
+    inset 0 -2px 0 rgba(82, 57, 25, 0.18);
+  opacity: 0.82;
+  animation: royal-seal-breathe 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.floor.royal-mandate-active[data-type="kingdom"][data-royal-mandate-phase="seal"] .life-stage::after {
+  opacity: 1;
+  filter: drop-shadow(0 0 10px rgba(255, 173, 95, 0.42));
+}
+
+.floor.royal-mandate-active[data-type="kingdom"][data-royal-mandate-phase="dispatch"] .life-stage::before {
+  background: radial-gradient(ellipse at 50% 50%, rgba(255, 214, 126, 0.3), rgba(123, 169, 224, 0.14) 48%, transparent 74%);
+}
+
+.floor.royal-mandate-active[data-type="kingdom"] .fixture-throne,
+.floor.royal-mandate-active[data-type="kingdom"] .fixture-banner {
+  filter: drop-shadow(0 0 10px rgba(255, 214, 126, 0.36));
+}
+
+.order.mandated-order {
+  border-color: rgba(255, 214, 126, 0.44);
+  background:
+    linear-gradient(120deg, rgba(255, 214, 126, 0.12), rgba(123, 169, 224, 0.08)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035));
+}
+
+.order.mandate-active {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 214, 126, 0.14),
+    0 0 18px rgba(255, 214, 126, 0.12);
+}
+
+.order-tags .mandate-tag {
+  color: #ffe29b;
+  background: rgba(255, 214, 126, 0.14);
+  border-color: rgba(255, 214, 126, 0.3);
+}
+
+.order-tags .mandate-tag.active {
+  color: #d7e8ff;
+  background: rgba(123, 169, 224, 0.14);
+  border-color: rgba(123, 169, 224, 0.3);
+}
+
+.order-tags .mandate-tag.seal {
+  color: #ffd2a2;
+  background: rgba(255, 126, 84, 0.14);
+  border-color: rgba(255, 173, 95, 0.34);
+}
+
+.order-foot {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+}
+
+.order-foot > span {
+  min-width: 0;
+}
+
+.royal-order-btn:not(:disabled) {
+  color: #241715;
+  border-color: rgba(255, 214, 126, 0.68);
+  background: linear-gradient(180deg, #ffe29b, #ffbd67);
+}
+
+@media (max-width: 620px) {
+  .order-foot {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .royal-mandate-panel {
+    padding: 9px;
+  }
+}
+
+@keyframes royal-mandate-glow {
+  0%,
+  100% {
+    opacity: 0.56;
+    scale: 0.95;
+  }
+  50% {
+    opacity: 1;
+    scale: 1.04;
+  }
+}
+
+@keyframes royal-seal-breathe {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
