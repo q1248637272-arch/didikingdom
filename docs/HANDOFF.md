@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v66`
-- Latest preview deployment: `https://444eb98e.little-depths.pages.dev/`
-- Local server used for v66 verification: `http://127.0.0.1:8816/`
+- Latest deployed version: `v67`
+- Latest preview deployment: `https://bed78f83.little-depths.pages.dev/`
+- Local server used for v67 verification: `http://127.0.0.1:8817/`
 
 ## Current State
 
@@ -22,11 +22,21 @@ wrangler pages deploy dist --project-name little-depths
 ```
 
 - GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`, but current release practice is to deploy Cloudflare with local Wrangler OAuth from `dist`, then sync GitHub separately. Use `[skip ci]` when pushing documentation/code sync commits that should not ask GitHub Actions to deploy Cloudflare.
-- Current caveat: v66 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
+- Current caveat: v67 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v67 Food Rush Kitchen Refresh / Old Map Polish
+
+- Refreshed the old food-floor meal-rush loop instead of adding a new room. Active `foodRush` sessions now carry current `course`, `servicePulse`, and `tableFocus`, and each served course increments `foodRushCoursesDone`.
+- Added `FOOD_RUSH_COURSES`, `foodRushCourseForProgress()`, `currentFoodRushCourse()`, `foodRushTableCount()`, `foodRushNextServiceProgress()`, and the new `serving_line` / `流水上菜` quest. The quest uses the existing manual `ready` / `领取` path, so rewards are not auto-awarded.
+- Improved old food map readability with `renderFoodRushServiceLayer()`, `.food-rush-service-layer`, `.food-rush-service-rail`, `.food-rush-course-stack`, and `.food-rush-table-lane` overlays. The floor detail panel now shows course, table count, next serving, serving progress, heat, and total rush courses.
+- The asset backpack now records `餐桌高峰` with total serving courses, rush count, and servings. Food detail perks also expose `桌次`.
+- Used `gpt-image-2` through the configured gateway to generate the refreshed no-text kitchen background `assets/art/room-food-v3.webp` at 1280x720; the user-facing PNG was saved to the current thread `outputs/v67-food-rush-kitchen.png`, and the reusable prompt is tracked at `docs/v67-food-rush-kitchen-image-prompt.txt`.
+- Bumped the save version to `22`, bumped `index.html` / `sw.js` to v67, updated `styles.css` and `overrides.css` to `room-food-v3.webp`, synced `dist`, rebuilt `cloudflare-pages-upload.zip`, and verified local desktop/mobile with Edge CDP.
+- Deployed v67 to Cloudflare Pages with local Wrangler direct upload. Production: `https://little-depths.pages.dev/`; preview: `https://bed78f83.little-depths.pages.dev/`.
 
 ### v66 Lobby Routing Refresh / Old Map Polish
 
@@ -283,6 +293,25 @@ wrangler pages deploy dist --project-name little-depths
 - Elevator passenger delivery now includes real waiting/door time before the visitor exits from the destination side.
 
 ## Verification Already Done
+
+- v67 local food-rush refresh verification:
+  - `node --check app.js`
+  - `node --check dist/app.js`
+  - `node --check sw.js`
+  - `node --check dist/sw.js`
+  - `node --check tmp/verify-v67-food-rush-refresh.mjs`
+  - `node tmp/verify-v67-food-rush-refresh.mjs`
+  - Local preview URL: `http://127.0.0.1:8817/?v67-food-rush-refresh=1`
+  - Desktop screenshot: `verification-v67-food-rush-refresh-local.png`
+  - Mobile screenshot: `verification-v67-food-rush-refresh-mobile-local.png`
+  - Assertions confirmed save version `22`, `foodRushCoursesDone` increments from real served courses, the `流水上菜` quest becomes ready without auto-awarding gems, the manual claim button grants exactly `460` coins and `2` gems, `.food-rush-service-layer`, service rail, course row, readouts, and active table markers render, `room-food-v3.webp` is served and referenced by CSS, mobile drawer/detail UI has no horizontal overflow, and no runtime errors were reported.
+- Cloudflare v67 checks:
+  - Local Wrangler OAuth deploy from `dist` succeeded and produced `https://bed78f83.little-depths.pages.dev/`.
+  - Production `https://little-depths.pages.dev/` and preview `https://bed78f83.little-depths.pages.dev/` both load `app.js?v=67`, `overrides.css?v=67`, and `styles.css?v=67`.
+  - Both `sw.js` files use `little-depths-v67`, `app.js?v=67`, `overrides.css?v=67`, `styles.css?v=67`, and `room-food-v3.webp`.
+  - Both `app.js?v=67` files contain `foodRushCoursesDone`, `serving_line`, and `renderFoodRushServiceLayer`; both `overrides.css?v=67` files contain `.food-rush-service-layer` and `room-food-v3.webp`.
+  - `assets/art/room-food-v3.webp` loads from production and preview as `image/webp`; size was `128812` bytes.
+  - `cloudflare-pages-upload.zip` was rebuilt from `dist`; size was `8319293` bytes.
 
 - v66 local lobby-refresh verification:
   - `node --check app.js`

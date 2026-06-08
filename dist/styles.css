@@ -1722,7 +1722,7 @@ body.fullscreen-active .layout {
 }
 
 .floor[data-type="food"] .room {
-  --room-art: url("assets/art/room-food-v2.webp");
+  --room-art: url("assets/art/room-food-v3.webp");
   --room-bg:
     radial-gradient(ellipse at 64% 84%, rgba(245, 197, 87, 0.44), transparent 30%),
     linear-gradient(160deg, #c7674f, #783a35 50%, #2d1d24);

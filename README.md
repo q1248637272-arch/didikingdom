@@ -4,10 +4,10 @@
 
 ## 本地运行
 
-直接打开 `index.html` 可以游玩；最近一次 v66 本地验证使用：
+直接打开 `index.html` 可以游玩；最近一次 v67 本地验证使用：
 
 ```text
-http://127.0.0.1:8816
+http://127.0.0.1:8817
 ```
 
 ## 玩法切片
@@ -25,6 +25,7 @@ http://127.0.0.1:8816
 - v64 深化旧探险系统：宿舍派出的斥候现在会在途中留下出发/营地/回程路标，完成后沉淀为可读的探险回执；地图、宿舍面板、居民卡和探险列表都会显示路线档案与回执收益。
 - v65 把任务奖励改为手动领取：完成后任务会进入“待领取”状态，玩家点击任务面板里的“领取”才会获得金币和宝石；顶部新增“资产背包”入口，可集中查看金币、宝石、居民、待领任务奖励、珍藏道具、楼层库存、订单和探险档案。
 - v66 翻新旧入口大厅：大厅访客会累积等待压力，推荐派号会按贵宾、久候、库存/空房等综合排序；旧地图大厅增加候车道和路线信号，电梯面板和路线票显示“顺畅/繁忙/压线”等状态，并用 `gpt-image-2` 刷新了无文字大厅背景 `room-lobby-v3.webp`。
+- v67 翻新旧餐饮楼层：餐桌高峰现在会显示服务轨、桌况点、菜序灯和下一次上菜倒计时；新增 `流水上菜` 手动领取任务，资产背包也会记录高峰桌次、组织次数和上菜份数，并用 `gpt-image-2` 刷新了无文字厨房背景 `room-food-v3.webp`。
 - v62 继续深化角色生活系统：居民外出现在会在出发楼层和目标楼层留下稳定的生活路线，完成后沉淀为“生活小故事”，地图、楼层详情、居民卡片和名册都会显示最近足迹与需求回补，不再用原地震动冒充互动。
 - v61 继续深化旧王国楼层：王令现在会显示信使路线、送达阶段和回执奖励，地图、详情面板和订单卡都会反馈信使进度；回执会提高订单奖励，交付时仍只扣除未被王令预备的真实库存。
 - v60 深化了旧市集楼层：撮合快单现在会进入“议价 / 打包 / 发货”的包裹流，地图、详情面板和订单卡会显示打包进度、发货状态与市集已打包数量；打包会先扣除真实经营库存，交付时只扣剩余未打包部分。
@@ -49,6 +50,16 @@ http://127.0.0.1:8816
 - 键盘支持 `W / ↑`、`S / ↓` 移动升降梯，`Space / Enter` 下客，`B` 打开建设。
 - v54 进行了轻量化清理：发布包移除了已被新版替代的旧房间图和旧表演者 PNG，表演者素材改为无损 WebP；发布运行目录只保留当前必要资产，本地旧浏览器配置、旧截图、图像中间产物和过期生成记录已清理。
 - v55 深化了旧演艺玩法：新增小剧任务、演出冷却、观众需求撮合、掌声金币奖励和娱乐/社交恢复，并保留 `docs/v55-entertainment-showtime-image-prompt.txt` 供后续图像网关恢复后刷新演艺房间背景。
+
+## v67 Update
+
+- v67 refreshes the old food-floor meal-rush loop instead of adding a new room: active rushes now track `foodRushCoursesDone`, current course, service pulse, and focused table state.
+- Added the new `流水上菜` quest. It becomes `ready` through the existing manual claim flow, so coins and gems are not auto-awarded.
+- Food rooms now render `.food-rush-service-layer`, service rails, course dots, and table markers on the old map; the detail panel shows course, table count, next serving time, total serving courses, heat, and progress.
+- The asset backpack now includes a food-rush record metric, and the save version is bumped to `22`.
+- `gpt-image-2` generated the refreshed no-text kitchen background `assets/art/room-food-v3.webp`; the reusable prompt is saved at `docs/v67-food-rush-kitchen-image-prompt.txt`.
+- Local verification for this pass used `http://127.0.0.1:8817/` with `tmp/verify-v67-food-rush-refresh.mjs`.
+- Cloudflare preview for this pass: `https://bed78f83.little-depths.pages.dev/`.
 
 ## v66 Update
 

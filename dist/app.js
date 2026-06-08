@@ -401,6 +401,12 @@ const FOOD_RUSH_PACES = [
   { id: "sharing", label: "拼桌", threshold: 0.58, worker: ["serve", "talk"], diner: ["eat", "talk"] },
   { id: "lastcall", label: "加桌", threshold: 0.84, worker: ["serve", "wave"], diner: ["snack", "talk"] },
 ];
+const FOOD_RUSH_COURSES = [
+  { id: "starter", label: "暖汤", threshold: 0 },
+  { id: "pot", label: "热锅", threshold: 0.28 },
+  { id: "share", label: "拼盘", threshold: 0.58 },
+  { id: "finale", label: "加桌", threshold: 0.84 },
+];
 const ROYAL_MANDATE_PHASES = [
   { id: "draft", label: "拟令", threshold: 0 },
   { id: "seal", label: "盖印", threshold: 0.38 },
@@ -702,6 +708,14 @@ const QUEST_DEFS = [
     metric: "foodRushesDone",
     reward: { coins: 420, gems: 2 },
     text: "用餐饮楼层组织 2 次用餐高峰",
+  },
+  {
+    id: "serving_line",
+    title: "流水上菜",
+    goal: 5,
+    metric: "foodRushCoursesDone",
+    reward: { coins: 460, gems: 2 },
+    text: "在餐桌高峰中完成 5 轮上菜",
   },
   {
     id: "shoppers",
@@ -1007,7 +1021,7 @@ let guideReady = false;
 
 function makeNewGame() {
   const game = {
-    version: 21,
+    version: 22,
     coins: 560,
     gems: 7,
     happiness: 72,
@@ -1054,6 +1068,7 @@ function makeNewGame() {
       foodFloorsBuilt: 1,
       foodRushesDone: 0,
       foodServingsDone: 0,
+      foodRushCoursesDone: 0,
       serviceFloorsBuilt: 1,
       craftFloorsBuilt: 0,
       marketDealsDone: 0,
@@ -1502,6 +1517,7 @@ function migrateGame(game) {
     foodFloorsBuilt: 0,
     foodRushesDone: 0,
     foodServingsDone: 0,
+    foodRushCoursesDone: 0,
     serviceFloorsBuilt: 0,
     craftFloorsBuilt: 0,
     marketDealsDone: 0,
@@ -1527,7 +1543,7 @@ function migrateGame(game) {
     aquariumFloorsBuilt: 0,
     festivalFloorsBuilt: 0,
   };
-  game.version = Math.max(Number(game.version) || 0, 21);
+  game.version = Math.max(Number(game.version) || 0, 22);
   game.nextExpeditionId ||= 1;
   game.nextExpeditionReportId ||= 1;
   game.nextLifeStoryId ||= 1;
@@ -1661,6 +1677,10 @@ function migrateGame(game) {
                 serviceTimer: Math.max(0, Number(floor.foodRush.serviceTimer) || 0),
                 earned: Math.max(0, Number(floor.foodRush.earned) || 0),
                 finalRewarded: Boolean(floor.foodRush.finalRewarded),
+                courses: Math.max(0, Number(floor.foodRush.courses) || 0),
+                course: floor.foodRush.course || "starter",
+                servicePulse: clamp(Number(floor.foodRush.servicePulse) || 0, 0, 1),
+                tableFocus: Math.max(0, Number(floor.foodRush.tableFocus) || 0),
               }
             : null;
       }
@@ -4143,10 +4163,30 @@ function foodRushPaceForProgress(progress = 0) {
   return FOOD_RUSH_PACES.reduce((current, pace) => (progress >= pace.threshold ? pace : current), FOOD_RUSH_PACES[0]);
 }
 
+function foodRushCourseForProgress(progress = 0) {
+  return FOOD_RUSH_COURSES.reduce((current, course) => (progress >= course.threshold ? course : current), FOOD_RUSH_COURSES[0]);
+}
+
 function currentFoodRushPace(floor) {
   if (!isFoodRushFloorType(floor?.type)) return FOOD_RUSH_PACES[0];
   const activePace = FOOD_RUSH_PACES.find((pace) => pace.id === floor.foodRush?.pace);
   return activePace || foodRushPaceForProgress(foodRushProgress(floor));
+}
+
+function currentFoodRushCourse(floor) {
+  if (!isFoodRushFloorType(floor?.type)) return FOOD_RUSH_COURSES[0];
+  const activeCourse = FOOD_RUSH_COURSES.find((course) => course.id === floor.foodRush?.course);
+  return activeCourse || foodRushCourseForProgress(foodRushProgress(floor));
+}
+
+function foodRushTableCount(floor, diners = foodRushParticipants(floor)) {
+  if (!isFoodRushFloorType(floor?.type)) return 0;
+  return clamp(Math.ceil((diners.length || floor.foodRush?.participantIds?.length || 1) / 2), 1, 4);
+}
+
+function foodRushNextServiceProgress(floor) {
+  if (!isActiveFoodRush(floor)) return 0;
+  return clamp(1 - Number(floor.foodRush.serviceTimer || 0) / 6.1, 0, 1);
 }
 
 function foodRushHeatTone(floor) {
@@ -4272,7 +4312,11 @@ function serveFoodRushCourse(floor, diners = foodRushParticipants(floor), staff 
   const servedNow = Math.min(remaining || 1, serveCapacity, Math.max(1, Math.ceil(diners.length / 2)));
   rush.served = (rush.served || 0) + servedNow;
   rush.courses = (rush.courses || 0) + 1;
+  rush.course = foodRushCourseForProgress(foodRushProgress(floor)).id;
+  rush.servicePulse = 1;
+  rush.tableFocus = ((rush.tableFocus || 0) + 1) % foodRushTableCount(floor, diners);
   state.stats.foodServingsDone = (state.stats.foodServingsDone || 0) + servedNow;
+  state.stats.foodRushCoursesDone = (state.stats.foodRushCoursesDone || 0) + 1;
   rush.heat = clamp(Number(rush.heat || 0) + 5 + servedNow * 4 + skill * 0.28 + serviceCareBonus(state) * 18, 0, 100);
   applyFoodRushPaceMotion(floor, diners, workers);
   for (let index = 0; index < servedNow; index += 1) {
@@ -4361,6 +4405,9 @@ function startFoodRush(floorId) {
     earned: 0,
     finalRewarded: false,
     courses: 0,
+    course: "starter",
+    servicePulse: 0,
+    tableFocus: 0,
   };
   const staff = (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
   staff.forEach((worker, index) => {
@@ -4405,6 +4452,7 @@ function updateFoodRushFloor(floor, dt) {
   floor.foodRushCooldown = Math.max(0, (floor.foodRushCooldown || 0) - dt * (1 + clockworkTempoBonus(state) * 0.18));
   if (!isActiveFoodRush(floor)) return before !== foodRushMapKey(floor);
   floor.foodRush.remaining = Math.max(0, Number(floor.foodRush.remaining || 0) - dt);
+  floor.foodRush.servicePulse = Math.max(0, Number(floor.foodRush.servicePulse || 0) - dt * 0.9);
   const diners = foodRushParticipants(floor);
   floor.foodRush.participantIds = diners.map((person) => person.id);
   diners.forEach((person) => applyFoodRushMotiveBurst(floor, person, dt * 0.06));
@@ -4425,6 +4473,7 @@ function updateFoodRushFloor(floor, dt) {
     serveFoodRushCourse(floor, diners, staff);
     floor.foodRush.serviceTimer = randFloat(4.2, 6.1);
   }
+  floor.foodRush.course = foodRushCourseForProgress(foodRushProgress(floor)).id;
   if (floor.foodRush.remaining <= 0 || !diners.length || (floor.foodRush.served || 0) >= (floor.foodRush.targetServings || 1)) {
     const label = FOOD_RUSH_LABELS[floor.type] || "餐桌高峰";
     const served = floor.foodRush.served || 0;
@@ -4446,6 +4495,9 @@ function renderFoodRushPanel(floor) {
   const served = active ? floor.foodRush.served || 0 : state.stats.foodServingsDone || 0;
   const target = active ? Math.max(1, Number(floor.foodRush.targetServings) || 1) : Math.max(1, served || 1);
   const progress = active ? clamp(served / target, 0, 1) : 0;
+  const course = active ? currentFoodRushCourse(floor) : FOOD_RUSH_COURSES[0];
+  const tableCount = active ? foodRushTableCount(floor, diners) : 0;
+  const serviceLeft = active ? Math.ceil(floor.foodRush.serviceTimer || 0) : 0;
   const names = diners.length ? diners.map((person) => person.name).slice(0, 4).join("、") : "等待居民入座";
   const status = active
     ? `${pace.label} ${Math.ceil(floor.foodRush.remaining)}s · ${names}`
@@ -4453,6 +4505,11 @@ function renderFoodRushPanel(floor) {
       ? `冷却 ${Math.ceil(floor.foodRushCooldown)}s`
       : "就绪";
   const extra = active ? ` · 收益 ${floor.foodRush.earned || 0}` : "";
+  const courseRow = FOOD_RUSH_COURSES.map((entry) => {
+    const done = active && foodRushProgress(floor) >= entry.threshold;
+    const current = active && entry.id === course.id;
+    return `<i class="${done ? "done" : ""} ${current ? "current" : ""}" title="${escapeAttr(entry.label)}"><b></b><span>${escapeHtml(entry.label)}</span></i>`;
+  }).join("");
   return `
     <div class="food-rush-panel ${active ? "active" : ""}" data-heat="${escapeAttr(heatTone)}" data-pace="${escapeAttr(pace.id)}">
       <div class="food-rush-panel-head">
@@ -4460,15 +4517,21 @@ function renderFoodRushPanel(floor) {
         <em>${active ? `${foodRushHeatLabel(floor)} ${heat}%` : "待开桌"}</em>
       </div>
       <div class="food-rush-meter" aria-hidden="true"><i style="width:${Math.round(progress * 100)}%"></i></div>
+      <div class="food-rush-course-row" aria-hidden="true">${courseRow}</div>
+      <div class="food-rush-readout">
+        <b><span>菜序</span><strong>${active ? escapeHtml(course.label) : "待开"}</strong></b>
+        <b><span>桌况</span><strong>${active ? `${tableCount}桌` : `${state.stats.foodRushCoursesDone || 0}桌次`}</strong></b>
+        <b><span>下次</span><strong>${active ? `${serviceLeft}s` : "就绪"}</strong></b>
+      </div>
       <span>${escapeHtml(status)}${extra}</span>
-      <small>上菜 ${served}/${target} · 已组织 ${state.stats.foodRushesDone || 0} 次</small>
+      <small>上菜 ${served}/${target} · 桌次 ${state.stats.foodRushCoursesDone || 0} · 已组织 ${state.stats.foodRushesDone || 0} 次</small>
     </div>`;
 }
 
 function foodRushMapKey(floor) {
   if (!isFoodRushFloorType(floor?.type)) return "";
   const participants = floor.foodRush?.participantIds || [];
-  return `foodRush:${Math.ceil(floor.foodRushCooldown || 0)}:${Math.ceil(floor.foodRush?.remaining || 0)}:${participants.join("-")}:${floor.foodRush?.pace || ""}:${Math.round(floor.foodRush?.heat || 0)}:${floor.foodRush?.served || 0}:${floor.foodRush?.targetServings || 0}:${floor.foodRush?.earned || 0}`;
+  return `foodRush:${Math.ceil(floor.foodRushCooldown || 0)}:${Math.ceil(floor.foodRush?.remaining || 0)}:${participants.join("-")}:${floor.foodRush?.pace || ""}:${floor.foodRush?.course || ""}:${Math.round(floor.foodRush?.heat || 0)}:${floor.foodRush?.served || 0}:${floor.foodRush?.targetServings || 0}:${floor.foodRush?.earned || 0}:${floor.foodRush?.courses || 0}:${Math.round((floor.foodRush?.servicePulse || 0) * 10)}:${floor.foodRush?.tableFocus || 0}`;
 }
 
 function isShowtimeFloorType(type) {
@@ -6506,6 +6569,7 @@ function renderOpenFloor(floor) {
       </div>
       <div class="room-scene">
         ${renderRoomStateTag(floor)}
+        ${renderFoodRushServiceLayer(floor)}
         ${floor.type === "lobby" ? renderLobbyRouteLayer() : ""}
         ${renderLifeTrailLayer(floor)}
         ${renderExpeditionWaymarkLayer(floor)}
@@ -6698,6 +6762,37 @@ function renderFixture(floor) {
   };
   const type = floor.type === "lobby" ? "lobby kingdom" : floor.type;
   return `<span class="fixture ${type}" aria-hidden="true">${extras[floor.type] || ""}</span>`;
+}
+
+function renderFoodRushServiceLayer(floor) {
+  if (!isActiveFoodRush(floor)) return "";
+  const rush = floor.foodRush;
+  const diners = foodRushParticipants(floor);
+  const pace = currentFoodRushPace(floor);
+  const course = currentFoodRushCourse(floor);
+  const heatTone = foodRushHeatTone(floor);
+  const tableCount = foodRushTableCount(floor, diners);
+  const tableFocus = clamp(Number(rush.tableFocus) || 0, 0, Math.max(0, tableCount - 1));
+  const servedRatio = clamp(Number(rush.served || 0) / Math.max(1, Number(rush.targetServings) || 1), 0, 1);
+  const serviceProgress = Math.round(foodRushNextServiceProgress(floor) * 100);
+  const progress = Math.round(foodRushProgress(floor) * 100);
+  const tables = Array.from({ length: 4 }, (_, index) => {
+    const active = index < tableCount;
+    const served = active && index < Math.ceil(servedRatio * tableCount);
+    const focus = active && index === tableFocus;
+    return `<b class="${active ? "active" : ""} ${served ? "served" : ""} ${focus ? "focus" : ""}" style="--table-index:${index}"><i></i><em></em></b>`;
+  }).join("");
+  const courses = FOOD_RUSH_COURSES.map((entry) => {
+    const lit = progress >= Math.round(entry.threshold * 100);
+    return `<i class="${lit ? "lit" : ""} ${entry.id === course.id ? "current" : ""}" data-course="${escapeAttr(entry.id)}"></i>`;
+  }).join("");
+  return `
+    <span class="food-rush-service-layer" data-pace="${escapeAttr(pace.id)}" data-course="${escapeAttr(course.id)}" data-heat="${escapeAttr(heatTone)}" data-pulse="${rush.servicePulse > 0 ? "pulse" : "idle"}" style="--rush-progress:${progress}%; --service-progress:${serviceProgress}%; --rush-heat:${Math.round(rush.heat || 0)};" title="${escapeAttr(`${course.label} · ${tableCount}桌 · 上菜 ${rush.served || 0}/${rush.targetServings || 0}`)}" aria-label="${escapeAttr(`${course.label} · ${tableCount}桌 · 上菜 ${rush.served || 0}/${rush.targetServings || 0}`)}">
+      <span class="food-rush-service-rail"><i></i><b></b></span>
+      <span class="food-rush-counter-spark"><i></i><i></i><i></i></span>
+      <span class="food-rush-course-stack">${courses}</span>
+      <span class="food-rush-table-lane">${tables}</span>
+    </span>`;
 }
 
 function renderRoyalCourierLayer(floor) {
@@ -7497,6 +7592,7 @@ function renderFloorDetail() {
   const foodRushReason = isFoodRushFloorType(floor.type) ? foodRushActionBlockReason(floor) : "";
   const foodRushHeatValue = foodRushActive ? `${Math.round(floor.foodRush.heat || 0)}%` : "-";
   const foodRushPaceValue = foodRushActive ? currentFoodRushPace(floor).label : foodRushCooldownValue ? `${foodRushCooldownValue}s` : "就绪";
+  const foodRushCourseValue = foodRushActive ? currentFoodRushCourse(floor).label : `${state.stats.foodRushCoursesDone || 0}`;
   const foodRushServedValue = foodRushActive ? `${floor.foodRush.served || 0}/${floor.foodRush.targetServings || 0}` : `${state.stats.foodServingsDone || 0}`;
   const comfortCooldown = isComfortFloorType(floor.type) ? Math.ceil(floor.comfortCooldown || 0) : 0;
   const comfortActive = isActiveComfortSession(floor);
@@ -7539,7 +7635,7 @@ function renderFloorDetail() {
       <div class="stat"><b>${dreamWorkers}/3</b><span>理想岗位</span></div>
       <div class="stat"><b>${skill.toFixed(1)}</b><span>技能</span></div>
       <div class="stat"><b>${floor.production ? Math.ceil(floor.production.remaining) + "s" : "就绪"}</b><span>补货</span></div>
-      ${isFoodRushFloorType(floor.type) ? `<div class="stat"><b>${foodRushActive ? Math.ceil(floor.foodRush.remaining) + "s" : foodRushCooldownValue ? foodRushCooldownValue + "s" : "就绪"}</b><span>高峰</span></div><div class="stat"><b>${foodRushPaceValue}</b><span>节奏</span></div><div class="stat"><b>${foodRushHeatValue}</b><span>忙场</span></div><div class="stat"><b>${foodRushServedValue}</b><span>上菜</span></div>` : ""}
+      ${isFoodRushFloorType(floor.type) ? `<div class="stat"><b>${foodRushActive ? Math.ceil(floor.foodRush.remaining) + "s" : foodRushCooldownValue ? foodRushCooldownValue + "s" : "就绪"}</b><span>高峰</span></div><div class="stat"><b>${foodRushPaceValue}</b><span>节奏</span></div><div class="stat"><b>${foodRushCourseValue}</b><span>菜序</span></div><div class="stat"><b>${foodRushHeatValue}</b><span>忙场</span></div><div class="stat"><b>${foodRushServedValue}</b><span>上菜</span></div>` : ""}
       ${floor.type === "market" ? `<div class="stat"><b>${state.orders.length}/${orderCapacity(state)}</b><span>订单栏</span></div><div class="stat"><b>${marketCooldown ? marketCooldown + "s" : "就绪"}</b><span>撮合</span></div><div class="stat"><b>${marketParcelStageValue}</b><span>包裹</span></div><div class="stat"><b>${marketParcelPackedValue}</b><span>打包</span></div><div class="stat"><b>${state.stats.marketParcelsDone || 0}</b><span>流转</span></div>` : ""}
       ${floor.type === "kingdom" ? `<div class="stat"><b>${royalMandateStageValue}</b><span>王令</span></div><div class="stat"><b>${royalMandatePreparedValue}</b><span>预备</span></div><div class="stat"><b>${state.stats.royalMandatesDone || 0}</b><span>签发</span></div><div class="stat"><b>${state.stats.royalCourierReceiptsDone || 0}</b><span>回执</span></div><div class="stat"><b>${royalMandateInfo ? royalMandateInfo.missing : "-"}</b><span>缺口</span></div>` : ""}
       ${floor.type === "library" ? `<div class="stat"><b>${catalog.completed}/${COLLECTION_DEFS.length}</b><span>图鉴</span></div><div class="stat"><b>${libraryCooldown ? libraryCooldown + "s" : "就绪"}</b><span>编目</span></div>` : ""}
@@ -7588,7 +7684,8 @@ function renderFloorPerks(floor) {
     perks.push(`探险补给 +${Math.round(foodWarmthBonus(state) * 22)}%`);
     perks.push(`高峰 ${state.stats.foodRushesDone || 0}`);
     perks.push(`上菜 ${state.stats.foodServingsDone || 0}`);
-    if (isActiveFoodRush(floor)) perks.push(`${currentFoodRushPace(floor).label}忙场 ${Math.round(floor.foodRush.heat || 0)}%`);
+    perks.push(`桌次 ${state.stats.foodRushCoursesDone || 0}`);
+    if (isActiveFoodRush(floor)) perks.push(`${currentFoodRushCourse(floor).label} · ${currentFoodRushPace(floor).label} ${Math.round(floor.foodRush.heat || 0)}%`);
   } else if (floor.type === "craft") {
     perks.push(`工具链 +${Math.round(craftToolBonus(state) * 100)}%`);
     perks.push(`补货省耗 +${Math.round(Math.min(0.2, craftToolBonus(state) * 0.42) * 100)}%`);
@@ -7939,6 +8036,7 @@ function renderInventoryPanel() {
   const recordItems = [
     renderInventoryMetric("生活记录", `${lifeStoryCount} 段`, "居民外出与日常片段"),
     renderInventoryMetric("探险回执", `${reportCount} 份`, `路线档案 +${Math.round(expeditionReportBonus(state) * 100)}%`),
+    renderInventoryMetric("餐桌高峰", `${state.stats.foodRushCoursesDone || 0} 桌次`, `${state.stats.foodRushesDone || 0} 次 / ${state.stats.foodServingsDone || 0} 份`),
     renderInventoryMetric("珍藏碎片", `${progress.total}/${progress.max}`, progress.next ? `下枚 ${progress.next.name}` : "图鉴已满"),
     renderInventoryMetric("任务奖励", pending.count ? `${pending.count} 待领` : "已清点", pending.count ? `${pending.coins} 金币 / ${pending.gems} 宝石` : "暂无待领"),
   ].join("");
