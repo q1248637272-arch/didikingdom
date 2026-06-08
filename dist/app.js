@@ -978,6 +978,9 @@ const els = {
   mobilePanelDock: document.getElementById("mobilePanelDock"),
   toast: document.getElementById("toast"),
   guideModal: document.getElementById("guideModal"),
+  inventoryBtn: document.getElementById("inventoryBtn"),
+  inventoryModal: document.getElementById("inventoryModal"),
+  inventoryPanel: document.getElementById("inventoryPanel"),
   buildModal: document.getElementById("buildModal"),
   buildOptions: document.getElementById("buildOptions"),
 };
@@ -996,7 +999,7 @@ let guideReady = false;
 
 function makeNewGame() {
   const game = {
-    version: 19,
+    version: 20,
     coins: 560,
     gems: 7,
     happiness: 72,
@@ -1067,7 +1070,7 @@ function makeNewGame() {
       aquariumFloorsBuilt: 0,
       festivalFloorsBuilt: 0,
     },
-    quests: QUEST_DEFS.map((quest) => ({ id: quest.id, claimed: false })),
+    quests: QUEST_DEFS.map((quest) => ({ id: quest.id, claimed: false, ready: false })),
     orders: [],
     collection: makeEmptyCollection(),
     expeditions: [],
@@ -1454,11 +1457,19 @@ function migrateGame(game) {
     aquariumFloorsBuilt: 0,
     festivalFloorsBuilt: 0,
   };
-  game.version = Math.max(Number(game.version) || 0, 19);
+  game.version = Math.max(Number(game.version) || 0, 20);
   game.nextExpeditionId ||= 1;
   game.nextExpeditionReportId ||= 1;
   game.nextLifeStoryId ||= 1;
-  game.quests ||= QUEST_DEFS.map((quest) => ({ id: quest.id, claimed: false }));
+  game.quests = Array.isArray(game.quests)
+    ? game.quests
+        .filter((quest) => quest && typeof quest === "object")
+        .map((quest) => ({
+          id: quest.id,
+          claimed: Boolean(quest.claimed),
+          ready: Boolean(quest.ready) && !quest.claimed,
+        }))
+    : QUEST_DEFS.map((quest) => ({ id: quest.id, claimed: false, ready: false }));
   game.stats ||= {};
   Object.keys(defaultStats).forEach((key) => {
     game.stats[key] ||= 0;
@@ -1504,8 +1515,16 @@ function migrateGame(game) {
   });
   QUEST_DEFS.forEach((quest) => {
     if (!game.quests.some((entry) => entry.id === quest.id)) {
-      game.quests.push({ id: quest.id, claimed: false });
+      game.quests.push({ id: quest.id, claimed: false, ready: false });
     }
+  });
+  game.quests.forEach((questState) => {
+    const def = QUEST_DEFS.find((quest) => quest.id === questState.id);
+    if (!def || questState.claimed) {
+      questState.ready = false;
+      return;
+    }
+    questState.ready = Boolean(questState.ready || (game.stats?.[def.metric] || 0) >= def.goal);
   });
   game.lastSavedAt ||= Date.now();
   game.happiness = clamp(game.happiness ?? 70, 0, 100);
@@ -6008,6 +6027,17 @@ function closeGuideModal(persist = true) {
   }
 }
 
+function openInventoryModal() {
+  if (!els.inventoryModal) return;
+  renderInventoryPanel();
+  els.inventoryModal.hidden = false;
+}
+
+function closeInventoryModal() {
+  if (!els.inventoryModal) return;
+  els.inventoryModal.hidden = true;
+}
+
 function buildFloor(type, direction = preferredBuildDirection) {
   const buildDirection = direction === "up" ? "up" : "down";
   const lockedReason = buildLockReason(type, buildDirection);
@@ -6081,16 +6111,75 @@ function floorUpgradeCost(floor) {
   return Math.round(160 + Math.abs(floor.id) * 48 + (floor.level || 1) * 125);
 }
 
+function questEntry(def, game = state) {
+  game.quests ||= [];
+  const questState = game.quests.find((quest) => quest.id === def.id);
+  if (questState) return questState;
+  const created = { id: def.id, claimed: false, ready: false };
+  game.quests.push(created);
+  return created;
+}
+
+function questProgressValue(def, game = state) {
+  return Math.max(0, Number(game.stats?.[def.metric]) || 0);
+}
+
+function isQuestReady(def, game = state) {
+  const questState = questEntry(def, game);
+  return !questState.claimed && (questState.ready || questProgressValue(def, game) >= def.goal);
+}
+
+function pendingQuestRewards(game = state) {
+  return QUEST_DEFS.reduce(
+    (total, def) => {
+      if (!isQuestReady(def, game)) return total;
+      total.count += 1;
+      total.coins += def.reward.coins;
+      total.gems += def.reward.gems;
+      return total;
+    },
+    { count: 0, coins: 0, gems: 0 }
+  );
+}
+
 function checkQuests() {
-  state.quests.forEach((questState) => {
-    const def = QUEST_DEFS.find((quest) => quest.id === questState.id);
-    if (!def || questState.claimed) return;
-    if ((state.stats[def.metric] || 0) < def.goal) return;
-    questState.claimed = true;
-    state.coins += def.reward.coins;
-    state.gems += def.reward.gems;
-    addLog(`任务「${def.title}」完成，获得 ${def.reward.coins} 金币和 ${def.reward.gems} 宝石。`);
+  QUEST_DEFS.forEach((def) => {
+    const questState = questEntry(def);
+    if (questState.claimed) {
+      questState.ready = false;
+      return;
+    }
+    if (questProgressValue(def) < def.goal) {
+      questState.ready = false;
+      return;
+    }
+    if (questState.ready) return;
+    questState.ready = true;
+    addLog(`任务「${def.title}」已完成，前往任务面板领取奖励。`);
   });
+}
+
+function claimQuest(questId) {
+  const def = QUEST_DEFS.find((quest) => quest.id === questId);
+  if (!def) return;
+  const questState = questEntry(def);
+  if (questState.claimed) {
+    showToast("任务奖励已领取");
+    return;
+  }
+  if (questProgressValue(def) < def.goal) {
+    showToast("任务还未完成");
+    return;
+  }
+  questState.claimed = true;
+  questState.ready = false;
+  addCoins(def.reward.coins);
+  state.gems += def.reward.gems;
+  addLog(`领取任务「${def.title}」奖励：${def.reward.coins} 金币和 ${def.reward.gems} 宝石。`);
+  showFloat(`任务 +${def.reward.coins}`);
+  showToast(`已领取：${def.title}`);
+  render(true);
+  saveGame(false);
 }
 
 function canFulfillOrder(order) {
@@ -6177,6 +6266,7 @@ function render(force = false) {
   renderCollection();
   renderExpeditions();
   renderLog();
+  if (els.inventoryModal && !els.inventoryModal.hidden) renderInventoryPanel();
   updateResponsiveLayoutState();
   updateFullscreenButton();
   updateElevatorToggleButton();
@@ -6222,6 +6312,9 @@ function renderResources() {
   els.population.textContent = `${allResidents(state).length}/${populationCap(state)}`;
   els.happiness.textContent = `${Math.round(state.happiness)}`;
   els.streak.textContent = `x${state.streak || 0}`;
+  const pending = pendingQuestRewards();
+  els.inventoryBtn?.classList.toggle("attention", pending.count > 0);
+  els.inventoryBtn?.setAttribute("aria-label", pending.count > 0 ? `资产背包，${pending.count} 个任务奖励待领取` : "资产背包");
 }
 
 function renderKingdom() {
@@ -7563,16 +7656,23 @@ function residentMoodClass(resident) {
 
 function renderQuests() {
   const completed = state.quests.filter((quest) => quest.claimed).length;
-  els.questCount.textContent = `${completed}/${QUEST_DEFS.length}`;
+  const pending = pendingQuestRewards();
+  els.questCount.textContent = pending.count ? `${completed}/${QUEST_DEFS.length} · ${pending.count}待领` : `${completed}/${QUEST_DEFS.length}`;
   els.quests.innerHTML = QUEST_DEFS.map((def) => {
-    const questState = state.quests.find((quest) => quest.id === def.id) || { claimed: false };
-    const current = Math.min(def.goal, state.stats[def.metric] || 0);
+    const questState = questEntry(def);
+    const ready = isQuestReady(def);
+    const current = Math.min(def.goal, questProgressValue(def));
     const pct = Math.round((current / def.goal) * 100);
+    const status = questState.claimed ? "已领取" : ready ? "待领取" : `${current}/${def.goal}`;
     return `
-      <div class="quest ${questState.claimed ? "done" : ""}">
-        <div class="quest-head"><span>${def.title}</span><span>${current}/${def.goal}</span></div>
+      <div class="quest ${questState.claimed ? "done" : ""} ${ready ? "ready" : ""}">
+        <div class="quest-head"><span>${def.title}</span><span>${status}</span></div>
         <small>${def.text} · 奖励 ${def.reward.coins} 金币 / ${def.reward.gems} 宝石</small>
-        <div class="meter"><span style="width:${pct}%"></span></div>
+        <div class="quest-progress-row">
+          <div class="meter"><span style="width:${pct}%"></span></div>
+          ${ready ? `<button class="quest-claim-btn" type="button" data-action="claim-quest" data-quest-id="${def.id}">领取</button>` : ""}
+          ${questState.claimed ? `<span class="quest-claimed">已领取</span>` : ""}
+        </div>
       </div>`;
   }).join("");
 }
@@ -7679,6 +7779,103 @@ function renderCollection() {
       </div>`;
   }).join("");
   els.collection.innerHTML = summary + items;
+}
+
+function renderInventoryMetric(label, value, note = "", tone = "") {
+  return `
+    <div class="inventory-item ${tone}">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      ${note ? `<small>${escapeHtml(note)}</small>` : ""}
+    </div>`;
+}
+
+function renderInventoryPanel() {
+  if (!els.inventoryPanel) return;
+  ensureOrders(state);
+  const pending = pendingQuestRewards();
+  const progress = collectionProgress(state);
+  const stockFloors = businessFloors(state);
+  const stockTotal = stockFloors.reduce((sum, floor) => sum + (floor.stock || 0), 0);
+  const stockMax = stockFloors.reduce((sum, floor) => sum + (floor.stockMax || 0), 0);
+  const readyOrders = state.orders.filter((order) => orderStockInfo(order).ready).length;
+  const activeExpeditions = state.expeditions.length;
+  const reportCount = state.expeditionReports?.length || 0;
+  const lifeStoryCount = state.lifeStories?.length || 0;
+  const recordItems = [
+    renderInventoryMetric("生活记录", `${lifeStoryCount} 段`, "居民外出与日常片段"),
+    renderInventoryMetric("探险回执", `${reportCount} 份`, `路线档案 +${Math.round(expeditionReportBonus(state) * 100)}%`),
+    renderInventoryMetric("珍藏碎片", `${progress.total}/${progress.max}`, progress.next ? `下枚 ${progress.next.name}` : "图鉴已满"),
+    renderInventoryMetric("任务奖励", pending.count ? `${pending.count} 待领` : "已清点", pending.count ? `${pending.coins} 金币 / ${pending.gems} 宝石` : "暂无待领"),
+  ].join("");
+  const overview = [
+    renderInventoryMetric("金币", Math.floor(state.coins), pending.coins ? `任务待领 +${pending.coins}` : "建设、补货、雇佣"),
+    renderInventoryMetric("宝石", state.gems, pending.gems ? `任务待领 +${pending.gems}` : "加速与扩充入口"),
+    renderInventoryMetric("居民", `${allResidents(state).length}/${populationCap(state)}`, `快乐 ${Math.round(state.happiness)}`),
+    renderInventoryMetric("连送", `x${state.streak || 0}`, "准确送达越多，奖励越高"),
+    renderInventoryMetric("待领任务", pending.count ? `${pending.count} 个` : "无", pending.count ? `${pending.coins} 金币 / ${pending.gems} 宝石` : "暂无待领", pending.count ? "ready" : ""),
+    renderInventoryMetric("王室订单", `${readyOrders}/${state.orders.length}`, `容量 ${orderCapacity(state)}`),
+    renderInventoryMetric("楼层现货", `${stockTotal}/${stockMax || 0}`, `${stockFloors.length} 个经营楼层`),
+    renderInventoryMetric("探险档案", `${reportCount} 份`, activeExpeditions ? `进行中 ${activeExpeditions}` : "暂无出发队伍"),
+  ].join("");
+  const relicItems = COLLECTION_DEFS.map((item) => {
+    const value = state.collection[item.id] || 0;
+    const pct = Math.round((value / 3) * 100);
+    return `
+      <div class="inventory-relic ${value >= 3 ? "done" : ""}">
+        <div>
+          <strong>${escapeHtml(item.name)}</strong>
+          <small>${escapeHtml(item.source || "订单 / 探险")} · ${escapeHtml(item.desc)}</small>
+        </div>
+        <span>${value}/3</span>
+        <div class="meter"><span style="width:${pct}%"></span></div>
+      </div>`;
+  }).join("");
+  const stockItems = stockFloors.length
+    ? stockFloors
+        .map((floor) => {
+          const pct = floor.stockMax ? Math.round((floor.stock / floor.stockMax) * 100) : 0;
+          return `
+            <div class="inventory-stock">
+              <div>
+                <strong>${escapeHtml(formatFloorLabel(floor.id))}层 ${escapeHtml(floor.name)}</strong>
+                <small>${escapeHtml(FLOOR_TYPES[floor.type]?.label || "楼层")} · 等级 ${floor.level || 1} · 员工 ${floor.workers?.length || 0}</small>
+              </div>
+              <span>${floor.stock || 0}/${floor.stockMax || 0}</span>
+              <div class="meter"><span style="width:${pct}%"></span></div>
+            </div>`;
+        })
+        .join("")
+    : `<div class="inventory-empty">还没有经营楼层库存。</div>`;
+  els.inventoryPanel.innerHTML = `
+    <section class="inventory-section">
+      <div class="inventory-section-head">
+        <h3>王国资产</h3>
+        <span>${new Date(state.lastSavedAt || Date.now()).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}</span>
+      </div>
+      <div class="inventory-grid">${overview}</div>
+    </section>
+    <section class="inventory-section">
+      <div class="inventory-section-head">
+        <h3>珍藏道具</h3>
+        <span>${progress.completed}/${COLLECTION_DEFS.length} · ${progress.total}/${progress.max}</span>
+      </div>
+      <div class="inventory-relic-list">${relicItems}</div>
+    </section>
+    <section class="inventory-section">
+      <div class="inventory-section-head">
+        <h3>楼层现货</h3>
+        <span>${stockTotal}/${stockMax || 0}</span>
+      </div>
+      <div class="inventory-stock-list">${stockItems}</div>
+    </section>
+    <section class="inventory-section compact">
+      <div class="inventory-section-head">
+        <h3>记录</h3>
+        <span>${lifeStoryCount} 段生活 / ${reportCount} 份探险</span>
+      </div>
+      <div class="inventory-grid inventory-grid-compact">${recordItems}</div>
+    </section>`;
 }
 
 function renderExpeditions() {
@@ -8159,9 +8356,11 @@ function bindEvents() {
   document.getElementById("saveBtn").addEventListener("click", () => saveGame(true));
   document.getElementById("resetBtn").addEventListener("click", resetGame);
   document.getElementById("guideBtn").addEventListener("click", openGuideModal);
+  els.inventoryBtn?.addEventListener("click", openInventoryModal);
   document.getElementById("fullscreenBtn").addEventListener("click", toggleFullscreen);
   document.getElementById("closeBuildBtn").addEventListener("click", closeBuildModal);
   document.getElementById("closeGuideBtn").addEventListener("click", () => closeGuideModal(true));
+  document.getElementById("closeInventoryBtn")?.addEventListener("click", closeInventoryModal);
   els.mobilePanelDock?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-mobile-panel-target]");
     if (!button) return;
@@ -8188,6 +8387,9 @@ function bindEvents() {
   });
   els.guideModal.addEventListener("click", (event) => {
     if (event.target === els.guideModal) closeGuideModal(true);
+  });
+  els.inventoryModal?.addEventListener("click", (event) => {
+    if (event.target === els.inventoryModal) closeInventoryModal();
   });
   els.rosterFilters.addEventListener("click", (event) => {
     const button = event.target.closest("[data-action='filter-roster']");
@@ -8276,6 +8478,12 @@ function bindEvents() {
     }
   });
 
+  els.quests.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-action='claim-quest']");
+    if (!button || button.disabled) return;
+    claimQuest(button.dataset.questId);
+  });
+
   els.orders.addEventListener("click", (event) => {
     const button = event.target.closest("[data-action]");
     if (!button) return;
@@ -8314,6 +8522,12 @@ function bindEvents() {
   });
 
   window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeBuildModal();
+      closeInventoryModal();
+      closeGuideModal(false);
+      return;
+    }
     if (event.target.closest("button")) return;
     if (event.key === "ArrowUp" || event.key.toLowerCase() === "w") {
       event.preventDefault();

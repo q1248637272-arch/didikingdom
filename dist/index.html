@@ -11,7 +11,7 @@
     <link rel="icon" href="icons/icon-512.png" type="image/png" />
     <link rel="apple-touch-icon" href="icons/icon-512.png" />
     <link rel="stylesheet" href="styles.css?v=56" />
-    <link rel="stylesheet" href="overrides.css?v=64" />
+    <link rel="stylesheet" href="overrides.css?v=65" />
   </head>
   <body>
     <div class="app" id="app">
@@ -41,6 +41,9 @@
           <span class="resource"><span class="res-icon streak"></span><strong id="streak">0</strong></span>
         </div>
         <div class="top-actions">
+          <button class="icon-btn" id="inventoryBtn" title="资产背包" aria-label="资产背包">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8V6a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M4 8h16v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M9 13h6"/><path d="M12 10v6"/></svg>
+          </button>
           <button class="icon-btn" id="guideBtn" title="王国公告" aria-label="王国公告">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h12"/><path d="M8 7h8"/><path d="M8 11h5"/><path d="M6 21h12a2 2 0 0 0 2-2V7"/></svg>
           </button>
@@ -198,7 +201,19 @@
       </div>
     </div>
 
+    <div class="modal-backdrop inventory-backdrop" id="inventoryModal" hidden>
+      <div class="modal inventory-scroll" role="dialog" aria-modal="true" aria-labelledby="inventoryTitle">
+        <div class="modal-head">
+          <h2 id="inventoryTitle">资产背包</h2>
+          <button class="icon-btn" id="closeInventoryBtn" title="关闭" aria-label="关闭">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        <div class="inventory-panel" id="inventoryPanel"></div>
+      </div>
+    </div>
+
     <div class="toast" id="toast" aria-live="polite"></div>
-    <script src="app.js?v=64"></script>
+    <script src="app.js?v=65"></script>
   </body>
 </html>

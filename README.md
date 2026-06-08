@@ -4,10 +4,10 @@
 
 ## 本地运行
 
-直接打开 `index.html` 可以游玩；最近一次 v64 本地验证使用：
+直接打开 `index.html` 可以游玩；最近一次 v65 本地验证使用：
 
 ```text
-http://127.0.0.1:8814
+http://127.0.0.1:8815
 ```
 
 ## 玩法切片
@@ -23,6 +23,7 @@ http://127.0.0.1:8814
 - 人物会根据需求和熟人关系结伴出门，去吃饭、看演出、找朋友或休息，不再只是原地摇晃。
 - v63 深化旧花园/温泉舒缓系统：茶会或温泉休整结束后会留下“舒缓余韵”，地图、详情面板、居民卡、名册和探险面板都会显示回租、动机缓冲与探险准备收益。
 - v64 深化旧探险系统：宿舍派出的斥候现在会在途中留下出发/营地/回程路标，完成后沉淀为可读的探险回执；地图、宿舍面板、居民卡和探险列表都会显示路线档案与回执收益。
+- v65 把任务奖励改为手动领取：完成后任务会进入“待领取”状态，玩家点击任务面板里的“领取”才会获得金币和宝石；顶部新增“资产背包”入口，可集中查看金币、宝石、居民、待领任务奖励、珍藏道具、楼层库存、订单和探险档案。
 - v62 继续深化角色生活系统：居民外出现在会在出发楼层和目标楼层留下稳定的生活路线，完成后沉淀为“生活小故事”，地图、楼层详情、居民卡片和名册都会显示最近足迹与需求回补，不再用原地震动冒充互动。
 - v61 继续深化旧王国楼层：王令现在会显示信使路线、送达阶段和回执奖励，地图、详情面板和订单卡都会反馈信使进度；回执会提高订单奖励，交付时仍只扣除未被王令预备的真实库存。
 - v60 深化了旧市集楼层：撮合快单现在会进入“议价 / 打包 / 发货”的包裹流，地图、详情面板和订单卡会显示打包进度、发货状态与市集已打包数量；打包会先扣除真实经营库存，交付时只扣剩余未打包部分。
@@ -47,6 +48,14 @@ http://127.0.0.1:8814
 - 键盘支持 `W / ↑`、`S / ↓` 移动升降梯，`Space / Enter` 下客，`B` 打开建设。
 - v54 进行了轻量化清理：发布包移除了已被新版替代的旧房间图和旧表演者 PNG，表演者素材改为无损 WebP；发布运行目录只保留当前必要资产，本地旧浏览器配置、旧截图、图像中间产物和过期生成记录已清理。
 - v55 深化了旧演艺玩法：新增小剧任务、演出冷却、观众需求撮合、掌声金币奖励和娱乐/社交恢复，并保留 `docs/v55-entertainment-showtime-image-prompt.txt` 供后续图像网关恢复后刷新演艺房间背景。
+
+## v65 Update
+
+- v65 makes quest rewards manually claimed instead of automatically granted by `checkQuests()`.
+- Quest save entries now carry `ready`; completed unclaimed quests render a `领取` button, `claimQuest()` grants the reward, and the save version is bumped to `20`.
+- Added a topbar asset backpack with `#inventoryBtn`, `#inventoryModal`, and `renderInventoryPanel()` so players can inspect coins, gems, population, streak, pending quest rewards, collection items, floor stock, orders, life records, and expedition reports in one place.
+- Local verification for this pass used `http://127.0.0.1:8815/` with `tmp/verify-v65-manual-quests-inventory.mjs`; Cloudflare production and preview both load `app.js?v=65`, `overrides.css?v=65`, and `little-depths-v65`.
+- Cloudflare preview for this pass: `https://b69b37e1.little-depths.pages.dev/`.
 
 ## v64 Update
 

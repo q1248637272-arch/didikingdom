@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v64`
-- Latest preview deployment: `https://f93524f3.little-depths.pages.dev/`
-- Local server used for v64 verification: `http://127.0.0.1:8814/`
+- Latest deployed version: `v65`
+- Latest preview deployment: `https://b69b37e1.little-depths.pages.dev/`
+- Local server used for v65 verification: `http://127.0.0.1:8815/`
 
 ## Current State
 
@@ -22,11 +22,20 @@ wrangler pages deploy dist --project-name little-depths
 ```
 
 - GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`, but current release practice is to deploy Cloudflare with local Wrangler OAuth from `dist`, then sync GitHub separately. Use `[skip ci]` when pushing documentation/code sync commits that should not ask GitHub Actions to deploy Cloudflare.
-- Current caveat: v63 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
+- Current caveat: v65 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v65 Manual Quest Rewards / Asset Backpack
+
+- Changed the quest reward loop from automatic payout to manual claiming. `checkQuests()` now marks completed unclaimed quests as `ready` and logs that rewards are available instead of adding coins/gems immediately.
+- Added quest-state migration and save support for `ready`, bumped new saves/migrations to version `20`, and added `questEntry()`, `questProgressValue()`, `isQuestReady()`, `pendingQuestRewards()`, and `claimQuest()`.
+- `renderQuests()` now shows pending counts, highlights `.quest.ready`, and renders a `领取` button for ready quests. Claiming grants coins/gems, records earned coins, clears `ready`, marks `claimed`, logs the claim, saves, and re-renders.
+- Added a topbar asset backpack entry: `#inventoryBtn`, `#inventoryModal`, `#inventoryPanel`, `openInventoryModal()`, `closeInventoryModal()`, and `renderInventoryPanel()`. The panel summarizes coins, gems, residents, streak, pending quest rewards, royal orders, floor stock, collection items, life records, and expedition reports.
+- Added v65 CSS for `.quest-claim-btn`, `.quest.ready`, `.inventory-backdrop`, `.inventory-scroll`, inventory grids/lists, and mobile topbar/icon sizing; the inventory modal uses a higher z-index so it stays above the mobile drawer.
+- Added `tmp/verify-v65-manual-quests-inventory.mjs`, bumped `index.html` / `sw.js` to v65, synced `dist`, rebuilt `cloudflare-pages-upload.zip`, verified local desktop/mobile with Edge CDP, and deployed with local Wrangler direct upload.
 
 ### v64 Expedition Reports / Waymarks
 
@@ -264,6 +273,24 @@ wrangler pages deploy dist --project-name little-depths
 - Elevator passenger delivery now includes real waiting/door time before the visitor exits from the destination side.
 
 ## Verification Already Done
+
+- v65 local manual-quest/inventory verification:
+  - `node --check app.js`
+  - `node --check dist/app.js`
+  - `node --check sw.js`
+  - `node --check dist/sw.js`
+  - `node --check tmp/verify-v65-manual-quests-inventory.mjs`
+  - `node tmp/verify-v65-manual-quests-inventory.mjs`
+  - Local preview URL: `http://127.0.0.1:8815/?v65-manual-quests-inventory=1`
+  - Desktop screenshot: `verification-v65-manual-quests-inventory-local.png`
+  - Mobile screenshot: `verification-v65-manual-quests-inventory-mobile-local.png`
+  - Assertions confirmed save version `20`, completed quests become `ready` without auto-awarding coins/gems, the manual `领取` button appears, claiming grants exactly the expected rewards and removes the button, earned coins are counted, the asset backpack opens, coins/gems/pending rewards/collection/stock/records render, desktop/mobile topbars fit, the mobile inventory modal stays above the drawer, and no runtime errors were reported.
+- Cloudflare v65 checks:
+  - Local Wrangler OAuth deploy from `dist` succeeded and produced `https://b69b37e1.little-depths.pages.dev/`.
+  - Production `https://little-depths.pages.dev/` and preview `https://b69b37e1.little-depths.pages.dev/` both load `app.js?v=65` and `overrides.css?v=65`.
+  - Both `sw.js` files use `little-depths-v65`, `app.js?v=65`, and `overrides.css?v=65`.
+  - Both `app.js?v=65` files contain `claimQuest`, `renderInventoryPanel`, and `pendingQuestRewards`; both `overrides.css?v=65` files contain `inventory-backdrop`, `quest-claim-btn`, and `inventory-scroll`.
+  - `cloudflare-pages-upload.zip` was rebuilt from `dist`; size was `8102085` bytes.
 
 - v64 local expedition-report verification:
   - `node --check app.js`

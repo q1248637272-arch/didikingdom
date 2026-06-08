@@ -3946,3 +3946,316 @@ body.fullscreen-active .build-grid {
     font-size: 10px;
   }
 }
+
+/* v65 manual quest rewards and asset backpack. */
+.icon-btn {
+  position: relative;
+}
+
+.icon-btn.attention {
+  color: #fff7d8;
+  border-color: rgba(245, 204, 122, 0.72);
+  background:
+    linear-gradient(180deg, rgba(128, 82, 38, 0.72), rgba(38, 35, 32, 0.9)),
+    rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 0 2px rgba(242, 184, 75, 0.16);
+}
+
+.icon-btn.attention::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #64c4b0;
+  box-shadow:
+    0 0 0 2px rgba(26, 28, 37, 0.96),
+    0 0 10px rgba(100, 196, 176, 0.78);
+}
+
+.quest.ready {
+  border-color: rgba(242, 184, 75, 0.66);
+  background:
+    linear-gradient(180deg, rgba(242, 184, 75, 0.14), rgba(100, 196, 176, 0.08)),
+    rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(242, 184, 75, 0.16);
+}
+
+.quest-progress-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.quest-progress-row .meter {
+  margin: 0;
+  min-width: 0;
+}
+
+.quest-claim-btn {
+  min-width: 58px;
+  min-height: 30px;
+  padding: 6px 11px;
+  border-radius: 8px;
+  color: #151923;
+  font-size: 12px;
+  font-weight: 900;
+  border: 1px solid rgba(255, 239, 174, 0.82);
+  background: linear-gradient(180deg, #ffe48a, #f2b84b);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 4px 12px rgba(0, 0, 0, 0.22);
+}
+
+.quest-claim-btn:hover {
+  transform: translateY(-1px);
+}
+
+.quest-claimed {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  color: #cfe7d4;
+  font-size: 11px;
+  font-weight: 900;
+  border: 1px solid rgba(125, 189, 98, 0.35);
+  background: rgba(125, 189, 98, 0.08);
+}
+
+.inventory-scroll {
+  width: min(900px, calc(100vw - 24px));
+  max-height: min(760px, calc(100dvh - 24px));
+  overflow: auto;
+}
+
+.inventory-backdrop {
+  z-index: 80;
+}
+
+.inventory-panel {
+  display: grid;
+  gap: 0;
+}
+
+.inventory-section {
+  padding: 14px 16px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.inventory-section:last-child {
+  border-bottom: 0;
+}
+
+.inventory-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.inventory-section-head h3 {
+  margin: 0;
+  color: #ffe48a;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.inventory-section-head span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.inventory-item,
+.inventory-relic,
+.inventory-stock {
+  min-width: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.035)),
+    rgba(255, 255, 255, 0.03);
+}
+
+.inventory-item {
+  display: grid;
+  gap: 4px;
+  min-height: 74px;
+  padding: 10px;
+}
+
+.inventory-item.ready {
+  border-color: rgba(242, 184, 75, 0.58);
+  background:
+    linear-gradient(180deg, rgba(242, 184, 75, 0.14), rgba(100, 196, 176, 0.06)),
+    rgba(255, 255, 255, 0.04);
+}
+
+.inventory-item span,
+.inventory-item small,
+.inventory-relic small,
+.inventory-stock small,
+.inventory-note {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.inventory-item strong {
+  min-width: 0;
+  color: #f7e8c4;
+  font-size: 19px;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.inventory-relic-list,
+.inventory-stock-list {
+  display: grid;
+  gap: 8px;
+}
+
+.inventory-relic,
+.inventory-stock {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 10px;
+  align-items: center;
+  padding: 10px;
+}
+
+.inventory-relic.done {
+  border-color: rgba(125, 189, 98, 0.46);
+  background:
+    linear-gradient(180deg, rgba(125, 189, 98, 0.1), rgba(255, 255, 255, 0.035)),
+    rgba(255, 255, 255, 0.03);
+}
+
+.inventory-relic strong,
+.inventory-stock strong {
+  display: block;
+  min-width: 0;
+  color: #f7e8c4;
+  font-size: 13px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.inventory-relic span,
+.inventory-stock span {
+  color: #ffe48a;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.inventory-relic .meter,
+.inventory-stock .meter {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.inventory-empty,
+.inventory-note {
+  margin: 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+@media (max-width: 760px) {
+  .inventory-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .top-actions {
+    gap: 4px;
+  }
+
+  .top-actions .icon-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .top-actions .icon-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .brand h1 {
+    font-size: 16px;
+  }
+
+  .crest {
+    width: 36px;
+    height: 36px;
+  }
+
+  .crest svg {
+    width: 29px;
+    height: 29px;
+  }
+
+  .inventory-backdrop {
+    padding: 8px;
+    align-items: start;
+  }
+
+  .inventory-scroll {
+    width: 100%;
+    max-height: calc(100dvh - 16px);
+  }
+
+  .inventory-section {
+    padding: 12px;
+  }
+
+  .inventory-item {
+    min-height: 68px;
+    padding: 9px;
+  }
+
+  .quest-progress-row {
+    grid-template-columns: minmax(0, 1fr) 54px;
+    gap: 6px;
+  }
+
+  .quest-claim-btn,
+  .quest-claimed {
+    min-width: 54px;
+  }
+}
+
+@media (max-width: 360px) {
+  .top-actions .icon-btn {
+    width: 28px;
+    height: 28px;
+  }
+
+  .brand {
+    gap: 5px;
+  }
+
+  .crest {
+    display: none;
+  }
+}
