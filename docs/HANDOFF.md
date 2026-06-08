@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v63`
-- Latest preview deployment: `https://6971228b.little-depths.pages.dev/`
-- Local server used for v63 verification: `http://127.0.0.1:8813/`
+- Latest deployed version: `v64`
+- Latest preview deployment: `https://f93524f3.little-depths.pages.dev/`
+- Local server used for v64 verification: `http://127.0.0.1:8814/`
 
 ## Current State
 
@@ -27,6 +27,15 @@ wrangler pages deploy dist --project-name little-depths
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v64 Expedition Reports / Waymarks
+
+- Deepened the old expedition loop so dwelling-origin expeditions now leave readable in-route waymarks and a return report instead of disappearing into the side panel.
+- Added expedition route markers and migration support: save version `19`, `EXPEDITION_WAYMARKS`, `expeditionReports`, `expeditionReportsDone`, `expeditionWaymarksDone`, `nextExpeditionReportId`, `expeditionReportBonus()`, `normalizeExpeditionReport()`, and the new `expedition_reports` quest.
+- Active expeditions now expose `depart` / `camp` / `return` waymarks, route archive bonus, and staged log feedback; completed expeditions now create a readable return report with route summary, rewards, and lingering report bonus.
+- Dwelling floors now render `.expedition-waymark-layer`, `.expedition-report-panel`, `data-expedition-waymarks`, and `data-expedition-stage`; resident cards, roster cards, and expedition cards show `.expedition-report-chip`, `.expedition-report-tag`, and route archive text.
+- Visual feedback uses stable route lines, waymark chips, report cards, and report meters. This pass keeps the no fake in-place character shaking rule.
+- Added `tmp/verify-v64-expedition-reports.mjs`, bumped `index.html` / `sw.js` to v64, synced `dist`, rebuilt `cloudflare-pages-upload.zip`, verified local desktop/mobile with Edge CDP, and deployed with local Wrangler direct upload.
 
 ### v63 Comfort Afterglow / Readable Recovery
 
@@ -255,6 +264,25 @@ wrangler pages deploy dist --project-name little-depths
 - Elevator passenger delivery now includes real waiting/door time before the visitor exits from the destination side.
 
 ## Verification Already Done
+
+- v64 local expedition-report verification:
+  - `node --check app.js`
+  - `node --check dist/app.js`
+  - `node --check sw.js`
+  - `node --check dist/sw.js`
+  - `node --check tmp/verify-v64-expedition-reports.mjs`
+  - `node tmp/verify-v64-expedition-reports.mjs`
+  - Local preview URL: `http://127.0.0.1:8814/?v64-expedition-reports=1`
+  - Desktop screenshot: `verification-v64-expedition-reports-local.png`
+  - Mobile screenshot: `verification-v64-expedition-reports-mobile-local.png`
+  - Assertions confirmed save version `19`, `app.js?v=64`, `overrides.css?v=64`, the `expedition_reports` quest, active `expeditionWaymarksDone`, `.floor.expedition-waymark-active`, `.expedition-waymark-layer`, `.expedition-card.active.expedition-report-active`, `.expedition-report-panel`, active/completed `.expedition-report-chip`, `expeditionReportsDone`, report bonus retention, forced relic award, mobile expedition drawer visibility, and no runtime errors.
+  - Latest local run returned `waymarksDone: 2`, `reportsDone: 1`, `reportBonus: 0.016`, and `relicPieces: 1`.
+- Cloudflare v64 checks:
+  - Local Wrangler OAuth deploy from `dist` succeeded and produced `https://f93524f3.little-depths.pages.dev/`.
+  - Production `https://little-depths.pages.dev/` and preview `https://f93524f3.little-depths.pages.dev/` both load `app.js?v=64`.
+  - Both `sw.js` files use `little-depths-v64` and `app.js?v=64`.
+  - Both `app.js` files contain `expeditionReports` and `expedition-waymark`.
+  - `cloudflare-pages-upload.zip` was rebuilt from `dist`; size was `8098976` bytes.
 
 - v63 local comfort-afterglow verification:
   - `node --check app.js`

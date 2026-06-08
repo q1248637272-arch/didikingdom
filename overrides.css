@@ -3645,6 +3645,217 @@ body.fullscreen-active .build-grid {
   background: linear-gradient(120deg, rgba(255, 224, 138, 0.14), rgba(115, 215, 208, 0.08)) !important;
 }
 
+.floor.expedition-waymark-active .room {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 224, 138, 0.2),
+    0 0 22px rgba(115, 215, 208, 0.14);
+}
+
+.expedition-waymark-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.expedition-waymark {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: calc(14px + var(--expedition-lane, 0) * 13px);
+  display: block;
+  height: 13px;
+}
+
+.expedition-waymark i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 6px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 224, 138, 0.74), rgba(115, 215, 208, 0.6));
+  opacity: 0.82;
+}
+
+.expedition-waymark b {
+  position: absolute;
+  left: var(--expedition-progress, 0%);
+  top: 1px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(255, 247, 209, 0.88);
+  border-radius: 50%;
+  background: #73d7d0;
+  box-shadow: 0 0 10px rgba(115, 215, 208, 0.45);
+  transform: translateX(-50%);
+}
+
+.expedition-waymark em {
+  position: absolute;
+  right: 0;
+  top: -7px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  color: #fff4cf;
+  background: rgba(12, 18, 28, 0.72);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.expedition-waymark--camp b {
+  background: #ffe08a;
+}
+
+.expedition-waymark--return b {
+  background: #f2b84b;
+}
+
+.expedition-report-panel {
+  display: grid;
+  gap: 9px;
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 224, 138, 0.28);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 224, 138, 0.12), rgba(115, 215, 208, 0.08)),
+    rgba(255, 255, 255, 0.045);
+}
+
+.expedition-report-head,
+.expedition-report-list {
+  display: grid;
+  gap: 7px;
+}
+
+.expedition-report-head {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.expedition-report-head strong {
+  color: #fff4cf;
+}
+
+.expedition-report-head em {
+  color: #b9d6ff;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.expedition-report-card {
+  display: grid;
+  gap: 5px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(12, 18, 28, 0.34);
+}
+
+.expedition-report-card.active {
+  border-color: rgba(115, 215, 208, 0.32);
+  background: linear-gradient(135deg, rgba(115, 215, 208, 0.12), rgba(255, 224, 138, 0.07));
+}
+
+.expedition-report-card strong {
+  color: #fff4cf;
+  font-size: 12px;
+}
+
+.expedition-report-card span,
+.expedition-report-card small {
+  color: #cdd9e8;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.expedition-report-card[data-tone="rare"] {
+  border-color: rgba(242, 184, 75, 0.42);
+  background: linear-gradient(135deg, rgba(242, 184, 75, 0.14), rgba(115, 215, 208, 0.08));
+}
+
+.expedition-report-meter {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.expedition-report-meter i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f2b84b, #73d7d0);
+}
+
+.expedition-report-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 6px;
+  padding: 4px 7px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 224, 138, 0.3);
+  border-radius: 999px;
+  color: #fff0bb;
+  background: linear-gradient(120deg, rgba(255, 224, 138, 0.13), rgba(115, 215, 208, 0.08));
+  font-size: 11px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.expedition-report-chip.active {
+  border-color: rgba(115, 215, 208, 0.34);
+  color: #dffbf5;
+}
+
+.expedition-report-tag {
+  border-color: rgba(115, 215, 208, 0.28) !important;
+  color: #dffbf5 !important;
+  background: linear-gradient(120deg, rgba(115, 215, 208, 0.12), rgba(255, 224, 138, 0.08)) !important;
+}
+
+.expedition-waymark-readout {
+  display: grid;
+  gap: 3px;
+  margin-top: 7px;
+  color: #dffbf5;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.expedition-waymark-readout small {
+  color: #b9d6ff;
+}
+
+.resident-card.expedition-report-active,
+.roster-card.expedition-report-active {
+  border-color: rgba(255, 224, 138, 0.32);
+  background:
+    linear-gradient(120deg, rgba(255, 224, 138, 0.1), rgba(115, 215, 208, 0.06)),
+    rgba(255, 255, 255, 0.04);
+}
+
+.status-glyph[data-state="expedition-report"],
+.room-state-tag[data-state="expedition-report"] {
+  background: linear-gradient(135deg, rgba(255, 224, 138, 0.92), rgba(115, 215, 208, 0.86));
+}
+
+.status-glyph[data-state="expedition-report"]::before,
+.room-state-tag[data-state="expedition-report"]::before {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(20, 27, 37, 0.78);
+  border-left-width: 4px;
+  border-radius: 2px;
+  transform: rotate(-10deg);
+}
+
 .life-trail-chip.active {
   border-color: rgba(255, 226, 155, 0.34);
   color: #fff0b6;
@@ -3714,9 +3925,24 @@ body.fullscreen-active .build-grid {
     padding: 9px;
   }
 
+  .expedition-waymark {
+    left: 9%;
+    right: 9%;
+    bottom: calc(16px + var(--expedition-lane, 0) * 11px);
+  }
+
+  .expedition-waymark em {
+    display: none;
+  }
+
+  .expedition-report-panel {
+    padding: 9px;
+  }
+
   .life-story-route,
   .life-trail-chip,
-  .comfort-memory-chip {
+  .comfort-memory-chip,
+  .expedition-report-chip {
     font-size: 10px;
   }
 }

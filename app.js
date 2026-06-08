@@ -640,6 +640,12 @@ const EXPEDITION_DEFS = [
   },
 ];
 
+const EXPEDITION_WAYMARKS = [
+  { id: "depart", at: 0.12, label: "出发", tone: "depart", text: "确认入口补给与住户牵挂" },
+  { id: "camp", at: 0.44, label: "营地", tone: "camp", text: "扎下临时营地，记录路线风险" },
+  { id: "return", at: 0.74, label: "回程", tone: "return", text: "带着线索与战利品返城" },
+];
+
 const QUEST_DEFS = [
   {
     id: "residents",
@@ -921,6 +927,14 @@ const QUEST_DEFS = [
     reward: { coins: 520, gems: 3 },
     text: "完成 3 次地底探险",
   },
+  {
+    id: "expedition_reports",
+    title: "探险回执",
+    goal: 4,
+    metric: "expeditionReportsDone",
+    reward: { coins: 640, gems: 3 },
+    text: "留下 4 份可读的探险回城报告。",
+  },
 ];
 
 const COLLECTION_DEFS = [
@@ -982,7 +996,7 @@ let guideReady = false;
 
 function makeNewGame() {
   const game = {
-    version: 18,
+    version: 19,
     coins: 560,
     gems: 7,
     happiness: 72,
@@ -994,6 +1008,7 @@ function makeNewGame() {
     nextVisitorId: 1,
     nextLogId: 1,
     nextExpeditionId: 1,
+    nextExpeditionReportId: 1,
     nextLifeStoryId: 1,
     elevator: {
       position: 0,
@@ -1018,6 +1033,8 @@ function makeNewGame() {
       commissionsDone: 0,
       relicPieces: 0,
       expeditionsDone: 0,
+      expeditionReportsDone: 0,
+      expeditionWaymarksDone: 0,
       skyFloorsBuilt: 0,
       depthFloorsBuilt: 0,
       dreamJobsFilled: 0,
@@ -1054,6 +1071,7 @@ function makeNewGame() {
     orders: [],
     collection: makeEmptyCollection(),
     expeditions: [],
+    expeditionReports: [],
     lifeStories: [],
     lastSavedAt: Date.now(),
     spawnTimer: 7.5 + Math.random() * 6.5,
@@ -1402,6 +1420,8 @@ function migrateGame(game) {
     commissionsDone: 0,
     relicPieces: 0,
     expeditionsDone: 0,
+    expeditionReportsDone: 0,
+    expeditionWaymarksDone: 0,
     skyFloorsBuilt: 0,
     depthFloorsBuilt: 0,
     dreamJobsFilled: 0,
@@ -1434,8 +1454,9 @@ function migrateGame(game) {
     aquariumFloorsBuilt: 0,
     festivalFloorsBuilt: 0,
   };
-  game.version = Math.max(Number(game.version) || 0, 18);
+  game.version = Math.max(Number(game.version) || 0, 19);
   game.nextExpeditionId ||= 1;
+  game.nextExpeditionReportId ||= 1;
   game.nextLifeStoryId ||= 1;
   game.quests ||= QUEST_DEFS.map((quest) => ({ id: quest.id, claimed: false }));
   game.stats ||= {};
@@ -1460,6 +1481,14 @@ function migrateGame(game) {
   game.orders ||= [];
   game.orders = game.orders.map((order) => normalizeOrderLogistics(order));
   game.expeditions = Array.isArray(game.expeditions) ? game.expeditions : [];
+  game.expeditionReports = Array.isArray(game.expeditionReports)
+    ? game.expeditionReports.map((report) => normalizeExpeditionReport(report)).filter(Boolean).slice(0, 8)
+    : [];
+  game.nextExpeditionReportId = Math.max(
+    game.nextExpeditionReportId || 1,
+    ...game.expeditionReports.map((report) => Number(report.id) + 1).filter(Number.isFinite),
+    1
+  );
   game.lifeStories = Array.isArray(game.lifeStories)
     ? game.lifeStories.map((story) => normalizeLifeStory(story)).filter(Boolean).slice(0, 8)
     : [];
@@ -1723,6 +1752,7 @@ function update(dt) {
   updateElevator(dt);
   updateLifeVisits(dt);
   updateLifeStories(dt);
+  updateExpeditionReports(dt);
   updatePersonActivities(dt);
   updateFloorArrivals(dt);
   updateTimers(dt);
@@ -5077,6 +5107,229 @@ function updateOrders(dt) {
   if (Math.random() < dt * 0.04) ensureOrders(state);
 }
 
+function expeditionProgress(expedition) {
+  if (!expedition) return 0;
+  const total = Math.max(1, Number(expedition.total) || 1);
+  return clamp(1 - Number(expedition.remaining || 0) / total, 0, 1);
+}
+
+function expeditionCurrentWaymark(expedition) {
+  const progress = expeditionProgress(expedition);
+  return EXPEDITION_WAYMARKS.reduce((current, mark) => (progress >= mark.at ? mark : current), EXPEDITION_WAYMARKS[0]);
+}
+
+function expeditionNextWaymark(expedition) {
+  const progress = expeditionProgress(expedition);
+  return EXPEDITION_WAYMARKS.find((mark) => progress < mark.at) || null;
+}
+
+function updateExpeditionWaymarks(expedition, game = state, noisy = game === state) {
+  if (!expedition || !game?.stats) return 0;
+  expedition.waymarkIds = Array.isArray(expedition.waymarkIds) ? expedition.waymarkIds : [];
+  const progress = expeditionProgress(expedition);
+  let added = 0;
+  EXPEDITION_WAYMARKS.forEach((mark) => {
+    if (progress < mark.at || expedition.waymarkIds.includes(mark.id)) return;
+    expedition.waymarkIds.push(mark.id);
+    game.stats.expeditionWaymarksDone = (game.stats.expeditionWaymarksDone || 0) + 1;
+    added += 1;
+    if (noisy) {
+      addLogToGame(game, `${expedition.residentName || "斥候"} 抵达「${expedition.title}」${mark.label}路标：${mark.text}。`);
+    }
+  });
+  if (added && game === state) lastKingdomKey = "";
+  return added;
+}
+
+function expeditionReportBonus(game = state) {
+  const reportsDone = Number(game?.stats?.expeditionReportsDone) || 0;
+  const visibleReports = Array.isArray(game?.expeditionReports) ? game.expeditionReports.length : 0;
+  return clamp(reportsDone * 0.006 + visibleReports * 0.01, 0, 0.22);
+}
+
+function normalizeExpeditionReport(report) {
+  if (!report || typeof report !== "object") return null;
+  const def = EXPEDITION_DEFS.find((entry) => entry.id === report.type) || EXPEDITION_DEFS[0];
+  const waymarks = Array.isArray(report.waymarks)
+    ? report.waymarks.filter((id) => EXPEDITION_WAYMARKS.some((mark) => mark.id === id)).slice(0, 4)
+    : [];
+  return {
+    id: Number(report.id) || 0,
+    expeditionId: typeof report.expeditionId === "string" ? report.expeditionId.slice(0, 32) : "",
+    personId: Number(report.personId) || 0,
+    personName: typeof report.personName === "string" ? report.personName.slice(0, 28) : "斥候",
+    type: def.id,
+    title: typeof report.title === "string" ? report.title.slice(0, 72) : def.title,
+    routeLabel: typeof report.routeLabel === "string" ? report.routeLabel.slice(0, 34) : def.tag,
+    originFloorId: Number.isFinite(Number(report.originFloorId)) ? Number(report.originFloorId) : null,
+    originFloorName: typeof report.originFloorName === "string" ? report.originFloorName.slice(0, 48) : "",
+    detail: typeof report.detail === "string" ? report.detail.slice(0, 150) : "",
+    coins: Math.max(0, Math.round(Number(report.coins) || 0)),
+    gems: Math.max(0, Math.round(Number(report.gems) || 0)),
+    relicFound: Boolean(report.relicFound),
+    comfortPrepLabel: typeof report.comfortPrepLabel === "string" ? report.comfortPrepLabel.slice(0, 34) : "",
+    reportBonus: clamp(Number(report.reportBonus) || 0, 0, 0.24),
+    waymarks,
+    tone: ["depart", "camp", "return", "rare", "bright", "steady"].includes(report.tone) ? report.tone : "steady",
+    remaining: Number.isFinite(Number(report.remaining)) ? clamp(Number(report.remaining), 0, 240) : 150,
+    createdAt: Number(report.createdAt) || Date.now(),
+  };
+}
+
+function updateExpeditionReports(dt) {
+  if (!Array.isArray(state.expeditionReports) || !state.expeditionReports.length) return;
+  const before = state.expeditionReports.length;
+  state.expeditionReports = state.expeditionReports
+    .map((report) => normalizeExpeditionReport({ ...report, remaining: Math.max(0, Number(report.remaining || 0) - dt) }))
+    .filter((report) => report && report.remaining > 0)
+    .slice(0, 8);
+  if (state.expeditionReports.length !== before) lastKingdomKey = "";
+}
+
+function recordExpeditionReport(game, expedition, resident, options = {}) {
+  if (!game || !expedition || !game.stats) return null;
+  game.expeditionReports = Array.isArray(game.expeditionReports) ? game.expeditionReports : [];
+  game.nextExpeditionReportId ||= 1;
+  const def = EXPEDITION_DEFS.find((entry) => entry.id === expedition.type) || EXPEDITION_DEFS[0];
+  const origin = Number.isFinite(Number(expedition.originFloorId))
+    ? game.floors.find((floor) => Number(floor.id) === Number(expedition.originFloorId))
+    : null;
+  const waymarks = Array.isArray(expedition.waymarkIds) && expedition.waymarkIds.length
+    ? expedition.waymarkIds
+    : EXPEDITION_WAYMARKS.map((mark) => mark.id);
+  const waymarkText = waymarks
+    .map((id) => EXPEDITION_WAYMARKS.find((mark) => mark.id === id)?.label)
+    .filter(Boolean)
+    .join(" / ");
+  const comfortText = expedition.comfortPrepBonus > 0 ? `，${expedition.comfortPrepLabel || "舒缓余韵"}稳定了队伍` : "";
+  const relicText = options.relicFound ? "，发现珍藏碎片" : "";
+  const gemText = options.gems ? `，带回 ${options.gems} 宝石` : "";
+  const report = normalizeExpeditionReport({
+    id: game.nextExpeditionReportId++,
+    expeditionId: expedition.id,
+    personId: resident?.id || expedition.residentId,
+    personName: resident?.name || expedition.residentName || "斥候",
+    type: expedition.type,
+    title: `${def.title}回城报告`,
+    routeLabel: def.tag || def.title,
+    originFloorId: origin?.id ?? expedition.originFloorId ?? null,
+    originFloorName: origin?.name || "",
+    detail: `${origin ? `${formatFloorLabel(origin.id)} ${origin.name}` : "公共探险队"} → ${def.title}，路标 ${waymarkText || "完整"}${gemText}${relicText}${comfortText}`,
+    coins: options.coins || expedition.rewardCoins || 0,
+    gems: options.gems || 0,
+    relicFound: Boolean(options.relicFound),
+    comfortPrepLabel: expedition.comfortPrepLabel || "",
+    reportBonus: expedition.reportBonus || 0,
+    waymarks,
+    tone: options.relicFound ? "rare" : options.gems ? "bright" : "return",
+    remaining: 170,
+    createdAt: Date.now(),
+  });
+  game.expeditionReports.unshift(report);
+  game.expeditionReports = game.expeditionReports.slice(0, 8);
+  game.stats.expeditionReportsDone = (game.stats.expeditionReportsDone || 0) + 1;
+  return report;
+}
+
+function activeExpeditionForPerson(person) {
+  if (!person?.expeditionId || !Array.isArray(state.expeditions)) return null;
+  return state.expeditions.find((expedition) => expedition.id === person.expeditionId) || null;
+}
+
+function latestExpeditionReportForPerson(person) {
+  if (!person || !Array.isArray(state.expeditionReports)) return null;
+  return state.expeditionReports.find((report) => Number(report.personId) === Number(person.id)) || null;
+}
+
+function renderExpeditionBadge(person) {
+  if (!person) return "";
+  const active = activeExpeditionForPerson(person);
+  if (active) {
+    const mark = expeditionCurrentWaymark(active);
+    const pct = Math.round(expeditionProgress(active) * 100);
+    return `<span class="expedition-report-chip active" data-tone="${escapeAttr(mark.tone)}">${escapeHtml(mark.label)} · ${escapeHtml(active.title)} · ${pct}%</span>`;
+  }
+  const report = latestExpeditionReportForPerson(person);
+  if (!report) return "";
+  return `<span class="expedition-report-chip" data-tone="${escapeAttr(report.tone)}">上次探险 · ${escapeHtml(report.routeLabel)} · ${escapeHtml(report.detail)}</span>`;
+}
+
+function expeditionWaymarksForFloor(floor) {
+  if (!floor || floor.type !== "dwelling" || floor.status !== "open") return [];
+  return (state.expeditions || [])
+    .filter((expedition) => Number(expedition.originFloorId) === Number(floor.id))
+    .map((expedition) => {
+      const resident = getResident(expedition.residentId);
+      const mark = expeditionCurrentWaymark(expedition);
+      return {
+        expedition,
+        resident,
+        mark,
+        progress: expeditionProgress(expedition),
+      };
+    })
+    .sort((a, b) => b.progress - a.progress);
+}
+
+function expeditionWaymarkMapKey(floor) {
+  return expeditionWaymarksForFloor(floor)
+    .map((entry) => `${entry.expedition.id}:${entry.mark.id}:${Math.round(entry.progress * 12)}`)
+    .join(",");
+}
+
+function renderExpeditionWaymarkLayer(floor) {
+  const waymarks = expeditionWaymarksForFloor(floor).slice(0, 3);
+  if (!waymarks.length) return "";
+  return `
+    <div class="expedition-waymark-layer" data-count="${waymarks.length}" aria-hidden="true">
+      ${waymarks
+        .map((entry, index) => {
+          const progress = Math.round(entry.progress * 100);
+          const title = `${entry.resident?.name || entry.expedition.residentName || "斥候"} / ${entry.expedition.title} / ${entry.mark.label} ${progress}%`;
+          return `
+            <span class="expedition-waymark expedition-waymark--${escapeAttr(entry.mark.tone)}" data-stage="${escapeAttr(entry.mark.id)}" style="--expedition-progress:${progress}%; --expedition-lane:${index}" title="${escapeAttr(title)}">
+              <i></i><b></b><em>${escapeHtml(entry.mark.label)}</em>
+            </span>`;
+        })
+        .join("")}
+    </div>`;
+}
+
+function renderExpeditionReportPanel(floor) {
+  if (!floor || floor.type !== "dwelling" || floor.status !== "open") return "";
+  const active = expeditionWaymarksForFloor(floor).slice(0, 3);
+  const reports = (state.expeditionReports || [])
+    .filter((report) => Number(report.originFloorId) === Number(floor.id))
+    .slice(0, 3);
+  if (!active.length && !reports.length) return "";
+  return `
+    <div class="expedition-report-panel">
+      <div class="expedition-report-head">
+        <strong>探险回执</strong>
+        <em>${state.stats.expeditionReportsDone || 0} 份 · 路线档案 +${Math.round(expeditionReportBonus(state) * 100)}%</em>
+      </div>
+      ${active.length ? `<div class="expedition-report-list">${active
+        .map((entry) => {
+          const pct = Math.round(entry.progress * 100);
+          return `
+            <div class="expedition-report-card active" data-tone="${escapeAttr(entry.mark.tone)}">
+              <strong>${escapeHtml(entry.resident?.name || entry.expedition.residentName || "斥候")} · ${escapeHtml(entry.expedition.title)}</strong>
+              <span>${escapeHtml(entry.mark.label)} · ${pct}% · ${escapeHtml(entry.mark.text)}</span>
+              <div class="expedition-report-meter"><i style="width:${clamp(pct, 0, 100)}%"></i></div>
+            </div>`;
+        })
+        .join("")}</div>` : ""}
+      ${reports.length ? `<div class="expedition-report-list">${reports
+        .map((report) => `
+          <div class="expedition-report-card" data-tone="${escapeAttr(report.tone)}">
+            <strong>${escapeHtml(report.personName)} · ${escapeHtml(report.routeLabel)}</strong>
+            <span>${escapeHtml(report.detail)}</span>
+            <small>${report.coins} 金币${report.gems ? ` · ${report.gems} 宝石` : ""}${report.relicFound ? " · 珍藏碎片" : ""}</small>
+          </div>`)
+        .join("")}</div>` : ""}
+    </div>`;
+}
+
 function reconcileExpeditions(game) {
   const residents = allResidents(game);
   residents.forEach((resident) => {
@@ -5105,6 +5358,11 @@ function reconcileExpeditions(game) {
         relicChance: expedition.relicChance ?? def.relicChance,
         comfortPrepBonus: clamp(Number(expedition.comfortPrepBonus) || 0, 0, 0.28),
         comfortPrepLabel: expedition.comfortPrepLabel || "",
+        routeNote: expedition.routeNote || def.text,
+        waymarkIds: Array.isArray(expedition.waymarkIds)
+          ? expedition.waymarkIds.filter((id) => EXPEDITION_WAYMARKS.some((mark) => mark.id === id))
+          : [],
+        reportBonus: clamp(Number(expedition.reportBonus) || 0, 0, 0.24),
       };
     });
   residents.forEach((resident) => {
@@ -5123,6 +5381,7 @@ function updateExpeditions(dt) {
   const completed = [];
   state.expeditions.forEach((expedition) => {
     expedition.remaining -= dt;
+    updateExpeditionWaymarks(expedition, state, true);
     if (expedition.remaining <= 0) completed.push(expedition.id);
   });
   completed.forEach((id) => completeExpedition(state, id, true));
@@ -5134,6 +5393,7 @@ function advanceOfflineExpeditions(game, elapsed) {
   const completed = [];
   game.expeditions.forEach((expedition) => {
     expedition.remaining -= elapsed;
+    updateExpeditionWaymarks(expedition, game, false);
     if (expedition.remaining <= 0) completed.push(expedition.id);
   });
   completed.forEach((id) => completeExpedition(game, id, false));
@@ -5211,11 +5471,12 @@ function startExpedition(type, preferredResident = null, options = {}) {
   const craftBonus = craftToolBonus(state);
   const homeBonus = dwellingJourneyBonus(state);
   const comfortPrep = Math.min(0.24, comfortExpeditionPrepBonus(state) + (resident.comfortMemory?.expeditionBonus || 0) * 0.72);
-  const speedBonus = Math.min(0.58, (power - 3) * 0.025 + state.elevator.upgrades * 0.015 + researchBonus * 0.45 + starBonus * 0.38 + restBonus * 0.18 + homeBonus * 0.24 + foodBonus * 0.22 + craftBonus * 0.24 + clockBonus * 0.28 + routeBonus * 0.32 + buzzBonus * 0.2 + comfortPrep * 0.28);
+  const reportBonus = expeditionReportBonus(state);
+  const speedBonus = Math.min(0.58, (power - 3) * 0.025 + state.elevator.upgrades * 0.015 + researchBonus * 0.45 + starBonus * 0.38 + restBonus * 0.18 + homeBonus * 0.24 + foodBonus * 0.22 + craftBonus * 0.24 + clockBonus * 0.28 + routeBonus * 0.32 + buzzBonus * 0.2 + comfortPrep * 0.28 + reportBonus * 0.18);
   const total = Math.max(14, Math.round(def.duration * (1 - speedBonus)));
-  const rewardCoins = Math.round((randInt(def.coins[0], def.coins[1]) + power * 8) * (1 + starBonus * 0.55 + wonderBonus * 0.32 + routeBonus * 0.42 + buzzBonus * 0.24 + homeBonus * 0.18 + foodBonus * 0.2 + craftBonus * 0.2 + comfortPrep * 0.26));
+  const rewardCoins = Math.round((randInt(def.coins[0], def.coins[1]) + power * 8) * (1 + starBonus * 0.55 + wonderBonus * 0.32 + routeBonus * 0.42 + buzzBonus * 0.24 + homeBonus * 0.18 + foodBonus * 0.2 + craftBonus * 0.2 + comfortPrep * 0.26 + reportBonus * 0.24));
   const rewardGems = Math.random() < def.gemChance + power * 0.01 + starBonus * 0.22 + wonderBonus * 0.12 + routeBonus * 0.18 + buzzBonus * 0.1 + craftBonus * 0.08 + comfortPrep * 0.08 ? 1 : 0;
-  const relicChance = clamp(def.relicChance + power * 0.012 + collectionMapBonus() + researchBonus + starBonus + wonderBonus * 0.4 + routeBonus * 0.22 + buzzBonus * 0.16 + homeBonus * 0.1 + craftBonus * 0.18 + comfortPrep * 0.12 + alchemyPotionBonus(state) * 0.12 + treasureVaultBonus(state) * 0.12, 0, 0.84);
+  const relicChance = clamp(def.relicChance + power * 0.012 + collectionMapBonus() + researchBonus + starBonus + wonderBonus * 0.4 + routeBonus * 0.22 + buzzBonus * 0.16 + homeBonus * 0.1 + craftBonus * 0.18 + comfortPrep * 0.12 + reportBonus * 0.1 + alchemyPotionBonus(state) * 0.12 + treasureVaultBonus(state) * 0.12, 0, 0.84);
   const expedition = {
     id: `exp-${state.nextExpeditionId++}`,
     type: def.id,
@@ -5230,6 +5491,9 @@ function startExpedition(type, preferredResident = null, options = {}) {
     relicChance,
     comfortPrepBonus: comfortPrep,
     comfortPrepLabel: resident.comfortMemory?.label || (comfortPrep > 0 ? "舒缓余韵" : ""),
+    routeNote: def.text,
+    waymarkIds: [],
+    reportBonus,
   };
   resident.expeditionId = expedition.id;
   state.expeditions.push(expedition);
@@ -5266,6 +5530,8 @@ function startDwellingExpedition(floorId) {
 function completeExpedition(game, expeditionId, noisy = game === state) {
   const expedition = game.expeditions.find((entry) => entry.id === expeditionId);
   if (!expedition) return;
+  expedition.remaining = 0;
+  updateExpeditionWaymarks(expedition, game, false);
   const resident = allResidents(game).find((entry) => entry.id === expedition.residentId);
   if (resident) resident.expeditionId = null;
   game.expeditions = game.expeditions.filter((entry) => entry.id !== expeditionId);
@@ -5278,17 +5544,19 @@ function completeExpedition(game, expeditionId, noisy = game === state) {
   game.happiness = clamp(game.happiness + 1 + provisionJoy, 0, 100);
   const relicFound = Math.random() < (expedition.relicChance || 0);
   if (relicFound) awardRelicPiece(game);
+  const report = recordExpeditionReport(game, expedition, resident, { coins, gems, relicFound });
   const gemText = gems ? `、${gems} 宝石` : "";
   const relicText = relicFound ? "，还带回珍藏碎片" : "";
   const provisionText = provisionJoy ? "，暖锅补给让队伍精神更足" : "";
   const toolText = craftToolBonus(game) > 0 ? "，工坊工具包让路线更稳" : "";
   const comfortText = expedition.comfortPrepBonus > 0 ? `，${expedition.comfortPrepLabel || "舒缓余韵"}让路线更安稳` : "";
+  const reportText = report ? "，留下回城报告" : "";
   const homeFloor = game.floors.find((floor) => floor.id === expedition.originFloorId && floor.type === "dwelling");
   if (homeFloor) {
     const homeShare = Math.round(coins * (0.08 + dwellingJourneyBonus(game) * 0.24));
     homeFloor.rentReady = Math.min(420, (homeFloor.rentReady || 0) + homeShare);
   }
-  addLogToGame(game, `${expedition.residentName || resident?.name || "斥候"} 完成「${expedition.title}」，带回 ${coins} 金币${gemText}${relicText}${provisionText}${toolText}${comfortText}。`);
+  addLogToGame(game, `${expedition.residentName || resident?.name || "斥候"} 完成「${expedition.title}」，带回 ${coins} 金币${gemText}${relicText}${provisionText}${toolText}${comfortText}${reportText}。`);
   if (noisy) {
     showFloat(`探险 +${coins}`);
     if (gems || relicFound) showToast(relicFound ? "探险发现珍藏碎片" : `探险带回 ${gems} 宝石`);
@@ -5924,7 +6192,7 @@ function getKingdomRenderKey() {
         return `${floor.id}:${floor.type}:build:${Math.ceil(floor.buildRemaining)}:${state.selectedFloorId}`;
       }
       if (floor.type === "dwelling") {
-        return `${floor.id}:dw:${floor.level}:${floor.residents.length}:${floor.capacity}:${floor.rentReady}:${floor.residents.map((resident) => resident.expeditionId || 0).join("-")}:${lifeTrailMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
+        return `${floor.id}:dw:${floor.level}:${floor.residents.length}:${floor.capacity}:${floor.rentReady}:${floor.residents.map((resident) => resident.expeditionId || 0).join("-")}:${lifeTrailMapKey(floor)}:${expeditionWaymarkMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
       }
       if (floor.type === "lobby") {
         return `${floor.id}:lobby:${state.queue.map((visitor) => `${visitor.id}:${visitor.need || ""}:${visitor.activity || ""}`).join("-")}:${state.selectedFloorId}`;
@@ -5970,6 +6238,11 @@ function renderFloor(floor) {
   const lifeTrailAttrs = lifeTrailItems.length
     ? ` data-life-trail-count="${lifeTrailItems.length}" data-life-trail-need="${escapeAttr(lifeTrailItems[0].need)}"`
     : "";
+  const expeditionWaymarkItems = expeditionWaymarksForFloor(floor);
+  const expeditionWaymarkClass = expeditionWaymarkItems.length ? "expedition-waymark-active" : "";
+  const expeditionWaymarkAttrs = expeditionWaymarkItems.length
+    ? ` data-expedition-waymarks="${expeditionWaymarkItems.length}" data-expedition-stage="${escapeAttr(expeditionWaymarkItems[0].mark.id)}"`
+    : "";
   const foodRushClass = isActiveFoodRush(floor) ? "food-rush-active" : "";
   const foodRushAttrs = isActiveFoodRush(floor)
     ? ` data-food-rush-pace="${escapeAttr(currentFoodRushPace(floor).id)}" data-food-rush-heat="${escapeAttr(foodRushHeatTone(floor))}"`
@@ -5997,7 +6270,7 @@ function renderFloor(floor) {
     : "";
   const zone = getFloorZone(floor);
   return `
-    <article class="floor ${selected} ${constructing} ${routeClass} ${lifeTrailClass} ${foodRushClass} ${marketParcelClass} ${royalMandateClass} ${royalCourierClass} ${comfortClass} ${comfortEchoClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${lifeTrailAttrs}${foodRushAttrs}${marketParcelAttrs}${royalMandateAttrs}${royalCourierAttrs}${comfortEchoAttrs}${showtimeAttrs}>
+    <article class="floor ${selected} ${constructing} ${routeClass} ${lifeTrailClass} ${expeditionWaymarkClass} ${foodRushClass} ${marketParcelClass} ${royalMandateClass} ${royalCourierClass} ${comfortClass} ${comfortEchoClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${lifeTrailAttrs}${expeditionWaymarkAttrs}${foodRushAttrs}${marketParcelAttrs}${royalMandateAttrs}${royalCourierAttrs}${comfortEchoAttrs}${showtimeAttrs}>
       ${renderFloorIndex(floor)}
       <div class="room" data-action="select-floor" data-floor-id="${floor.id}" title="${escapeAttr(floorMapLabel(floor))}" aria-label="${escapeAttr(floorMapLabel(floor))}">
         ${floor.status === "construction" ? renderConstruction(floor) : renderOpenFloor(floor)}
@@ -6055,6 +6328,7 @@ function renderOpenFloor(floor) {
       <div class="room-scene">
         ${renderRoomStateTag(floor)}
         ${renderLifeTrailLayer(floor)}
+        ${renderExpeditionWaymarkLayer(floor)}
         ${renderComfortAfterglowLayer(floor)}
         ${renderRoyalCourierLayer(floor)}
         ${renderFloorArrivals(floor)}
@@ -6273,6 +6547,11 @@ function renderRoomStateTag(floor) {
     return state.queue.length ? "" : `<span class="room-state-tag calm icon-only" data-state="idle" title="自然待客" aria-label="自然待客"></span>`;
   }
   if (floor.type === "dwelling") {
+    const waymarks = expeditionWaymarksForFloor(floor);
+    if (waymarks.length) {
+      const mark = waymarks[0].mark;
+      return `<span class="room-state-tag good icon-only" data-state="expedition-report" title="${escapeAttr(`探险${mark.label}`)}" aria-label="${escapeAttr(`探险${mark.label}`)}"></span>`;
+    }
     const vacancy = getVacancy(floor);
     return vacancy
       ? `<span class="room-state-tag calm icon-only" data-state="vacancy" title="余 ${vacancy} 间" aria-label="余 ${vacancy} 间"></span>`
@@ -6311,7 +6590,7 @@ function renderFloorStatusGlyph(floor) {
   const status = renderFloorStatus(floor);
   let stateName = "open";
   if (floor.type === "lobby") stateName = state.queue.length ? "queue" : "idle";
-  else if (floor.type === "dwelling") stateName = floor.rentReady ? "rent" : "home";
+  else if (floor.type === "dwelling") stateName = expeditionWaymarksForFloor(floor).length ? "expedition-report" : floor.rentReady ? "rent" : "home";
   else if (isActiveComfortSession(floor)) stateName = "comfort";
   else if (isActiveComfortAfterglow(floor)) stateName = "comfort-echo";
   else if (isActiveFoodRush(floor)) stateName = "meal-rush";
@@ -6448,6 +6727,11 @@ function spriteArtForPerson(person) {
 function personLifeSummary(person, floorType = "default") {
   if (!person || typeof person !== "object") return "";
   ensurePersonLife(person);
+  const expedition = activeExpeditionForPerson(person);
+  if (expedition) {
+    const mark = expeditionCurrentWaymark(expedition);
+    return `探险中 · ${expedition.title} · ${mark.label} ${Math.round(expeditionProgress(expedition) * 100)}% · 剩余 ${Math.ceil(expedition.remaining)}s`;
+  }
   if (isActiveLifeVisit(person)) {
     const visit = person.lifeVisit;
     const liveLabel = PERSON_NEED_LABELS[visit.need] || "生活";
@@ -6531,7 +6815,11 @@ function renderFloorMeter(floor) {
 
 function renderFloorStatus(floor) {
   if (floor.type === "lobby") return state.queue.length ? "待接待" : "自然待客";
-  if (floor.type === "dwelling") return floor.rentReady ? `租金 ${floor.rentReady}` : "居住";
+  if (floor.type === "dwelling") {
+    const waymarks = expeditionWaymarksForFloor(floor);
+    if (waymarks.length) return `探险${waymarks[0].mark.label} ${Math.round(waymarks[0].progress * 100)}%`;
+    return floor.rentReady ? `租金 ${floor.rentReady}` : "居住";
+  }
   if (isActiveComfortSession(floor)) return `${COMFORT_SESSION_LABELS[floor.type] || "休整"} ${Math.ceil(floor.comfortSession.remaining)}s`;
   if (isActiveComfortAfterglow(floor)) return `${floor.comfortAfterglow.label || "余韵"} ${Math.ceil(floor.comfortAfterglow.remaining)}s`;
   if (isActiveRoyalMandate(floor)) return `${currentRoyalMandatePhase(floor).label}王令 · ${currentRoyalCourierPhase(floor).label} ${Math.ceil(floor.royalMandate.remaining)}s`;
@@ -6557,7 +6845,11 @@ function renderFloorStatus(floor) {
 
 function renderFloorStatus(floor) {
   if (floor.type === "lobby") return state.queue.length ? "等候接待" : "自然待客";
-  if (floor.type === "dwelling") return floor.rentReady ? `租金 ${floor.rentReady}` : "居住";
+  if (floor.type === "dwelling") {
+    const waymarks = expeditionWaymarksForFloor(floor);
+    if (waymarks.length) return `探险${waymarks[0].mark.label} ${Math.round(waymarks[0].progress * 100)}%`;
+    return floor.rentReady ? `租金 ${floor.rentReady}` : "居住";
+  }
   if (isActiveComfortSession(floor)) return `${COMFORT_SESSION_LABELS[floor.type] || "休整"} ${Math.ceil(floor.comfortSession.remaining)}s`;
   if (isActiveComfortAfterglow(floor)) return `${floor.comfortAfterglow.label || "余韵"} ${Math.ceil(floor.comfortAfterglow.remaining)}s`;
   if (isActiveFoodRush(floor)) return `${currentFoodRushPace(floor).label}${FOOD_RUSH_LABELS[floor.type] || "餐桌高峰"} · 上菜 ${floor.foodRush.served || 0}/${floor.foodRush.targetServings || 0}`;
@@ -6725,6 +7017,7 @@ function renderFloorDetail() {
       </div>
       ${renderFloorPerks(floor)}
       ${renderLifeStoryPanel(floor)}
+      ${renderExpeditionReportPanel(floor)}
       ${renderResidentList(floor.residents)}
       <div class="detail-actions">
         <button class="detail-btn primary" data-action="collect-rent" data-floor-id="${floor.id}">收租</button>
@@ -6789,6 +7082,7 @@ function renderFloorDetail() {
     </div>
     ${renderFloorPerks(floor)}
     ${renderLifeStoryPanel(floor)}
+    ${renderExpeditionReportPanel(floor)}
     ${renderMarketParcelPanel(floor)}
     ${renderComfortSessionPanel(floor)}
     ${renderShowtimePanel(floor)}
@@ -6814,6 +7108,8 @@ function renderFloorPerks(floor) {
   } else if (floor.type === "dwelling") {
     perks.push(`远行整备 +${Math.round(dwellingJourneyBonus(state) * 100)}%`);
     perks.push(`租金回响 +${Math.round(dwellingJourneyBonus(state) * 30)}%`);
+    perks.push(`探险回执 ${state.stats.expeditionReportsDone || 0}`);
+    perks.push(`路线档案 +${Math.round(expeditionReportBonus(state) * 100)}%`);
   } else if (!isBusiness(floor)) {
     return "";
   } else if (floor.type === "food") {
@@ -6949,6 +7245,7 @@ function renderFloorDetail() {
       </div>
       ${renderFloorPerks(floor)}
       ${renderLifeStoryPanel(floor)}
+      ${renderExpeditionReportPanel(floor)}
       ${renderResidentList(floor.residents)}
       <div class="detail-actions">
         <button class="detail-btn primary" data-action="collect-rent" data-floor-id="${floor.id}">收租</button>
@@ -7025,6 +7322,7 @@ function renderFloorDetail() {
     </div>
     ${renderFloorPerks(floor)}
     ${renderLifeStoryPanel(floor)}
+    ${renderExpeditionReportPanel(floor)}
     ${renderMarketParcelPanel(floor)}
     ${renderRoyalMandatePanel(floor)}
     ${renderFoodRushPanel(floor)}
@@ -7054,6 +7352,8 @@ function renderFloorPerks(floor) {
   } else if (floor.type === "dwelling") {
     perks.push(`远行整备 +${Math.round(dwellingJourneyBonus(state) * 100)}%`);
     perks.push(`租金回响 +${Math.round(dwellingJourneyBonus(state) * 30)}%`);
+    perks.push(`探险回执 ${state.stats.expeditionReportsDone || 0}`);
+    perks.push(`路线档案 +${Math.round(expeditionReportBonus(state) * 100)}%`);
   } else if (!isBusiness(floor)) {
     return "";
   } else if (floor.type === "food") {
@@ -7152,12 +7452,14 @@ function renderResidentList(residents, skillType = null) {
           const job = residentJobLabel(resident);
           const life = renderMotiveStrip(resident, skillType || "dwelling");
           const trail = renderLifeTrailBadge(resident);
+          const expedition = renderExpeditionBadge(resident);
           const comfort = renderComfortMemoryBadge(resident);
           const comfortClass = resident.comfortMemory ? "comfort-memory-active" : "";
+          const expeditionClass = resident.expeditionId || latestExpeditionReportForPerson(resident) ? "expedition-report-active" : "";
           return `
-            <div class="resident-card ${dreamFit} ${isActiveLifeVisit(resident) ? "life-story-active" : ""} ${comfortClass}">
+            <div class="resident-card ${dreamFit} ${isActiveLifeVisit(resident) ? "life-story-active" : ""} ${comfortClass} ${expeditionClass}">
               <span class="mini-person person-sprite person-sprite--${spriteVariantForPerson(resident)}" style="--person-art:url('${spriteArtForPerson(resident)}')"></span>
-              <span><strong>${escapeHtml(resident.name)}</strong><small>理想 ${dream} · ${job}</small>${life}${trail}${comfort}</span>
+              <span><strong>${escapeHtml(resident.name)}</strong><small>理想 ${dream} · ${job}</small>${life}${trail}${expedition}${comfort}</span>
               ${skill}
             </div>`;
         })
@@ -7198,10 +7500,12 @@ function renderResidentRoster() {
       const lifeFloor = resident.workFloorId ? findFloor(resident.workFloorId)?.type || "dwelling" : "dwelling";
       const life = renderMotiveStrip(resident, lifeFloor);
       const trail = renderLifeTrailBadge(resident);
+      const expedition = renderExpeditionBadge(resident);
       const comfort = renderComfortMemoryBadge(resident);
       const comfortClass = resident.comfortMemory ? "comfort-memory-active" : "";
+      const expeditionClass = resident.expeditionId || latestExpeditionReportForPerson(resident) ? "expedition-report-active" : "";
       return `
-        <article class="roster-card ${isActiveLifeVisit(resident) ? "life-story-active" : ""} ${comfortClass}" data-dream="${resident.dreamType}" data-mood="${mood}">
+        <article class="roster-card ${isActiveLifeVisit(resident) ? "life-story-active" : ""} ${comfortClass} ${expeditionClass}" data-dream="${resident.dreamType}" data-mood="${mood}">
           <span class="roster-portrait">
             <span class="mini-person person-sprite person-sprite--${spriteVariantForPerson(resident)}" style="--person-art:url('${spriteArtForPerson(resident)}')"></span>
             <i class="mood-mark" aria-hidden="true"></i>
@@ -7212,6 +7516,7 @@ function renderResidentRoster() {
             ${renderSkillStrip(resident)}
             ${life}
             ${trail}
+            ${expedition}
             ${comfort}
           </span>
         </article>`;
@@ -7379,17 +7684,25 @@ function renderCollection() {
 function renderExpeditions() {
   const capacity = expeditionCapacity(state);
   const explorers = availableExplorers(state);
+  const reportBonus = expeditionReportBonus(state);
   els.expeditionCount.textContent = `${state.expeditions.length}/${capacity}`;
   const active = state.expeditions
     .map((expedition) => {
-      const pct = Math.round((1 - expedition.remaining / expedition.total) * 100);
+      const pct = Math.round(expeditionProgress(expedition) * 100);
       const resident = getResident(expedition.residentId);
+      const mark = expeditionCurrentWaymark(expedition);
+      const next = expeditionNextWaymark(expedition);
       const comfortPrep = expedition.comfortPrepBonus > 0 ? ` · ${expedition.comfortPrepLabel || "舒缓余韵"} +${Math.round(expedition.comfortPrepBonus * 100)}%` : "";
+      const routeArchive = expedition.reportBonus > 0 ? ` · 路线档案 +${Math.round(expedition.reportBonus * 100)}%` : "";
       return `
-        <div class="expedition-card active">
+        <div class="expedition-card active expedition-report-active" data-stage="${escapeAttr(mark.id)}">
           <div class="expedition-head">
-            <span><strong>${escapeHtml(expedition.title)}</strong><small>${escapeHtml(expedition.residentName || resident?.name || "斥候")} · 剩余 ${Math.ceil(expedition.remaining)}s${escapeHtml(comfortPrep)}</small></span>
-            <span class="expedition-tag">进行中</span>
+            <span><strong>${escapeHtml(expedition.title)}</strong><small>${escapeHtml(expedition.residentName || resident?.name || "斥候")} · ${escapeHtml(mark.label)} · 剩余 ${Math.ceil(expedition.remaining)}s${escapeHtml(comfortPrep)}${escapeHtml(routeArchive)}</small></span>
+            <span class="expedition-tag">${escapeHtml(mark.label)}</span>
+          </div>
+          <div class="expedition-waymark-readout">
+            <span>${escapeHtml(mark.text)}</span>
+            <small>${next ? `下一路标：${next.label}` : "准备回城报告"}</small>
           </div>
           <div class="meter"><span style="width:${clamp(pct, 0, 100)}%"></span></div>
         </div>`;
@@ -7403,7 +7716,7 @@ function renderExpeditions() {
     const best = explorers[0];
     const prep = best ? Math.min(0.24, comfortExpeditionPrepBonus(state) + (best.comfortMemory?.expeditionBonus || 0) * 0.72) : comfortExpeditionPrepBonus(state);
     const estimate = best ? `${def.coins[0] + Math.round(explorerPower(best) * 8)}-${def.coins[1] + Math.round(explorerPower(best) * 8)}` : `${def.coins[0]}-${def.coins[1]}`;
-    const note = lock || (full ? "探险队已满" : explorers.length ? `${explorers.length} 位空闲居民${prep > 0 ? ` · 舒缓准备 +${Math.round(prep * 100)}%` : ""}` : "需要空闲居民");
+    const note = lock || (full ? "探险队已满" : explorers.length ? `${explorers.length} 位空闲居民${prep > 0 ? ` · 舒缓准备 +${Math.round(prep * 100)}%` : ""}${reportBonus > 0 ? ` · 路线档案 +${Math.round(reportBonus * 100)}%` : ""}` : "需要空闲居民");
     return `
       <button class="expedition-card option" data-action="start-expedition" data-expedition-id="${def.id}" ${disabled ? "disabled" : ""}>
         <div class="expedition-head">
@@ -7415,6 +7728,7 @@ function renderExpeditions() {
           <span>${estimate} 金币</span>
           <span>${Math.round(def.relicChance * 100)}% 碎片</span>
           ${prep > 0 ? `<span class="comfort-prep-tag">舒缓 +${Math.round(prep * 100)}%</span>` : ""}
+          ${reportBonus > 0 ? `<span class="expedition-report-tag">档案 +${Math.round(reportBonus * 100)}%</span>` : ""}
         </div>
         <small>${note}</small>
       </button>`;
