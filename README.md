@@ -4,10 +4,10 @@
 
 ## 本地运行
 
-直接打开 `index.html` 可以游玩；最近一次 v69 本地验证使用：
+直接打开 `index.html` 可以游玩；最近一次 v70 本地验证使用：
 
 ```text
-http://127.0.0.1:8819
+http://127.0.0.1:8820
 ```
 
 ## 玩法切片
@@ -52,6 +52,13 @@ http://127.0.0.1:8819
 - 键盘支持 `W / ↑`、`S / ↓` 移动升降梯，`Space / Enter` 下客，`B` 打开建设。
 - v54 进行了轻量化清理：发布包移除了已被新版替代的旧房间图和旧表演者 PNG，表演者素材改为无损 WebP；发布运行目录只保留当前必要资产，本地旧浏览器配置、旧截图、图像中间产物和过期生成记录已清理。
 - v55 深化了旧演艺玩法：新增小剧任务、演出冷却、观众需求撮合、掌声金币奖励和娱乐/社交恢复，并保留 `docs/v55-entertainment-showtime-image-prompt.txt` 供后续图像网关恢复后刷新演艺房间背景。
+
+## v70 Update
+
+- v70 raises the mobile interaction toast above the bottom function dock so short action messages are no longer covered by the mobile controls.
+- The mobile toast now uses a larger safe-area-aware bottom offset, a wider small-screen max width, and a higher layer than the dock.
+- Local verification used `http://127.0.0.1:8820/` with `tmp/verify-v70-mobile-toast-offset.mjs`; the measured mobile toast/dock clearance was `28px`.
+- Cloudflare production and preview both load v70. Preview for this pass: `https://06de3a5a.little-depths.pages.dev/`.
 
 ## v69 Update
 

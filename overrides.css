@@ -3524,6 +3524,12 @@ body.fullscreen-active .build-grid {
     display: none;
   }
 
+  body.mobile-panel-layout .toast {
+    bottom: calc(92px + env(safe-area-inset-bottom));
+    z-index: 42;
+    max-width: min(520px, calc(100vw - 24px));
+  }
+
   .mobile-panel-tab {
     flex: 0 0 42px;
     width: 42px;
@@ -3647,6 +3653,10 @@ body.fullscreen-active .build-grid {
   body.mobile-panel-layout .mobile-panel-dock {
     min-height: 52px;
     padding: 5px;
+  }
+
+  body.mobile-panel-layout .toast {
+    bottom: calc(88px + env(safe-area-inset-bottom));
   }
 
   .mobile-panel-tab {

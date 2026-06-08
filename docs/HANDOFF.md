@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v69`
-- Latest preview deployment: `https://6dd9355b.little-depths.pages.dev/`
-- Local server used for v69 verification: `http://127.0.0.1:8819/`
+- Latest deployed version: `v70`
+- Latest preview deployment: `https://06de3a5a.little-depths.pages.dev/`
+- Local server used for v70 verification: `http://127.0.0.1:8820/`
 
 ## Current State
 
@@ -22,11 +22,17 @@ wrangler pages deploy dist --project-name little-depths
 ```
 
 - GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`, but current release practice is to deploy Cloudflare with local Wrangler OAuth from `dist`, then sync GitHub separately. Use `[skip ci]` when pushing documentation/code sync commits that should not ask GitHub Actions to deploy Cloudflare.
-- Current caveat: v69 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
+- Current caveat: v70 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v70 Mobile Interaction Toast Offset
+
+- Raised `.toast` in mobile panel layout so short interaction/action messages sit above the bottom `mobile-panel-dock` instead of being covered by it.
+- Added safe-area-aware mobile offsets in `overrides.css`: `92px` for tablet/mobile layout and `88px` for narrow phones, with `z-index: 42` so the toast sits above the dock layer.
+- Bumped `index.html` / `sw.js` to v70, synced `dist`, rebuilt `cloudflare-pages-upload.zip`, and deployed v70 to Cloudflare Pages with local Wrangler direct upload. Production: `https://little-depths.pages.dev/`; preview: `https://06de3a5a.little-depths.pages.dev/`.
 
 ### v69 Observatory Star Chart Refresh / Old Map Polish
 
@@ -317,6 +323,21 @@ wrangler pages deploy dist --project-name little-depths
 
 ## Verification Already Done
 
+- v70 mobile interaction toast verification:
+  - `node --check app.js`
+  - `node --check sw.js`
+  - `node --check dist/sw.js`
+  - `node --check tmp/verify-v70-mobile-toast-offset.mjs`
+  - `node tmp/verify-v70-mobile-toast-offset.mjs`
+  - Local preview URL: `http://127.0.0.1:8820/?v70-mobile-toast-offset=1`
+  - Mobile screenshot: `verification-v70-mobile-toast-offset-local.png`
+  - Assertions confirmed `index.html`, `sw.js`, and `overrides.css` load v70; mobile layout and dock are active; the toast is visible, has `z-index: 42` over the dock's `z-index: 38`, and its bottom edge sits `28px` above the dock top with no horizontal overflow or runtime errors.
+- Cloudflare v70 checks:
+  - The first local Wrangler attempt failed with a transient `fetch failed`; the second direct upload from `dist` succeeded and produced `https://06de3a5a.little-depths.pages.dev/`.
+  - Production `https://little-depths.pages.dev/` and preview `https://06de3a5a.little-depths.pages.dev/` both load `app.js?v=70`, `overrides.css?v=70`, and `styles.css?v=70`.
+  - Both `sw.js` files use `little-depths-v70`.
+  - Both `overrides.css?v=70` files contain `body.mobile-panel-layout .toast`, `calc(92px + env(safe-area-inset-bottom))`, and `z-index: 42`.
+  - `cloudflare-pages-upload.zip` was rebuilt from `dist`.
 - v69 local observatory star-chart refresh verification:
   - `node --check app.js`
   - `node tmp/verify-v69-observatory-star-chart.mjs`
