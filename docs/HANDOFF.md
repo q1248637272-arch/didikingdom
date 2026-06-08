@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v65`
-- Latest preview deployment: `https://b69b37e1.little-depths.pages.dev/`
-- Local server used for v65 verification: `http://127.0.0.1:8815/`
+- Latest deployed version: `v66`
+- Latest preview deployment: `https://444eb98e.little-depths.pages.dev/`
+- Local server used for v66 verification: `http://127.0.0.1:8816/`
 
 ## Current State
 
@@ -22,11 +22,21 @@ wrangler pages deploy dist --project-name little-depths
 ```
 
 - GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`, but current release practice is to deploy Cloudflare with local Wrangler OAuth from `dist`, then sync GitHub separately. Use `[skip ci]` when pushing documentation/code sync commits that should not ask GitHub Actions to deploy Cloudflare.
-- Current caveat: v65 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
+- Current caveat: v66 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v66 Lobby Routing Refresh / Old Map Polish
+
+- Refreshed the old lobby/elevator loop instead of adding a new floor. Queued visitors now carry `lobbyWait`, and `updateVisitors()` advances lobby waiting pressure while keeping visitor spawning behavior intact.
+- Added `lobbyPressureInfo()`, `lobbyWaitTier()`, `lobbyRankedVisitors()`, and priority dispatch scoring so recommendations now blend VIP value, available stock/rooms, and long-waiting visitors.
+- Added `lobbyPriorityDispatchesDone` plus the new `lobby_order` / `候车秩序` quest. Successful busy/urgent/VIP route dispatches increment the metric and improve dispatch rewards without auto-claiming quest rewards.
+- Improved old lobby UI: the map now renders `.lobby-route-layer`, `.lobby-pressure-gate`, and up to three `.lobby-route-signal` markers; the route board now renders `.lobby-route-summary`, priority-sorted `.route-ticket` cards, waiting/urgent tags, and mobile-safe ticket layouts.
+- Updated the elevator idle panel and lobby detail stats to show pressure state, recommended target, and priority dispatch progress instead of only generic route/streak information.
+- Used `gpt-image-2` through the configured gateway to generate the refreshed no-text lobby background `assets/art/room-lobby-v3.webp` at 1280x720; the user-facing PNG was saved to the current thread `outputs/v66-lobby-route-hall.png`, and the reusable prompt is tracked at `docs/v66-lobby-route-hall-image-prompt.txt`.
+- Added `tmp/verify-v66-lobby-refresh.mjs`, bumped `index.html` / `sw.js` to v66, bumped `styles.css` and `overrides.css` query strings to v66, synced `dist`, and verified local desktop/mobile with Edge CDP.
 
 ### v65 Manual Quest Rewards / Asset Backpack
 
@@ -273,6 +283,25 @@ wrangler pages deploy dist --project-name little-depths
 - Elevator passenger delivery now includes real waiting/door time before the visitor exits from the destination side.
 
 ## Verification Already Done
+
+- v66 local lobby-refresh verification:
+  - `node --check app.js`
+  - `node --check dist/app.js`
+  - `node --check sw.js`
+  - `node --check dist/sw.js`
+  - `node --check tmp/verify-v66-lobby-refresh.mjs`
+  - `node tmp/verify-v66-lobby-refresh.mjs`
+  - Local preview URL: `http://127.0.0.1:8816/?v66-lobby-refresh=1`
+  - Desktop screenshot: `verification-v66-lobby-refresh-local.png`
+  - Mobile screenshot: `verification-v66-lobby-refresh-mobile-local.png`
+  - Assertions confirmed save version `21`, lobby waits advance, lobby pressure reaches busy/urgent, route tickets are priority sorted, `.lobby-route-layer` and three `.lobby-route-signal` markers render, route-ticket clicks count as route dispatches, successful priority dispatches increment `lobbyPriorityDispatchesDone`, the new `lobby_order` quest becomes ready with manual claim button, `room-lobby-v3.webp` is served and referenced by CSS, mobile route tickets fit, and no runtime errors were reported.
+- Cloudflare v66 checks:
+  - Local Wrangler OAuth deploy from `dist` succeeded and produced `https://444eb98e.little-depths.pages.dev/`.
+  - Production `https://little-depths.pages.dev/` and preview `https://444eb98e.little-depths.pages.dev/` both load `app.js?v=66`, `overrides.css?v=66`, and `styles.css?v=66`.
+  - Both `sw.js` files use `little-depths-v66`, `app.js?v=66`, `overrides.css?v=66`, `styles.css?v=66`, and `room-lobby-v3.webp`.
+  - Both `app.js?v=66` files contain `lobbyPriorityDispatchesDone`, `renderLobbyRouteLayer`, `lobbyPressureInfo`, and `lobby_order`; both `overrides.css?v=66` files contain `.lobby-route-layer`, `.lobby-route-summary`, and `room-lobby-v3.webp`.
+  - `assets/art/room-lobby-v3.webp` loads from production and preview; size was `83010` bytes.
+  - `cloudflare-pages-upload.zip` was rebuilt from `dist`; size was `8187736` bytes.
 
 - v65 local manual-quest/inventory verification:
   - `node --check app.js`

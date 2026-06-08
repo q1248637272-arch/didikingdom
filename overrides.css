@@ -4259,3 +4259,282 @@ body.fullscreen-active .build-grid {
     display: none;
   }
 }
+
+/* v66 lobby routing readability and refreshed entrance art. */
+.floor[data-type="lobby"] .room {
+  --room-art: url("assets/art/room-lobby-v3.webp");
+  --room-bg:
+    radial-gradient(ellipse at 50% 105%, rgba(245, 197, 87, 0.34), transparent 34%),
+    radial-gradient(circle at 72% 28%, rgba(100, 196, 176, 0.17), transparent 22%),
+    linear-gradient(160deg, #7d6a4b, #394948 56%, #1e2424);
+}
+
+.floor[data-type="lobby"] .room-scene {
+  min-height: 92px;
+}
+
+.floor[data-type="lobby"] .lobby-queue {
+  position: relative;
+  z-index: 4;
+  padding-left: 8px;
+}
+
+.lobby-route-layer {
+  position: absolute;
+  inset: 0 0 -2px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.lobby-pressure-gate {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  bottom: 2px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 232, 154, 0.16);
+  background: rgba(13, 18, 22, 0.54);
+  box-shadow: 0 0 16px rgba(0, 0, 0, 0.25);
+}
+
+.lobby-pressure-gate i {
+  display: block;
+  width: var(--pressure, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #64c4b0, #f2b84b);
+}
+
+.lobby-route-layer[data-pressure="urgent"] .lobby-pressure-gate i {
+  background: linear-gradient(90deg, #f2b84b, #ec6f5d);
+}
+
+.lobby-route-signal {
+  position: absolute;
+  left: calc(28% + var(--route-lane, 0) * 18%);
+  bottom: calc(24px + var(--route-lane, 0) * 12px);
+  min-width: 34px;
+  min-height: 24px;
+  display: inline-grid;
+  place-items: center;
+  color: #132226;
+  font-size: 11px;
+  font-weight: 950;
+  border-radius: 8px;
+  border: 1px solid rgba(216, 255, 247, 0.62);
+  background: linear-gradient(180deg, #d9fff6, #64c4b0);
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.26),
+    0 0 18px rgba(100, 196, 176, 0.25);
+}
+
+.lobby-route-signal::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -22px;
+  width: 2px;
+  height: 22px;
+  translate: -50% 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(216, 255, 247, 0.72), rgba(216, 255, 247, 0));
+}
+
+.lobby-route-signal i {
+  position: absolute;
+  inset: -5px;
+  border-radius: 10px;
+  border: 1px solid rgba(216, 255, 247, 0.25);
+}
+
+.lobby-route-signal.route-warn,
+.lobby-route-signal.route-urgent {
+  border-color: rgba(255, 232, 154, 0.68);
+  background: linear-gradient(180deg, #ffe48a, #f2b84b);
+}
+
+.lobby-route-signal.route-vip {
+  border-color: rgba(255, 244, 205, 0.86);
+  background: linear-gradient(180deg, #fff4cd, #f2b84b);
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.26),
+    0 0 20px rgba(242, 184, 75, 0.34);
+}
+
+.lobby-route-signal.wait-urgent {
+  animation: lobby-signal-pulse 1.2s ease-in-out infinite;
+}
+
+.visitor.wait-waiting .wish,
+.visitor.wait-urgent .wish {
+  border-color: rgba(242, 184, 75, 0.66);
+}
+
+.visitor.wait-urgent .wish {
+  box-shadow:
+    0 0 0 2px rgba(236, 111, 93, 0.38),
+    0 8px 18px rgba(0, 0, 0, 0.24);
+}
+
+.visitor.route-urgent .route-dot {
+  background: #ec6f5d;
+  box-shadow: 0 0 12px rgba(236, 111, 93, 0.76);
+}
+
+.lobby-route-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(100, 196, 176, 0.24);
+  background:
+    linear-gradient(180deg, rgba(100, 196, 176, 0.1), rgba(255, 255, 255, 0.035)),
+    rgba(255, 255, 255, 0.035);
+}
+
+.lobby-route-summary[data-pressure="busy"],
+.lobby-route-summary[data-pressure="urgent"] {
+  border-color: rgba(242, 184, 75, 0.38);
+  background:
+    linear-gradient(180deg, rgba(242, 184, 75, 0.12), rgba(255, 255, 255, 0.035)),
+    rgba(255, 255, 255, 0.035);
+}
+
+.lobby-route-summary strong {
+  color: #ffe48a;
+  font-size: 13px;
+}
+
+.lobby-route-summary span {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lobby-route-summary > i {
+  grid-column: 1 / -1;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.lobby-route-summary > i::before {
+  content: "";
+  display: block;
+  width: var(--pressure, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #64c4b0, #f2b84b);
+}
+
+.route-ticket {
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "floor title state"
+    "floor tags badge";
+  align-items: center;
+}
+
+.route-ticket b {
+  grid-area: floor;
+}
+
+.route-ticket span {
+  grid-area: title;
+}
+
+.route-ticket small {
+  grid-area: state;
+}
+
+.route-ticket em {
+  grid-area: tags;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  font-style: normal;
+}
+
+.route-ticket em i {
+  padding: 1px 5px 2px;
+  border-radius: 999px;
+  color: #dff8ff;
+  background: rgba(100, 196, 176, 0.12);
+  border: 1px solid rgba(100, 196, 176, 0.18);
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.route-ticket.route-urgent,
+.route-ticket.wait-urgent {
+  border-color: rgba(236, 111, 93, 0.46);
+  background: linear-gradient(90deg, rgba(236, 111, 93, 0.13), rgba(242, 184, 75, 0.08));
+}
+
+.route-ticket.route-urgent em i,
+.route-ticket.wait-urgent em i {
+  color: #fff0da;
+  border-color: rgba(236, 111, 93, 0.28);
+  background: rgba(236, 111, 93, 0.14);
+}
+
+.route-ticket .need-badge {
+  grid-area: badge;
+}
+
+.lobby-pressure-meter[data-pressure="busy"] i,
+.lobby-pressure-meter[data-pressure="urgent"] i {
+  background: linear-gradient(90deg, #f2b84b, #ec6f5d);
+}
+
+@keyframes lobby-signal-pulse {
+  0%,
+  100% {
+    transform: translateY(0);
+    filter: brightness(1);
+  }
+  50% {
+    transform: translateY(-2px);
+    filter: brightness(1.12);
+  }
+}
+
+@media (max-width: 620px) {
+  .lobby-route-signal {
+    min-width: 30px;
+    min-height: 21px;
+    font-size: 10px;
+  }
+
+  .lobby-route-summary {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .route-ticket {
+    grid-template-columns: 34px minmax(0, 1fr);
+    grid-template-areas:
+      "floor title"
+      "floor state"
+      "tags tags";
+  }
+
+  .route-ticket .need-badge {
+    display: none;
+  }
+
+  .route-ticket small {
+    justify-self: start;
+    white-space: normal;
+  }
+}

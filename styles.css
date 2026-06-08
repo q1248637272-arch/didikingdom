@@ -1707,7 +1707,7 @@ body.fullscreen-active .layout {
 }
 
 .floor[data-type="lobby"] .room {
-  --room-art: url("assets/art/room-lobby-v2.webp");
+  --room-art: url("assets/art/room-lobby-v3.webp");
   --room-bg:
     radial-gradient(ellipse at 50% 105%, rgba(245, 197, 87, 0.42), transparent 34%),
     radial-gradient(circle at 78% 22%, rgba(255, 238, 164, 0.18), transparent 20%),

@@ -672,6 +672,14 @@ const QUEST_DEFS = [
     text: "用大厅推荐接待 5 位访客",
   },
   {
+    id: "lobby_order",
+    title: "候车秩序",
+    goal: 6,
+    metric: "lobbyPriorityDispatchesDone",
+    reward: { coins: 260, gems: 2 },
+    text: "在繁忙或久候时完成 6 次优先派号",
+  },
+  {
     id: "craft_tools",
     title: "手作工具箱",
     goal: 1,
@@ -999,7 +1007,7 @@ let guideReady = false;
 
 function makeNewGame() {
   const game = {
-    version: 20,
+    version: 21,
     coins: 560,
     gems: 7,
     happiness: 72,
@@ -1042,6 +1050,7 @@ function makeNewGame() {
       depthFloorsBuilt: 0,
       dreamJobsFilled: 0,
       lobbyRoutesDone: 0,
+      lobbyPriorityDispatchesDone: 0,
       foodFloorsBuilt: 1,
       foodRushesDone: 0,
       foodServingsDone: 0,
@@ -1268,6 +1277,7 @@ function makeVisitor(game) {
       title: pick(VISITOR_TITLES.resident),
       color: resident.color,
       resident,
+      lobbyWait: 0,
       targetFloorId: vacantDwelling?.id ?? null,
       wish: vacantDwelling ? formatFloorLabel(vacantDwelling.id) : "住",
     };
@@ -1281,6 +1291,7 @@ function makeVisitor(game) {
       kind,
       title: pick(VISITOR_TITLES.vip),
       color: "#f2b84b",
+      lobbyWait: 0,
       targetFloorId: target?.id ?? 0,
       wish: target ? formatFloorLabel(target.id) : "★",
       effect: pick(["rush", "coins", "joy", ...(observatoryStarBonus(game) > 0 ? ["stars"] : [])]),
@@ -1293,6 +1304,7 @@ function makeVisitor(game) {
     kind,
     title: pick(VISITOR_TITLES.shopper),
     color: pick(PERSON_COLORS),
+    lobbyWait: 0,
     targetFloorId: target?.id ?? 0,
     wish: target ? formatFloorLabel(target.id) : "$",
   };
@@ -1309,12 +1321,69 @@ function pickBusinessTarget(floors, game = state) {
   return floors[floors.length - 1];
 }
 
+function lobbyWaitSeconds(visitor) {
+  return Math.max(0, Number(visitor?.lobbyWait) || 0);
+}
+
+function lobbyWaitTier(visitor) {
+  const wait = lobbyWaitSeconds(visitor);
+  if (wait >= 32) return "urgent";
+  if (wait >= 16) return "waiting";
+  return "fresh";
+}
+
+function lobbyPressureInfo(game = state) {
+  const queue = game.queue || [];
+  const maxWait = queue.reduce((max, visitor) => Math.max(max, lobbyWaitSeconds(visitor)), 0);
+  const ratio = VISITOR_QUEUE_MAX ? queue.length / VISITOR_QUEUE_MAX : 0;
+  const pressure = clamp(ratio * 0.72 + Math.min(1, maxWait / 42) * 0.28, 0, 1);
+  const tone = pressure >= 0.78 ? "urgent" : pressure >= 0.52 ? "busy" : pressure >= 0.28 ? "steady" : "calm";
+  const label = tone === "urgent" ? "压线" : tone === "busy" ? "繁忙" : tone === "steady" ? "稳定" : "顺畅";
+  const text = queue.length
+    ? `等候 ${queue.length}/${VISITOR_QUEUE_MAX} · 最久 ${Math.floor(maxWait)}s`
+    : "大厅空闲";
+  return {
+    count: queue.length,
+    maxWait,
+    pressure,
+    percent: Math.round(pressure * 100),
+    tone,
+    label,
+    text,
+  };
+}
+
+function lobbyRouteRank(visitor, index = 0, game = state) {
+  const route = visitorRouteInfo(visitor, game);
+  return {
+    visitor,
+    index,
+    route,
+    score: route.score,
+  };
+}
+
+function lobbyRankedVisitors(game = state) {
+  return (game.queue || [])
+    .map((visitor, index) => lobbyRouteRank(visitor, index, game))
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+}
+
+function isPriorityLobbyDispatch(visitor, game = state) {
+  const pressure = lobbyPressureInfo(game);
+  return pressure.count >= 3 || pressure.tone === "busy" || pressure.tone === "urgent" || lobbyWaitSeconds(visitor) >= 18 || visitor?.kind === "vip";
+}
+
 function visitorRouteInfo(visitor, game = state) {
   const floor = game.floors.find((entry) => entry.id === Number(visitor?.targetFloorId));
   const floorLabel = floor ? formatFloorLabel(floor.id) : visitor?.wish || "?";
   if (!visitor || !floor) {
     return { floor: null, floorLabel, floorName: "未知楼层", ready: false, tone: "warn", text: "目标不明", score: -20 };
   }
+  const wait = lobbyWaitSeconds(visitor);
+  const waitBonus = Math.min(28, Math.floor(wait / 3));
+  const waitText = wait >= 32 ? "久候" : wait >= 16 ? `等候 ${Math.floor(wait)}s` : "";
+  const pressureTone = wait >= 32 ? "urgent" : null;
 
   if (visitor.kind === "resident") {
     const vacancy = floor.type === "dwelling" ? getVacancy(floor) : 0;
@@ -1324,9 +1393,10 @@ function visitorRouteInfo(visitor, game = state) {
       floorLabel,
       floorName: floor.name,
       ready,
-      tone: ready ? "ready" : "warn",
-      text: ready ? `空房 ${vacancy}` : "满员",
-      score: (ready ? 42 : 2) + vacancy * 2,
+      tone: pressureTone || (ready ? "ready" : "warn"),
+      text: [ready ? `空房 ${vacancy}` : "满员", waitText].filter(Boolean).join(" · "),
+      wait,
+      score: (ready ? 42 : 2) + vacancy * 2 + waitBonus,
     };
   }
 
@@ -1337,8 +1407,9 @@ function visitorRouteInfo(visitor, game = state) {
       floorName: floor.name,
       ready: true,
       tone: "vip",
-      text: floor.status === "construction" ? "施工急件" : "贵宾优先",
-      score: 80 + (floor.status === "construction" ? 8 : 0),
+      text: [floor.status === "construction" ? "施工急件" : "贵宾优先", waitText].filter(Boolean).join(" · "),
+      wait,
+      score: 80 + (floor.status === "construction" ? 8 : 0) + waitBonus,
     };
   }
 
@@ -1349,8 +1420,9 @@ function visitorRouteInfo(visitor, game = state) {
       floorName: floor.name,
       ready: false,
       tone: "warn",
-      text: "不能消费",
-      score: 4,
+      text: ["不能消费", waitText].filter(Boolean).join(" · "),
+      wait,
+      score: 4 + Math.floor(waitBonus / 2),
     };
   }
 
@@ -1363,18 +1435,15 @@ function visitorRouteInfo(visitor, game = state) {
     floorLabel,
     floorName: floor.name,
     ready,
-    tone: ready ? "ready" : "warn",
-    text: !staffed ? "缺员工" : !stocked ? "缺货" : `库存 ${floor.stock}`,
-    score: (ready ? 34 : 6) + Math.round(stockRatio * 12) + (visitor.kind === "shopper" ? 2 : 0),
+    tone: pressureTone || (ready ? "ready" : "warn"),
+    text: [!staffed ? "缺员工" : !stocked ? "缺货" : `库存 ${floor.stock}`, waitText].filter(Boolean).join(" · "),
+    wait,
+    score: (ready ? 34 : 6) + Math.round(stockRatio * 12) + (visitor.kind === "shopper" ? 2 : 0) + waitBonus,
   };
 }
 
 function bestLobbyVisitor(game = state) {
-  const queue = game.queue || [];
-  if (!queue.length) return null;
-  return [...queue]
-    .map((visitor, index) => ({ visitor, index, route: visitorRouteInfo(visitor, game) }))
-    .sort((a, b) => b.route.score - a.route.score || a.index - b.index)[0].visitor;
+  return lobbyRankedVisitors(game)[0]?.visitor || null;
 }
 
 function businessVisitorWeight(floor, game = state) {
@@ -1429,6 +1498,7 @@ function migrateGame(game) {
     depthFloorsBuilt: 0,
     dreamJobsFilled: 0,
     lobbyRoutesDone: 0,
+    lobbyPriorityDispatchesDone: 0,
     foodFloorsBuilt: 0,
     foodRushesDone: 0,
     foodServingsDone: 0,
@@ -1457,7 +1527,7 @@ function migrateGame(game) {
     aquariumFloorsBuilt: 0,
     festivalFloorsBuilt: 0,
   };
-  game.version = Math.max(Number(game.version) || 0, 20);
+  game.version = Math.max(Number(game.version) || 0, 21);
   game.nextExpeditionId ||= 1;
   game.nextExpeditionReportId ||= 1;
   game.nextLifeStoryId ||= 1;
@@ -1486,6 +1556,9 @@ function migrateGame(game) {
   game.queue.forEach((visitor) => {
     if (visitor && typeof visitor === "object") {
       ensurePersonLife(visitor);
+      visitor.lobbyWait = Math.max(0, Number(visitor.lobbyWait) || 0);
+      visitor.routeDispatch = Boolean(visitor.routeDispatch);
+      visitor.priorityDispatch = Boolean(visitor.priorityDispatch);
       visitor.wish = visitor.targetFloorId !== null && visitor.targetFloorId !== undefined ? formatFloorLabel(visitor.targetFloorId) : visitor.wish;
     }
   });
@@ -3095,6 +3168,9 @@ function updateTimers(dt) {
 }
 
 function updateVisitors(dt) {
+  (state.queue || []).forEach((visitor) => {
+    visitor.lobbyWait = Math.min(90, lobbyWaitSeconds(visitor) + dt);
+  });
   state.spawnTimer -= dt;
   if (state.spawnTimer > 0) return;
   const queueCount = state.queue.length;
@@ -5628,7 +5704,12 @@ function boardVisitor(visitorId, options = {}) {
 
   if (options.routeDispatch) {
     visitor.routeDispatch = true;
+    visitor.priorityDispatch = isPriorityLobbyDispatch(visitor, state);
+    visitor.dispatchPressure = lobbyPressureInfo(state).tone;
     state.stats.lobbyRoutesDone = (state.stats.lobbyRoutesDone || 0) + 1;
+  } else {
+    visitor.routeDispatch = false;
+    visitor.priorityDispatch = false;
   }
 
   if (elevatorIsMaxed()) {
@@ -5720,11 +5801,16 @@ function resolveVisitorAtFloor(passenger, floor, correct = true) {
   }
 
   if (passenger.routeDispatch && success && correct) {
-    const routeBonus = Math.min(34, 8 + Math.floor((state.streak || 0) * 1.4));
+    const waitBonus = Math.min(16, Math.floor(lobbyWaitSeconds(passenger) / 4));
+    const priorityBonus = passenger.priorityDispatch ? 8 : 0;
+    const routeBonus = Math.min(48, 8 + Math.floor((state.streak || 0) * 1.4) + waitBonus + priorityBonus);
     addCoins(routeBonus);
     showFloat(`+${routeBonus}`);
     state.happiness = clamp(state.happiness + 1, 0, 100);
-    addLog(`大厅派号顺利完成，额外收入 ${routeBonus} 金币。`);
+    if (passenger.priorityDispatch) {
+      state.stats.lobbyPriorityDispatchesDone = (state.stats.lobbyPriorityDispatchesDone || 0) + 1;
+    }
+    addLog(`大厅派号顺利完成，额外收入 ${routeBonus} 金币${passenger.priorityDispatch ? "，候车秩序 +1" : ""}。`);
   }
 
   recordDelivery(success && correct);
@@ -6285,7 +6371,7 @@ function getKingdomRenderKey() {
         return `${floor.id}:dw:${floor.level}:${floor.residents.length}:${floor.capacity}:${floor.rentReady}:${floor.residents.map((resident) => resident.expeditionId || 0).join("-")}:${lifeTrailMapKey(floor)}:${expeditionWaymarkMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
       }
       if (floor.type === "lobby") {
-        return `${floor.id}:lobby:${state.queue.map((visitor) => `${visitor.id}:${visitor.need || ""}:${visitor.activity || ""}`).join("-")}:${state.selectedFloorId}`;
+        return `${floor.id}:lobby:${state.queue.map((visitor) => `${visitor.id}:${visitor.need || ""}:${visitor.activity || ""}:${Math.floor(lobbyWaitSeconds(visitor) / 5)}:${visitor.targetFloorId || ""}`).join("-")}:${lobbyPressureInfo(state).tone}:${state.selectedFloorId}`;
       }
       return `${floor.id}:${floor.type}:${floor.level}:${floor.stock}:${floor.stockMax}:${floor.workers.length}:${Boolean(floor.production)}:${foodRushMapKey(floor)}:${marketParcelMapKey(floor)}:${royalMandateMapKey(floor)}:${comfortSessionMapKey(floor)}:${showtimeMapKey(floor)}:${lifeTrailMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
     })
@@ -6420,6 +6506,7 @@ function renderOpenFloor(floor) {
       </div>
       <div class="room-scene">
         ${renderRoomStateTag(floor)}
+        ${floor.type === "lobby" ? renderLobbyRouteLayer() : ""}
         ${renderLifeTrailLayer(floor)}
         ${renderExpeditionWaymarkLayer(floor)}
         ${renderComfortAfterglowLayer(floor)}
@@ -6492,7 +6579,7 @@ function renderLobbyQueue() {
           const recommendClass = recommended?.id === visitor.id ? "recommended" : "";
           const title = `${visitor.title} · ${route.floorLabel} ${route.floorName} · ${route.text}`;
           return renderPersonButton(visitor, "visitor", "lobby", {
-            extraClass: `${visitor.kind === "vip" ? "vip" : ""} ${recommendClass} route-${route.tone}`,
+            extraClass: `${visitor.kind === "vip" ? "vip" : ""} ${recommendClass} route-${route.tone} wait-${lobbyWaitTier(visitor)}`,
             action: "board",
             actionId: visitor.id,
             title,
@@ -6503,21 +6590,53 @@ function renderLobbyQueue() {
     </div>`;
 }
 
+function renderLobbyRouteLayer() {
+  const pressure = lobbyPressureInfo(state);
+  const ranked = lobbyRankedVisitors(state).slice(0, 3);
+  const signals = ranked
+    .map(({ visitor, route }, index) => {
+      const waitTier = lobbyWaitTier(visitor);
+      return `
+        <span class="lobby-route-signal route-${escapeAttr(route.tone)} wait-${escapeAttr(waitTier)}" style="--route-lane:${index}" title="${escapeAttr(`${visitor.title} → ${route.floorLabel} ${route.floorName} · ${route.text}`)}">
+          <i></i><b>${escapeHtml(route.floorLabel)}</b>
+        </span>`;
+    })
+    .join("");
+  return `
+    <div class="lobby-route-layer" data-pressure="${escapeAttr(pressure.tone)}" aria-hidden="true">
+      <span class="lobby-pressure-gate" style="--pressure:${pressure.percent}%"><i></i></span>
+      ${signals}
+    </div>`;
+}
+
 function renderLobbyRouteBoard() {
   const queue = state.queue || [];
+  const pressure = lobbyPressureInfo(state);
   if (!queue.length) return `<div class="lobby-route-board empty"><span>大厅空闲，下一位访客正在路上。</span></div>`;
   const recommended = bestLobbyVisitor(state);
   return `
     <div class="lobby-route-board">
-      ${queue
-        .map((visitor) => {
-          const route = visitorRouteInfo(visitor, state);
+      <div class="lobby-route-summary" data-pressure="${escapeAttr(pressure.tone)}">
+        <strong>${escapeHtml(pressure.label)}</strong>
+        <span>${escapeHtml(pressure.text)}</span>
+        <i style="--pressure:${pressure.percent}%"></i>
+      </div>
+      ${lobbyRankedVisitors(state)
+        .map(({ visitor, route }, index) => {
           const active = recommended?.id === visitor.id ? "active" : "";
+          const waitTier = lobbyWaitTier(visitor);
+          const tags = [
+            active ? "推荐" : "",
+            route.tone === "vip" ? "贵宾" : "",
+            waitTier === "urgent" ? "久候" : waitTier === "waiting" ? "等候" : "",
+            index === 0 && isPriorityLobbyDispatch(visitor, state) ? "优先" : "",
+          ].filter(Boolean);
           return `
-            <button class="route-ticket ${active} route-${route.tone}" data-action="board" data-visitor-id="${visitor.id}">
+            <button class="route-ticket ${active} route-${route.tone} wait-${waitTier}" data-action="board" data-visitor-id="${visitor.id}" title="${escapeAttr(`${visitor.title} → ${route.floorLabel} ${route.floorName} · ${route.text}`)}">
               <b>${escapeHtml(route.floorLabel)}</b>
               <span>${escapeHtml(visitor.title)} · ${escapeHtml(route.floorName)}</span>
               <small>${escapeHtml(route.text)}</small>
+              ${tags.length ? `<em>${tags.map((tag) => `<i>${escapeHtml(tag)}</i>`).join("")}</em>` : ""}
               <i class="need-badge" data-need="${escapeAttr(visitor.need || "social")}" aria-hidden="true"></i>
             </button>`;
         })
@@ -7037,9 +7156,20 @@ function renderElevatorPanel() {
         <div class="elevator-route-meter" aria-hidden="true"><i style="width:${elevatorTripProgress()}%"></i></div>
       </div>`;
   } else {
-    els.passengerBox.innerHTML = `<div class="passenger-copy"><strong>大厅访客 ${state.queue.length}/${VISITOR_QUEUE_MAX}</strong><span>${
-      directLobby ? "入口满级，可直接点大厅接待。" : "点大厅访客进入电梯。"
-    }</span></div>`;
+    const pressure = lobbyPressureInfo(state);
+    const best = bestLobbyVisitor(state);
+    const route = best ? visitorRouteInfo(best, state) : null;
+    const idleText = route
+      ? `${pressure.label} · 推荐 ${route.floorLabel} ${route.floorName}`
+      : directLobby
+        ? "入口满级，可直接点大厅接待。"
+        : "点大厅访客进入电梯。";
+    els.passengerBox.innerHTML = `
+      <div class="passenger-copy">
+        <strong>大厅访客 ${state.queue.length}/${VISITOR_QUEUE_MAX}</strong>
+        <span>${escapeHtml(idleText)}</span>
+        <div class="elevator-route-meter lobby-pressure-meter" data-pressure="${escapeAttr(pressure.tone)}" aria-hidden="true"><i style="width:${pressure.percent}%"></i></div>
+      </div>`;
   }
   const elevatorBusy = Boolean(passenger && (state.elevator.target !== null || (state.elevator.doorTimer || 0) > 0));
   dropBtn.disabled = !passenger || elevatorBusy;
@@ -7076,14 +7206,15 @@ function renderFloorDetail() {
   if (floor.type === "lobby") {
     const best = bestLobbyVisitor(state);
     const bestRoute = best ? visitorRouteInfo(best, state) : null;
+    const pressure = lobbyPressureInfo(state);
     els.floorDetail.innerHTML = `
       <strong>${escapeHtml(floor.name)}</strong>
-      <p>${elevatorIsMaxed() ? "入口满级后，点大厅访客可直接接待。" : "访客会自然刷新，先点访客进入电梯，再在入口面板接待。"}</p>
+      <p>${escapeHtml(pressure.text)}</p>
       <div class="stat-grid">
         <div class="stat"><b>${state.queue.length}</b><span>等候访客</span></div>
-        <div class="stat"><b>x${state.streak || 0}</b><span>连送奖励</span></div>
+        <div class="stat"><b>${escapeHtml(pressure.label)}</b><span>候车压力</span></div>
         <div class="stat"><b>${bestRoute ? bestRoute.floorLabel : "-"}</b><span>推荐目标</span></div>
-        <div class="stat"><b>${state.stats.lobbyRoutesDone || 0}</b><span>派号</span></div>
+        <div class="stat"><b>${state.stats.lobbyPriorityDispatchesDone || 0}</b><span>优先派号</span></div>
       </div>
       ${renderFloorPerks(floor)}
       ${renderLobbyRouteBoard()}
@@ -7197,6 +7328,7 @@ function renderFloorPerks(floor) {
   const perks = [];
   if (floor.type === "lobby") {
     perks.push(`入口调度 +${Math.round(lobbyDispatchBonus(state) * 100)}%`);
+    perks.push(`优先派号 ${state.stats.lobbyPriorityDispatchesDone || 0}`);
     perks.push(elevatorIsMaxed() ? "满级直达接待" : "访客节奏优化");
   } else if (floor.type === "dwelling") {
     perks.push(`远行整备 +${Math.round(dwellingJourneyBonus(state) * 100)}%`);
@@ -7304,14 +7436,15 @@ function renderFloorDetail() {
   if (floor.type === "lobby") {
     const best = bestLobbyVisitor(state);
     const bestRoute = best ? visitorRouteInfo(best, state) : null;
+    const pressure = lobbyPressureInfo(state);
     els.floorDetail.innerHTML = `
       <strong>${escapeHtml(floor.name)}</strong>
-      <p>${elevatorIsMaxed() ? "入口满级后，可以直接在这里接待访客。" : "先让访客进入电梯，再根据推荐路线安排接待。"}</p>
+      <p>${escapeHtml(pressure.text)}</p>
       <div class="stat-grid">
         <div class="stat"><b>${state.queue.length}</b><span>等待访客</span></div>
-        <div class="stat"><b>x${state.streak || 0}</b><span>连送奖励</span></div>
+        <div class="stat"><b>${escapeHtml(pressure.label)}</b><span>候车压力</span></div>
         <div class="stat"><b>${bestRoute ? bestRoute.floorLabel : "-"}</b><span>推荐目标</span></div>
-        <div class="stat"><b>${state.stats.lobbyRoutesDone || 0}</b><span>派号</span></div>
+        <div class="stat"><b>${state.stats.lobbyPriorityDispatchesDone || 0}</b><span>优先派号</span></div>
       </div>
       ${renderFloorPerks(floor)}
       ${renderLobbyRouteBoard()}
@@ -7441,6 +7574,7 @@ function renderFloorPerks(floor) {
   const perks = [];
   if (floor.type === "lobby") {
     perks.push(`入口调度 +${Math.round(lobbyDispatchBonus(state) * 100)}%`);
+    perks.push(`优先派号 ${state.stats.lobbyPriorityDispatchesDone || 0}`);
     perks.push(elevatorIsMaxed() ? "满级直达接待" : "访客节奏优化");
   } else if (floor.type === "dwelling") {
     perks.push(`远行整备 +${Math.round(dwellingJourneyBonus(state) * 100)}%`);
@@ -8460,7 +8594,7 @@ function bindEvents() {
         dispatchLobbyVisitor();
         break;
       case "board":
-        boardVisitor(Number(button.dataset.visitorId));
+        boardVisitor(Number(button.dataset.visitorId), { routeDispatch: Boolean(button.closest(".lobby-route-board")) });
         break;
       case "speed":
         speedUpFloor(floorId);

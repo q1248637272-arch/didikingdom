@@ -1,0 +1,7 @@
+Create a polished no-text 2D game room background for a compact underground castle lobby in the original game Didi Kingdom. The room is a horizontal cutaway tile for a tower-management game.
+
+Scene: a warm old entrance hall upgraded into a readable dispatch lobby: central elevator arch with open doorway, brass route lamps, queue rails, luggage niches, a small abstract route board made only of shapes and colored beads, tiny floor inlays guiding visitors, stone walls, wood-and-gold trim, cozy lantern light, subtle teal and amber wayfinding accents.
+
+Composition and constraints: keep the lower foreground clear for small character sprites and route overlays. No characters, no UI, no readable text, no letters, no numbers, no logos, no watermark.
+
+Style: painterly stylized 2D mobile game background, crisp silhouettes, strong value separation, readable at small size, 16:9 composition.
