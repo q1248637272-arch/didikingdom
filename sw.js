@@ -1,10 +1,10 @@
-const CACHE_NAME = "little-depths-v71";
+const CACHE_NAME = "little-depths-v72";
 const ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=71",
-  "./overrides.css?v=71",
-  "./app.js?v=71",
+  "./styles.css?v=72",
+  "./overrides.css?v=72",
+  "./app.js?v=72",
   "./manifest.webmanifest",
   "./icons/icon.svg",
   "./icons/icon-512.png",
@@ -17,7 +17,7 @@ const ASSETS = [
   "./assets/art/room-kingdom.webp",
   "./assets/art/room-market-v2.webp",
   "./assets/art/room-library-v2.webp",
-  "./assets/art/room-garden-v2.webp",
+  "./assets/art/room-garden-v3.webp",
   "./assets/art/room-observatory-v2.webp",
   "./assets/art/room-skyport.webp",
   "./assets/art/room-festival.webp",

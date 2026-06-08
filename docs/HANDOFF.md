@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v71`
-- Latest preview deployment: `https://87571ccf.little-depths.pages.dev/`
-- Local server used for v71 verification: `http://127.0.0.1:8821/`
+- Latest deployed version: `v72`
+- Latest preview deployment: `https://617d865a.little-depths.pages.dev/`
+- Local server used for v72 verification: `http://127.0.0.1:8822/`
 
 ## Current State
 
@@ -22,11 +22,22 @@ wrangler pages deploy dist --project-name little-depths
 ```
 
 - GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`, but current release practice is to deploy Cloudflare with local Wrangler OAuth from `dist`, then sync GitHub separately. Use `[skip ci]` when pushing documentation/code sync commits that should not ask GitHub Actions to deploy Cloudflare.
-- Current caveat: v71 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
+- Current caveat: v72 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v72 Comfort Focus / Garden Afterglow Refresh
+
+- Deepened the old `garden` / `bathhouse` comfort-afterglow loop instead of adding a new floor. Completed comfort sessions now keep their recorded participant IDs even if residents leave the room early, so afterglow is no longer lost at session end.
+- Added `COMFORT_FOCUS_OPTIONS`, `COMFORT_FOCUS_ORDER`, `comfortFocusesDone`, `comfortRentFocusesDone`, `comfortExpeditionFocusesDone`, `comfortRecoveryFocusesDone`, `comfortFocusOption()`, `comfortFocusLabel()`, `comfortFocusTone()`, `comfortFocusStatKey()`, `comfortFocusActionBlockReason()`, `focusComfortAfterglow()`, and `renderComfortFocusControls()`.
+- Added the `comfort_focus` / `余韵调息` quest. It uses the existing manual `ready` / `领取` flow, so the quest becomes ready without auto-awarding gems or coins.
+- Active comfort afterglow can now be manually directed into `租金回响`, `探险整备`, or `居民恢复`, feeding dwelling rent preparation, active/next expedition prep, or low-motive resident recovery and comfort-memory extension.
+- Improved old map/UI readability with `data-comfort-echo-focus`, `.comfort-focus-readout`, `.comfort-focus-actions`, `.comfort-focus-btn`, `data-state="comfort-focus"`, and textless afterglow map pips instead of a visible room-label string.
+- Used `gpt-image-2` through the configured gateway to generate the refreshed no-text sky garden afterglow background `assets/art/room-garden-v3.webp`; the source PNG is `tmp/imagegen/v72-comfort-focus/room-garden-v3.png`, and the reusable prompt is tracked at `docs/v72-comfort-focus-garden-image-prompt.txt`.
+- Bumped the save version to `26`, bumped `index.html` / `sw.js` to v72, updated `styles.css` and `overrides.css` to `room-garden-v3.webp`, and verified local desktop/mobile with Edge CDP using `tmp/verify-v72-comfort-focus.mjs`.
+- Synced `dist`, rebuilt `cloudflare-pages-upload.zip`, and deployed v72 to Cloudflare Pages with local Wrangler direct upload. Production: `https://little-depths.pages.dev/`; preview: `https://617d865a.little-depths.pages.dev/`.
 
 ### v71 Craft Tool Tune / Workshop Refresh
 
@@ -827,6 +838,7 @@ wrangler pages deploy dist --project-name little-depths
 - The user wants image work to use `gpt-image-2` through their configured gateway.
 - Read credentials only from `GPT_IMAGE_2_API_KEY`, `GPT_IMAGE_2_BASE_URL`, and `GPT_IMAGE_2_MODEL`.
 - Never print, echo, commit, or store API keys.
+- v72 generated refreshed sky-garden comfort-focus room art through the configured `gpt-image-2` gateway. The source PNG is `tmp/imagegen/v72-comfort-focus/room-garden-v3.png`, the connected asset is `assets/art/room-garden-v3.webp`, and the saved prompt is `docs/v72-comfort-focus-garden-image-prompt.txt`.
 - v71 generated refreshed craft/tool-tune room art through the configured `gpt-image-2` gateway. The source PNG was saved in the current thread outputs as `room-craft-v3.png`, the connected asset is `assets/art/room-craft-v3.webp`, and the saved prompt is `docs/v71-craft-tool-tune-room-image-prompt.txt`.
 - v69 generated refreshed rooftop observatory star-chart room art through the configured `gpt-image-2` gateway. The source PNG was saved in the current thread outputs as `room-observatory-v2.png`, the connected asset is `assets/art/room-observatory-v2.webp`, and the saved prompt is `docs/v69-observatory-star-chart-image-prompt.txt`.
 - v68 generated refreshed service/concierge flower atelier room art through the configured `gpt-image-2` gateway. The source PNG was saved in the current thread outputs as `v68-service-care-room.png`, the connected asset is `assets/art/room-service-v2.webp`, and the saved prompt is `docs/v68-service-care-room-image-prompt.txt`.
@@ -840,7 +852,7 @@ wrangler pages deploy dist --project-name little-depths
 - v56 attempted refreshed entertainment theater room art, but the configured gateway timed out before returning an image. No new art was connected; the saved web-ready prompt is `docs/v56-entertainment-theater-image-prompt.txt`.
 - v55 attempted refreshed entertainment showtime room art, but the configured gateway returned 404 for the Images API paths. No new art was generated; the saved web-ready prompt is `docs/v55-entertainment-showtime-image-prompt.txt`.
 - v54 did not generate new art with `gpt-image-2`; it converted the old `person-performer.png` asset into lossless `assets/art/person-performer.webp`.
-- Current published image assets from prior image work include `room-lobby-v3.webp`, `room-dwelling-v3.webp`, `room-food-v3.webp`, `room-service-v2.webp`, `room-observatory-v2.webp`, `room-craft-v3.webp`, `room-market-v2.webp`, `room-library-v2.webp`, `room-garden-v2.webp`, and `room-bathhouse-v2.webp`.
+- Current published image assets from prior image work include `room-lobby-v3.webp`, `room-dwelling-v3.webp`, `room-food-v3.webp`, `room-service-v2.webp`, `room-observatory-v2.webp`, `room-craft-v3.webp`, `room-market-v2.webp`, `room-library-v2.webp`, `room-garden-v3.webp`, and `room-bathhouse-v2.webp`.
 - Previous `tmp/imagegen` generation images/JSON records and other intermediate image outputs were cleaned during v54 local lightweight cleanup; `tmp/imagegen` is currently empty unless a future run recreates it.
 - If the image gateway is unavailable in a future pass, save a ready-to-use prompt for the web UI without printing or storing secrets.
 
@@ -848,13 +860,12 @@ wrangler pages deploy dist --project-name little-depths
 
 - Continue improving older floors instead of only adding new floors. Good next targets:
   - `character life`: add short interruptions, route conflicts, remembered preferences, or player-clickable story follow-ups now that visible trails and receipts exist.
-  - `garden/bathhouse`: deepen afterglow follow-up decisions, such as spending余韵 to prioritize rent, expedition prep, or motive recovery.
   - `dwelling`: refresh the dwelling/life-trail room art when the `gpt-image-2` gateway is healthy, using `docs/v62-life-trails-dwelling-image-prompt.txt`.
-  - `garden`: refresh the comfort-afterglow garden art when the image gateway is healthy, using `docs/v63-comfort-afterglow-garden-image-prompt.txt`.
+  - `garden/bathhouse`: add second-step follow-ups after `余韵调息`, such as resident story choices or floor-specialist modifiers for each focus.
   - `kingdom`: deepen downstream city effects, courier specialization, or refreshed council-room art now that signing and receipt follow-through exist.
   - `food`: deepen dining needs with table rushes, staff serving feedback, and clearer kitchen UI.
   - `service`: tune礼宾照看 pacing, add guest preference follow-ups, or make service specialists affect care phases differently.
-  - `garden/bathhouse`: make happiness, rest, rent, and expedition preparation more visible and interactive.
+  - `bathhouse`: consider a refreshed bathhouse-focused rest/recovery visual pass, now that garden art has `room-garden-v3.webp`.
   - `alchemy/training/treasure`: give the late-game floors stronger decision hooks beyond passive bonuses.
   - `market`: tune parcel pacing, expose stalled/partial packing more clearly, or let multiple market floors specialize in different goods after the first parcel-flow pass.
 - Keep each version small and deployable: one floor or one systemic pass per release.
@@ -873,8 +884,8 @@ wrangler pages deploy dist --project-name little-depths
 继续开发 C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4 里的迪迪王国项目。
 
 线上地址：https://little-depths.pages.dev/
-最新部署版本：v71
-最新预览：https://87571ccf.little-depths.pages.dev/
+最新部署版本：v72
+最新预览：https://617d865a.little-depths.pages.dev/
 交接文档：docs/HANDOFF.md
 
 请先读取项目代码、README.md、docs/HANDOFF.md 和最近状态，再继续优化。方向：从游戏内容、玩法、画面、图像质量等层面更新迭代，不只新增内容，也要把旧楼层和旧系统做得更好。涉及图像绘制时使用 gpt-image-2；如果网关不可用，不要写入或打印密钥，改为保存可直接用于网页端生成的提示词。

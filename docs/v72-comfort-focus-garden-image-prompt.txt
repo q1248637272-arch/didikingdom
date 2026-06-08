@@ -1,0 +1,13 @@
+Model: gpt-image-2
+Size: 1280x720
+Quality: low
+
+Create a polished 1280x720 no-text fantasy sky garden room background for a cozy vertical kingdom-management browser game.
+
+Scene: an old garden floor inside a stacked castle tower after a resident tea gathering has ended. Show a readable comfort-afterglow gameplay state without any characters: hanging planters, flower beds, a tiny tea table, folded blankets, packed little travel satchels, warm lanterns, pale sunbeams, clear path stones, and a faint golden-green aura near the floor. The room should communicate calm recovery, rent happiness, and expedition preparation through environmental cues only.
+
+Art direction: painterly high-quality stylized 2D game background, cozy castle-room set, warm amber lamplight mixed with fresh leaf greens and muted teal shadows, crisp silhouettes, rich materials, bright enough to inspect at gameplay size. Keep the central and lower foreground clear for small character sprites and UI overlays.
+
+Composition: horizontal side-view room cutaway, stable left/right anchors, readable floor plane, open center lane, layered wall props, detailed but not cluttered. No visible text, no signage, no letters, no numbers, no logos, no UI, no characters, no watermark.
+
+Avoid: dark fog, heavy blur, cropped closeups, stock-photo atmosphere, unreadable clutter, text-like marks, posters, empty room with no gameplay props.

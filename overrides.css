@@ -1,6 +1,6 @@
 /* v63 comfort afterglow, v62 life trails, v53 comfort sessions, and recent room-map passes. */
 .floor[data-type="garden"] .room {
-  --room-art: url("assets/art/room-garden-v2.webp");
+  --room-art: url("assets/art/room-garden-v3.webp");
   --room-bg:
     radial-gradient(circle at 52% 26%, rgba(255, 224, 138, 0.24), transparent 24%),
     radial-gradient(circle at 22% 42%, rgba(111, 214, 140, 0.22), transparent 24%),
@@ -109,6 +109,21 @@
   --echo-b: #73d7d0;
 }
 
+.floor[data-comfort-echo-focus="rent"] .comfort-afterglow-layer {
+  --echo-a: #ffd36f;
+  --echo-b: #ff9f5f;
+}
+
+.floor[data-comfort-echo-focus="expedition"] .comfort-afterglow-layer {
+  --echo-a: #dff8ff;
+  --echo-b: #8faaff;
+}
+
+.floor[data-comfort-echo-focus="recovery"] .comfort-afterglow-layer {
+  --echo-a: #dff8d2;
+  --echo-b: #77e5a1;
+}
+
 .comfort-afterglow-layer i {
   position: absolute;
   left: 0;
@@ -141,14 +156,33 @@
   position: absolute;
   right: 0;
   bottom: 34px;
-  max-width: 92px;
-  overflow: hidden;
-  color: color-mix(in srgb, var(--echo-a) 86%, #fff);
-  font-size: 10px;
-  font-style: normal;
-  text-overflow: ellipsis;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.72);
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  width: 34px;
+  height: 14px;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--echo-a) 44%, transparent);
+  border-radius: 999px;
+  background: rgba(11, 20, 22, 0.46);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--echo-b) 24%, transparent);
+}
+
+.comfort-afterglow-layer em span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--echo-a) 90%, #fff);
+  opacity: 0.8;
+}
+
+.floor[data-comfort-echo-focus="rent"] .comfort-afterglow-layer em span:first-child,
+.floor[data-comfort-echo-focus="expedition"] .comfort-afterglow-layer em span:nth-child(2),
+.floor[data-comfort-echo-focus="recovery"] .comfort-afterglow-layer em span:nth-child(3) {
+  width: 8px;
+  border-radius: 5px;
+  background: #fff7ca;
+  box-shadow: 0 0 8px var(--echo-a);
 }
 
 .comfort-session-panel {
@@ -191,6 +225,64 @@
 
 .comfort-afterglow-readout {
   color: #dff8d2 !important;
+}
+
+.comfort-focus-readout {
+  color: #fff4c6 !important;
+}
+
+.comfort-focus-readout[data-focus="expedition"] {
+  color: #dfe8ff !important;
+}
+
+.comfort-focus-readout[data-focus="recovery"] {
+  color: #dff8d2 !important;
+}
+
+.comfort-focus-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.comfort-focus-btn {
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  padding: 7px 8px;
+  border: 1px solid rgba(255, 229, 138, 0.22);
+  border-radius: 8px;
+  color: #f9f4bd;
+  background: rgba(255, 255, 255, 0.055);
+  cursor: pointer;
+}
+
+.comfort-focus-btn:hover {
+  border-color: rgba(255, 229, 138, 0.54);
+  background: rgba(255, 229, 138, 0.11);
+}
+
+.comfort-focus-btn b {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #132018;
+  background: linear-gradient(180deg, #fff4c6, #9ee7b8);
+  font-size: 11px;
+}
+
+.comfort-focus-btn span {
+  overflow: hidden;
+  color: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .food-rush-panel {
@@ -648,6 +740,23 @@
     radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.8) 0 18%, transparent 19%),
     radial-gradient(circle at 50% 50%, currentColor 0 48%, transparent 49%);
   box-shadow: 0 0 12px currentColor;
+}
+
+.status-glyph[data-state="comfort-focus"],
+.room-state-tag[data-state="comfort-focus"] {
+  color: #fff0a6;
+}
+
+.status-glyph[data-state="comfort-focus"]::before,
+.room-state-tag[data-state="comfort-focus"]::before {
+  width: 16px;
+  height: 16px;
+  border-radius: 42% 58% 50% 50%;
+  background:
+    linear-gradient(135deg, currentColor 0 42%, transparent 43%),
+    radial-gradient(circle at 62% 62%, rgba(255, 255, 255, 0.86) 0 18%, currentColor 19% 52%, transparent 53%);
+  box-shadow: 0 0 14px currentColor;
+  animation: comfort-glyph 1.18s ease-in-out infinite;
 }
 
 .status-glyph[data-state="showtime"],

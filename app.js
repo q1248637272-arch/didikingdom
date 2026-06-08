@@ -383,6 +383,30 @@ const COMFORT_AFTERGLOW_TOTALS = {
   garden: 105,
   bathhouse: 120,
 };
+const COMFORT_FOCUS_ORDER = ["rent", "expedition", "recovery"];
+const COMFORT_FOCUS_OPTIONS = {
+  rent: {
+    id: "rent",
+    label: "租金回响",
+    short: "租",
+    action: "导向租金",
+    desc: "把余韵转成住户租金准备",
+  },
+  expedition: {
+    id: "expedition",
+    label: "探险整备",
+    short: "探",
+    action: "整备探险",
+    desc: "缩短进行中的探险并提高准备",
+  },
+  recovery: {
+    id: "recovery",
+    label: "居民恢复",
+    short: "舒",
+    action: "舒缓居民",
+    desc: "治疗低状态居民并延长舒缓记忆",
+  },
+};
 const SHOWTIME_FLOOR_TYPES = ["entertainment"];
 const SHOWTIME_LABELS = {
   entertainment: "烛光小剧",
@@ -948,6 +972,14 @@ const QUEST_DEFS = [
     text: "让花园或温泉留下 3 次可读余韵",
   },
   {
+    id: "comfort_focus",
+    title: "余韵调息",
+    goal: 3,
+    metric: "comfortFocusesDone",
+    reward: { coins: 680, gems: 3 },
+    text: "将花园或温泉余韵导向租金、探险或恢复 3 次",
+  },
+  {
     id: "moon_clinic",
     title: "星露医馆",
     goal: 1,
@@ -1099,7 +1131,7 @@ let guideReady = false;
 
 function makeNewGame() {
   const game = {
-    version: 25,
+    version: 26,
     coins: 560,
     gems: 7,
     happiness: 72,
@@ -1162,6 +1194,10 @@ function makeNewGame() {
       libraryStudiesDone: 0,
       comfortSessionsDone: 0,
       comfortEchoesDone: 0,
+      comfortFocusesDone: 0,
+      comfortRentFocusesDone: 0,
+      comfortExpeditionFocusesDone: 0,
+      comfortRecoveryFocusesDone: 0,
       entertainmentShowsDone: 0,
       showtimeReactionsDone: 0,
       entertainmentFloorsBuilt: 0,
@@ -1629,6 +1665,10 @@ function migrateGame(game) {
     libraryStudiesDone: 0,
     comfortSessionsDone: 0,
     comfortEchoesDone: 0,
+    comfortFocusesDone: 0,
+    comfortRentFocusesDone: 0,
+    comfortExpeditionFocusesDone: 0,
+    comfortRecoveryFocusesDone: 0,
     entertainmentShowsDone: 0,
     showtimeReactionsDone: 0,
     entertainmentFloorsBuilt: 0,
@@ -1645,7 +1685,7 @@ function migrateGame(game) {
     aquariumFloorsBuilt: 0,
     festivalFloorsBuilt: 0,
   };
-  game.version = Math.max(Number(game.version) || 0, 25);
+  game.version = Math.max(Number(game.version) || 0, 26);
   game.nextExpeditionId ||= 1;
   game.nextExpeditionReportId ||= 1;
   game.nextLifeStoryId ||= 1;
@@ -4273,6 +4313,7 @@ function normalizeComfortAfterglow(glow, floor = null) {
   const remaining = Math.max(0, Number(glow.remaining) || 0);
   if (remaining <= 0) return null;
   const total = Math.max(1, Number(glow.total) || COMFORT_AFTERGLOW_TOTALS[type] || remaining || 1);
+  const focus = COMFORT_FOCUS_OPTIONS[glow.focus] ? glow.focus : "";
   return {
     id: glow.id || `comfort-echo-${floor?.id || type}-${Date.now()}`,
     type,
@@ -4283,11 +4324,35 @@ function normalizeComfortAfterglow(glow, floor = null) {
     rentBonus: Math.max(0, Number(glow.rentBonus) || 0),
     expeditionBonus: clamp(Number(glow.expeditionBonus) || 0.06, 0, 0.22),
     motiveEase: clamp(Number(glow.motiveEase) || 0.08, 0, 0.24),
+    focus,
+    focusLabel: focus ? COMFORT_FOCUS_OPTIONS[focus].label : "",
+    focusApplied: Boolean(glow.focusApplied && focus),
+    focusPulse: Math.max(0, Number(glow.focusPulse) || 0),
   };
 }
 
 function isActiveComfortAfterglow(floor) {
   return Boolean(isComfortFloorType(floor?.type) && floor.comfortAfterglow && Number(floor.comfortAfterglow.remaining) > 0);
+}
+
+function comfortFocusOption(focus) {
+  return COMFORT_FOCUS_OPTIONS[focus] || null;
+}
+
+function comfortFocusLabel(glow) {
+  const option = comfortFocusOption(glow?.focus);
+  return option ? option.label : "待调息";
+}
+
+function comfortFocusTone(glow) {
+  return comfortFocusOption(glow?.focus)?.id || "open";
+}
+
+function comfortFocusStatKey(focus) {
+  if (focus === "rent") return "comfortRentFocusesDone";
+  if (focus === "expedition") return "comfortExpeditionFocusesDone";
+  if (focus === "recovery") return "comfortRecoveryFocusesDone";
+  return "";
 }
 
 function comfortSessionBonus(game = state) {
@@ -4305,21 +4370,35 @@ function activeComfortAfterglowBonus(game = state) {
       if (!isActiveComfortAfterglow(floor)) return sum;
       const glow = floor.comfortAfterglow;
       const ratio = clamp(Number(glow.remaining) / Math.max(1, Number(glow.total) || 1), 0, 1);
-      return sum + (Number(glow.motiveEase) || 0.08) * (0.45 + ratio * 0.55);
+      const focusBoost = glow.focus === "recovery" ? 1.42 : glow.focus ? 1.12 : 1;
+      return sum + (Number(glow.motiveEase) || 0.08) * (0.45 + ratio * 0.55) * focusBoost;
     }, 0)
   );
 }
 
 function comfortRentEchoBonus(game = state) {
-  return Math.min(0.16, activeComfortAfterglowBonus(game) * 0.9 + comfortEchoPracticeBonus(game) * 0.55);
+  const focusBonus = businessFloors(game).reduce((sum, floor) => {
+    if (!isActiveComfortAfterglow(floor) || floor.comfortAfterglow.focus !== "rent") return sum;
+    const glow = floor.comfortAfterglow;
+    const ratio = clamp(Number(glow.remaining) / Math.max(1, Number(glow.total) || 1), 0, 1);
+    return sum + 0.026 + ratio * 0.034;
+  }, 0);
+  return Math.min(0.2, activeComfortAfterglowBonus(game) * 0.9 + comfortEchoPracticeBonus(game) * 0.55 + focusBonus);
 }
 
 function comfortExpeditionPrepBonus(game = state) {
+  const focusBonus = businessFloors(game).reduce((sum, floor) => {
+    if (!isActiveComfortAfterglow(floor) || floor.comfortAfterglow.focus !== "expedition") return sum;
+    const glow = floor.comfortAfterglow;
+    const ratio = clamp(Number(glow.remaining) / Math.max(1, Number(glow.total) || 1), 0, 1);
+    return sum + 0.024 + ratio * 0.04;
+  }, 0);
   return Math.min(
-    0.18,
+    0.22,
     activeComfortAfterglowBonus(game) * 0.75 +
       comfortEchoPracticeBonus(game) * 0.48 +
-      businessFloors(game).reduce((sum, floor) => sum + (isActiveComfortAfterglow(floor) ? floor.comfortAfterglow.expeditionBonus || 0 : 0), 0) * 0.22
+      businessFloors(game).reduce((sum, floor) => sum + (isActiveComfortAfterglow(floor) ? floor.comfortAfterglow.expeditionBonus || 0 : 0), 0) * 0.22 +
+      focusBonus
   );
 }
 
@@ -6376,18 +6455,102 @@ function startComfortSession(floorId) {
   render(true);
 }
 
+function comfortFocusActionBlockReason(floor, focus) {
+  if (!isBusiness(floor) || !isComfortFloorType(floor.type)) return "这个楼层不能调息余韵";
+  if (!isActiveComfortAfterglow(floor)) return "先完成一次花园茶会或温泉休整";
+  if (!comfortFocusOption(focus)) return "选择一个余韵方向";
+  if (floor.comfortAfterglow.focusApplied) return `余韵已经导向${comfortFocusLabel(floor.comfortAfterglow)}`;
+  return "";
+}
+
+function focusComfortAfterglow(floorId, focus) {
+  const floor = findFloor(floorId);
+  const reason = comfortFocusActionBlockReason(floor, focus);
+  if (reason) {
+    showToast(reason);
+    return;
+  }
+  const glow = floor.comfortAfterglow;
+  const option = comfortFocusOption(focus);
+  const participantCount = Math.max(1, (glow.participantIds || []).length);
+  glow.focus = option.id;
+  glow.focusLabel = option.label;
+  glow.focusApplied = true;
+  glow.focusPulse = 5.5;
+  glow.remaining = Math.min(Math.max(glow.total || 1, glow.remaining || 1) + 22, (glow.remaining || 0) + 18);
+  glow.total = Math.max(glow.total || 1, glow.remaining || 1);
+  state.stats.comfortFocusesDone = (state.stats.comfortFocusesDone || 0) + 1;
+  const statKey = comfortFocusStatKey(option.id);
+  if (statKey) state.stats[statKey] = (state.stats[statKey] || 0) + 1;
+
+  let resultText = "";
+  if (option.id === "rent") {
+    const dwellings = dwellingFloors(state);
+    const rentGain = Math.round((glow.rentBonus || 8) * (1.18 + participantCount * 0.14 + (floor.level || 1) * 0.08));
+    dwellings.forEach((home) => {
+      home.rentReady = Math.min(520, (home.rentReady || 0) + rentGain);
+    });
+    state.happiness = clamp(state.happiness + Math.min(3, 1 + dwellings.length * 0.4), 0, 100);
+    resultText = `${dwellings.length} 间住处租金准备 +${rentGain}`;
+  } else if (option.id === "expedition") {
+    const active = state.expeditions || [];
+    const prep = clamp((glow.expeditionBonus || 0.06) * 0.42 + participantCount * 0.006, 0.02, 0.08);
+    const timePush = Math.round(6 + participantCount * 2 + (floor.level || 1) * 1.5);
+    active.forEach((expedition) => {
+      expedition.remaining = Math.max(1, Number(expedition.remaining || 0) - timePush);
+      expedition.comfortPrepBonus = Math.min(0.28, Number(expedition.comfortPrepBonus || 0) + prep);
+      expedition.comfortPrepLabel = option.label;
+      updateExpeditionWaymarks(expedition, state, true);
+    });
+    resultText = active.length ? `${active.length} 支探险队准备 +${Math.round(prep * 100)}%，剩余 -${timePush}s` : "下一次探险准备提高";
+  } else {
+    const targets = allResidents(state)
+      .filter((person) => person && !person.expeditionId)
+      .map((person) => {
+        ensurePersonLife(person);
+        const pressure = PERSON_MOTIVE_KEYS.reduce((sum, key) => sum + (100 - Number(person.motives[key] || 0)), 0);
+        return { person, pressure };
+      })
+      .sort((a, b) => b.pressure - a.pressure)
+      .slice(0, Math.max(3, Math.min(6, participantCount + 2)))
+      .map((entry) => entry.person);
+    targets.forEach((person) => {
+      applyComfortMotiveBurst(floor, person, 0.82);
+      ensurePersonLife(person);
+      const memory = person.comfortMemory;
+      if (memory) {
+        memory.remaining = Math.min(180, Number(memory.remaining || 0) + 28);
+        memory.total = Math.max(Number(memory.total || 1), memory.remaining);
+        memory.power = Math.min(0.26, Number(memory.power || glow.motiveEase || 0.08) + 0.025);
+      } else {
+        grantComfortMemory(person, floor, glow);
+      }
+    });
+    state.happiness = clamp(state.happiness + Math.min(4, 1.2 + targets.length * 0.35), 0, 100);
+    resultText = `${targets.length} 位居民恢复并延长舒缓记忆`;
+  }
+
+  showToast(`${option.label}：${resultText}`);
+  addLog(`${floor.name} 将${glow.label || "余韵"}导向${option.label}，${resultText}。`);
+  lastKingdomKey = "";
+  render(true);
+}
+
 function updateComfortFloor(floor, dt) {
   if (!isComfortFloorType(floor?.type)) return false;
   const before = comfortSessionMapKey(floor);
   floor.comfortCooldown = Math.max(0, (floor.comfortCooldown || 0) - dt * (1 + clockworkTempoBonus(state) * 0.18));
   if (isActiveComfortAfterglow(floor)) {
     floor.comfortAfterglow.remaining = Math.max(0, Number(floor.comfortAfterglow.remaining || 0) - dt);
+    floor.comfortAfterglow.focusPulse = Math.max(0, Number(floor.comfortAfterglow.focusPulse || 0) - dt);
     if (floor.comfortAfterglow.remaining <= 0) floor.comfortAfterglow = null;
   }
   if (!isActiveComfortSession(floor)) return before !== comfortSessionMapKey(floor);
   const participants = comfortParticipants(floor);
   floor.comfortSession.remaining = Math.max(0, Number(floor.comfortSession.remaining || 0) - dt);
-  floor.comfortSession.participantIds = participants.map((person) => person.id);
+  floor.comfortSession.participantIds = Array.from(
+    new Set([...(floor.comfortSession.participantIds || []), ...participants.map((person) => person.id)].map(Number).filter(Boolean))
+  );
   participants.forEach((person) => applyComfortMotiveBurst(floor, person, dt * 0.055));
   if (floor.comfortSession.remaining <= 0 || !participants.length) {
     const label = COMFORT_SESSION_LABELS[floor.type] || "休整";
@@ -6424,14 +6587,29 @@ function renderComfortSessionPanel(floor) {
       <strong>${COMFORT_SESSION_LABELS[floor.type] || "结伴休整"}</strong>
       <span>${escapeHtml(status)}</span>
       ${echoText}
+      ${renderComfortFocusControls(floor, afterglow)}
     </div>`;
+}
+
+function renderComfortFocusControls(floor, afterglow) {
+  if (!afterglow) return "";
+  const focusText = afterglow.focus
+    ? `<small class="comfort-focus-readout" data-focus="${escapeAttr(afterglow.focus)}">已导向 ${escapeHtml(comfortFocusLabel(afterglow))} · 调息 ${state.stats.comfortFocusesDone || 0} 次</small>`
+    : `<small class="comfort-focus-readout">选择余韵用途：租金、探险或居民恢复</small>`;
+  const actions = !afterglow.focusApplied
+    ? `<div class="comfort-focus-actions">${COMFORT_FOCUS_ORDER.map((focus) => {
+        const option = comfortFocusOption(focus);
+        return `<button class="comfort-focus-btn" data-action="comfort-focus" data-floor-id="${floor.id}" data-focus="${escapeAttr(option.id)}" title="${escapeAttr(option.desc)}"><b>${escapeHtml(option.short)}</b><span>${escapeHtml(option.action)}</span></button>`;
+      }).join("")}</div>`
+    : "";
+  return `${focusText}${actions}`;
 }
 
 function comfortSessionMapKey(floor) {
   if (!isComfortFloorType(floor?.type)) return "";
   const participants = floor.comfortSession?.participantIds || [];
   const glow = floor.comfortAfterglow;
-  return `comfort:${Math.ceil(floor.comfortCooldown || 0)}:${Math.ceil(floor.comfortSession?.remaining || 0)}:${participants.join("-")}:echo:${Math.ceil(glow?.remaining || 0)}:${glow?.participantIds?.join("-") || ""}:${glow?.rentBonus || 0}:${Math.round((glow?.expeditionBonus || 0) * 100)}`;
+  return `comfort:${Math.ceil(floor.comfortCooldown || 0)}:${Math.ceil(floor.comfortSession?.remaining || 0)}:${participants.join("-")}:echo:${Math.ceil(glow?.remaining || 0)}:${glow?.participantIds?.join("-") || ""}:${glow?.rentBonus || 0}:${Math.round((glow?.expeditionBonus || 0) * 100)}:${glow?.focus || ""}:${Math.round((glow?.focusPulse || 0) * 10)}`;
 }
 
 function collectionOrderBonus(game) {
@@ -7860,7 +8038,7 @@ function renderFloor(floor) {
   const comfortClass = isActiveComfortSession(floor) ? "comfort-active" : "";
   const comfortEchoClass = isActiveComfortAfterglow(floor) ? "comfort-afterglow-active" : "";
   const comfortEchoAttrs = isActiveComfortAfterglow(floor)
-    ? ` data-comfort-echo="${escapeAttr(floor.comfortAfterglow.type)}" data-comfort-echo-power="${escapeAttr(Math.round((floor.comfortAfterglow.expeditionBonus || 0) * 100))}"`
+    ? ` data-comfort-echo="${escapeAttr(floor.comfortAfterglow.type)}" data-comfort-echo-focus="${escapeAttr(comfortFocusTone(floor.comfortAfterglow))}" data-comfort-echo-power="${escapeAttr(Math.round((floor.comfortAfterglow.expeditionBonus || 0) * 100))}"`
     : "";
   const showtimeClass = isActiveShowtime(floor) ? "showtime-active" : "";
   const showtimeAttrs = isActiveShowtime(floor)
@@ -8229,11 +8407,13 @@ function renderComfortAfterglowLayer(floor) {
   const glow = floor.comfortAfterglow;
   const progress = Math.round((Number(glow.remaining) / Math.max(1, Number(glow.total) || 1)) * 100);
   const count = clamp((glow.participantIds || []).length || 1, 1, 5);
+  const focus = comfortFocusTone(glow);
+  const focusLabel = comfortFocusLabel(glow);
   return `
     <span class="comfort-afterglow-layer" data-type="${escapeAttr(glow.type)}" style="--comfort-echo:${progress}%" title="${escapeAttr(`${glow.label} · ${Math.ceil(glow.remaining)}s`)}" aria-label="${escapeAttr(`${glow.label} · ${Math.ceil(glow.remaining)}s`)}">
       <i></i>
       ${Array.from({ length: count }, (_, index) => `<b style="--echo-left:${14 + index * 17}%; --echo-lift:${index % 2 ? 8 : 0}px"></b>`).join("")}
-      <em>${escapeHtml(glow.label)}</em>
+      <em aria-hidden="true"><span></span><span></span><span></span></em>
     </span>`;
 }
 
@@ -8247,7 +8427,7 @@ function renderRoomStateTag(floor) {
   }
   if (isActiveComfortAfterglow(floor)) {
     const label = floor.comfortAfterglow.label || "舒缓余韵";
-    return `<span class="room-state-tag good icon-only" data-state="comfort-echo" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"></span>`;
+    return `<span class="room-state-tag good icon-only" data-state="${floor.comfortAfterglow.focus ? "comfort-focus" : "comfort-echo"}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"></span>`;
   }
   if (isActiveFoodRush(floor)) {
     const label = FOOD_RUSH_LABELS[floor.type] || "餐桌高峰";
@@ -8326,7 +8506,7 @@ function renderFloorStatusGlyph(floor) {
   if (floor.type === "lobby") stateName = state.queue.length ? "queue" : "idle";
   else if (floor.type === "dwelling") stateName = expeditionWaymarksForFloor(floor).length ? "expedition-report" : floor.rentReady ? "rent" : "home";
   else if (isActiveComfortSession(floor)) stateName = "comfort";
-  else if (isActiveComfortAfterglow(floor)) stateName = "comfort-echo";
+  else if (isActiveComfortAfterglow(floor)) stateName = floor.comfortAfterglow.focus ? "comfort-focus" : "comfort-echo";
   else if (isActiveFoodRush(floor)) stateName = "meal-rush";
   else if (isActiveServiceCare(floor)) stateName = "service-care";
   else if (isActiveStarChart(floor)) stateName = "star-chart";
@@ -8574,7 +8754,7 @@ function renderFloorStatus(floor) {
     return floor.rentReady ? `租金 ${floor.rentReady}` : "居住";
   }
   if (isActiveComfortSession(floor)) return `${COMFORT_SESSION_LABELS[floor.type] || "休整"} ${Math.ceil(floor.comfortSession.remaining)}s`;
-  if (isActiveComfortAfterglow(floor)) return `${floor.comfortAfterglow.label || "余韵"} ${Math.ceil(floor.comfortAfterglow.remaining)}s`;
+  if (isActiveComfortAfterglow(floor)) return `${floor.comfortAfterglow.label || "余韵"}${floor.comfortAfterglow.focus ? ` · ${comfortFocusLabel(floor.comfortAfterglow)}` : ""} ${Math.ceil(floor.comfortAfterglow.remaining)}s`;
   if (isActiveServiceCare(floor)) return `${currentServiceCarePhase(floor).label}${SERVICE_CARE_LABELS[floor.type] || "礼宾照看"} · 照看 ${floor.serviceCare.touches || 0}/${floor.serviceCare.targetTouches || 0}`;
   if (isActiveStarChart(floor)) return `${currentStarChartPhase(floor).label}${STAR_CHART_LABELS[floor.type] || "星图校准"} · 星标 ${floor.starChart.marks || 0}/${floor.starChart.targetMarks || 0}`;
   if (isActiveToolTune(floor)) return `${currentToolTunePhase(floor).label}${TOOL_TUNE_LABELS[floor.type] || "工具校准"} · 校准点 ${floor.toolTune.marks || 0}/${floor.toolTune.targetMarks || 0}`;
@@ -8607,7 +8787,7 @@ function renderFloorStatus(floor) {
     return floor.rentReady ? `租金 ${floor.rentReady}` : "居住";
   }
   if (isActiveComfortSession(floor)) return `${COMFORT_SESSION_LABELS[floor.type] || "休整"} ${Math.ceil(floor.comfortSession.remaining)}s`;
-  if (isActiveComfortAfterglow(floor)) return `${floor.comfortAfterglow.label || "余韵"} ${Math.ceil(floor.comfortAfterglow.remaining)}s`;
+  if (isActiveComfortAfterglow(floor)) return `${floor.comfortAfterglow.label || "余韵"}${floor.comfortAfterglow.focus ? ` · ${comfortFocusLabel(floor.comfortAfterglow)}` : ""} ${Math.ceil(floor.comfortAfterglow.remaining)}s`;
   if (isActiveFoodRush(floor)) return `${currentFoodRushPace(floor).label}${FOOD_RUSH_LABELS[floor.type] || "餐桌高峰"} · 上菜 ${floor.foodRush.served || 0}/${floor.foodRush.targetServings || 0}`;
   if (isActiveServiceCare(floor)) return `${currentServiceCarePhase(floor).label}${SERVICE_CARE_LABELS[floor.type] || "礼宾照看"} · 照看 ${floor.serviceCare.touches || 0}/${floor.serviceCare.targetTouches || 0}`;
   if (isActiveStarChart(floor)) return `${currentStarChartPhase(floor).label}${STAR_CHART_LABELS[floor.type] || "星图校准"} · 星标 ${floor.starChart.marks || 0}/${floor.starChart.targetMarks || 0}`;
@@ -9078,6 +9258,7 @@ function renderFloorDetail() {
   const comfortReason = isComfortFloorType(floor.type) ? comfortActionBlockReason(floor) : "";
   const comfortEchoValue = comfortAfterglow ? `${Math.ceil(comfortAfterglow.remaining)}s` : `${state.stats.comfortEchoesDone || 0}`;
   const comfortPrepValue = comfortAfterglow ? `+${Math.round((comfortAfterglow.expeditionBonus || 0) * 100)}%` : `+${Math.round(comfortExpeditionPrepBonus(state) * 100)}%`;
+  const comfortFocusValue = comfortAfterglow?.focus ? comfortFocusLabel(comfortAfterglow) : `${state.stats.comfortFocusesDone || 0}`;
   const showtimeCooldownValue = isShowtimeFloorType(floor.type) ? Math.ceil(floor.showtimeCooldown || 0) : 0;
   const showtimeActive = isActiveShowtime(floor);
   const showtimeReason = isShowtimeFloorType(floor.type) ? showtimeActionBlockReason(floor) : "";
@@ -9120,7 +9301,7 @@ function renderFloorDetail() {
       ${floor.type === "market" ? `<div class="stat"><b>${state.orders.length}/${orderCapacity(state)}</b><span>订单栏</span></div><div class="stat"><b>${marketCooldown ? marketCooldown + "s" : "就绪"}</b><span>撮合</span></div><div class="stat"><b>${marketParcelStageValue}</b><span>包裹</span></div><div class="stat"><b>${marketParcelPackedValue}</b><span>打包</span></div><div class="stat"><b>${state.stats.marketParcelsDone || 0}</b><span>流转</span></div>` : ""}
       ${floor.type === "kingdom" ? `<div class="stat"><b>${royalMandateStageValue}</b><span>王令</span></div><div class="stat"><b>${royalMandatePreparedValue}</b><span>预备</span></div><div class="stat"><b>${state.stats.royalMandatesDone || 0}</b><span>签发</span></div><div class="stat"><b>${state.stats.royalCourierReceiptsDone || 0}</b><span>回执</span></div><div class="stat"><b>${royalMandateInfo ? royalMandateInfo.missing : "-"}</b><span>缺口</span></div>` : ""}
       ${floor.type === "library" ? `<div class="stat"><b>${catalog.completed}/${COLLECTION_DEFS.length}</b><span>图鉴</span></div><div class="stat"><b>${libraryCooldown ? libraryCooldown + "s" : "就绪"}</b><span>编目</span></div>` : ""}
-      ${isComfortFloorType(floor.type) ? `<div class="stat"><b>${comfortActive ? Math.ceil(floor.comfortSession.remaining) + "s" : comfortCooldown ? comfortCooldown + "s" : "就绪"}</b><span>休整</span></div><div class="stat"><b>${comfortEchoValue}</b><span>余韵</span></div><div class="stat"><b>${comfortPrepValue}</b><span>探险准备</span></div>` : ""}
+      ${isComfortFloorType(floor.type) ? `<div class="stat"><b>${comfortActive ? Math.ceil(floor.comfortSession.remaining) + "s" : comfortCooldown ? comfortCooldown + "s" : "就绪"}</b><span>休整</span></div><div class="stat"><b>${comfortEchoValue}</b><span>余韵</span></div><div class="stat"><b>${comfortPrepValue}</b><span>探险准备</span></div><div class="stat"><b>${comfortFocusValue}</b><span>调息</span></div>` : ""}
       ${isShowtimeFloorType(floor.type) ? `<div class="stat"><b>${showtimeActive ? Math.ceil(floor.showtime.remaining) + "s" : showtimeCooldownValue ? showtimeCooldownValue + "s" : "就绪"}</b><span>演出</span></div><div class="stat"><b>${showtimeBeatValue}</b><span>段落</span></div><div class="stat"><b>${showtimeHeatValue}</b><span>热度</span></div><div class="stat"><b>${state.stats.entertainmentShowsDone || 0}/${state.stats.showtimeReactionsDone || 0}</b><span>小剧/反应</span></div>` : ""}
     </div>
     ${renderFloorPerks(floor)}
@@ -9205,6 +9386,7 @@ function renderFloorPerks(floor) {
     perks.push(`休整 ${state.stats.comfortSessionsDone || 0}`);
     perks.push(`余韵 ${state.stats.comfortEchoesDone || 0}`);
     if (isActiveComfortAfterglow(floor)) perks.push(`${floor.comfortAfterglow.label} ${Math.ceil(floor.comfortAfterglow.remaining)}s`);
+    if (isActiveComfortAfterglow(floor) && floor.comfortAfterglow.focus) perks.push(`调息 ${comfortFocusLabel(floor.comfortAfterglow)}`);
   } else if (floor.type === "entertainment") {
     perks.push("快乐稳定恢复");
     perks.push(`掌声奖励 +${Math.round(entertainmentJoyBonus(state) * 55)}%`);
@@ -9234,6 +9416,7 @@ function renderFloorPerks(floor) {
     perks.push(`休整 ${state.stats.comfortSessionsDone || 0}`);
     perks.push(`余韵 ${state.stats.comfortEchoesDone || 0}`);
     if (isActiveComfortAfterglow(floor)) perks.push(`${floor.comfortAfterglow.label} ${Math.ceil(floor.comfortAfterglow.remaining)}s`);
+    if (isActiveComfortAfterglow(floor) && floor.comfortAfterglow.focus) perks.push(`调息 ${comfortFocusLabel(floor.comfortAfterglow)}`);
   } else if (floor.type === "clinic") {
     perks.push(`容错护理 +${Math.round(clinicCareBonus(state) * 100)}%`);
     perks.push(`情绪修复 +${Math.round(clinicCareBonus(state) * 42)}%`);
@@ -9529,6 +9712,7 @@ function renderInventoryPanel() {
   const reportCount = state.expeditionReports?.length || 0;
   const lifeStoryCount = state.lifeStories?.length || 0;
   const recordItems = [
+    renderInventoryMetric("余韵调息", `${state.stats.comfortFocusesDone || 0} 次`, `租金 ${state.stats.comfortRentFocusesDone || 0} / 探险 ${state.stats.comfortExpeditionFocusesDone || 0} / 恢复 ${state.stats.comfortRecoveryFocusesDone || 0}`),
     renderInventoryMetric("生活记录", `${lifeStoryCount} 段`, "居民外出与日常片段"),
     renderInventoryMetric("探险回执", `${reportCount} 份`, `路线档案 +${Math.round(expeditionReportBonus(state) * 100)}%`),
     renderInventoryMetric("餐桌高峰", `${state.stats.foodRushCoursesDone || 0} 桌次`, `${state.stats.foodRushesDone || 0} 次 / ${state.stats.foodServingsDone || 0} 份`),
@@ -10195,6 +10379,9 @@ function bindEvents() {
         break;
       case "comfort-session":
         startComfortSession(floorId);
+        break;
+      case "comfort-focus":
+        focusComfortAfterglow(floorId, button.dataset.focus);
         break;
       case "entertainment-show":
         startEntertainmentShow(floorId);

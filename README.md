@@ -4,10 +4,10 @@
 
 ## 本地运行
 
-直接打开 `index.html` 可以游玩；最近一次 v71 本地验证使用：
+直接打开 `index.html` 可以游玩；最近一次 v72 本地验证使用：
 
 ```text
-http://127.0.0.1:8821
+http://127.0.0.1:8822
 ```
 
 ## 玩法切片
@@ -27,6 +27,7 @@ http://127.0.0.1:8821
 - v66 翻新旧入口大厅：大厅访客会累积等待压力，推荐派号会按贵宾、久候、库存/空房等综合排序；旧地图大厅增加候车道和路线信号，电梯面板和路线票显示“顺畅/繁忙/压线”等状态，并用 `gpt-image-2` 刷新了无文字大厅背景 `room-lobby-v3.webp`。
 - v67 翻新旧餐饮楼层：餐桌高峰现在会显示服务轨、桌况点、菜序灯和下一次上菜倒计时；新增 `流水上菜` 手动领取任务，资产背包也会记录高峰桌次、组织次数和上菜份数，并用 `gpt-image-2` 刷新了无文字厨房背景 `room-food-v3.webp`。
 - v69 翻新旧观星台：观星台现在可主动 `星图校准`，消耗星盘耗材拉居民读星、为正在进行的探险缩短时间并沉淀星图预报奖励；新增 `星图校准` 手动领取任务，资产背包记录校准场次和星标，并用 `gpt-image-2` 刷新了无文字云顶观星背景 `room-observatory-v2.webp`。
+- v72 深化旧花园/温泉余韵：茶会或休整结束后的余韵现在可手动导向 `租金回响`、`探险整备` 或 `居民恢复`，新增 `余韵调息` 手动领取任务，资产背包记录三种导向次数；同时修复参与者提前离场导致余韵丢失的旧玩法边界，并用 `gpt-image-2` 刷新无文字花园背景 `room-garden-v3.webp`。
 - v71 翻新旧工坊：工坊现在可主动 `工具校准`，消耗工坊零件拉居民到工具台，分阶段积累校准点，支援施工、补货、探险和工坊订单；新增 `工具校准` 手动领取任务，资产背包记录校准场次和校准点，并用 `gpt-image-2` 刷新了无文字工坊背景 `room-craft-v3.webp`。
 - v68 翻新旧服务楼层：露台花坊现在可主动安排 `礼宾照看`，消耗花礼把居民拉入服务层，分阶段降低大厅等待压力、奖励金币/幸福/租金准备；新增 `礼宾照看` 手动领取任务，资产背包记录照看次数和场次，并用 `gpt-image-2` 刷新了无文字花坊礼宾背景 `room-service-v2.webp`。
 - v62 继续深化角色生活系统：居民外出现在会在出发楼层和目标楼层留下稳定的生活路线，完成后沉淀为“生活小故事”，地图、楼层详情、居民卡片和名册都会显示最近足迹与需求回补，不再用原地震动冒充互动。
@@ -53,6 +54,16 @@ http://127.0.0.1:8821
 - 键盘支持 `W / ↑`、`S / ↓` 移动升降梯，`Space / Enter` 下客，`B` 打开建设。
 - v54 进行了轻量化清理：发布包移除了已被新版替代的旧房间图和旧表演者 PNG，表演者素材改为无损 WebP；发布运行目录只保留当前必要资产，本地旧浏览器配置、旧截图、图像中间产物和过期生成记录已清理。
 - v55 深化了旧演艺玩法：新增小剧任务、演出冷却、观众需求撮合、掌声金币奖励和娱乐/社交恢复，并保留 `docs/v55-entertainment-showtime-image-prompt.txt` 供后续图像网关恢复后刷新演艺房间背景。
+
+## v72 Update
+
+- v72 deepens the old garden/bathhouse comfort-afterglow loop instead of adding a new floor. Completed tea/rest sessions now preserve their participant list even if residents leave early, so afterglow is no longer lost at session end.
+- Added `COMFORT_FOCUS_OPTIONS`, `focusComfortAfterglow()`, `comfortFocusesDone`, per-focus stats, and the new `余韵调息` quest. It uses the existing manual claim flow, so coins and gems are not auto-awarded.
+- Active afterglow can be directed into `租金回响`, `探险整备`, or `居民恢复`; these boost dwelling rent preparation, active/next expedition prep, or low-motive residents and comfort memories.
+- Garden/bathhouse detail panels now show the current focus, focus controls, updated stats, and backpack records; the old map removes the visible afterglow text label and uses compact glyph/pip styling for focus state.
+- `gpt-image-2` generated the refreshed no-text garden afterglow background `assets/art/room-garden-v3.webp`; the reusable prompt is saved at `docs/v72-comfort-focus-garden-image-prompt.txt`.
+- The save version is bumped to `26`; local verification used `http://127.0.0.1:8822/` with `tmp/verify-v72-comfort-focus.mjs`.
+- Cloudflare production and preview both load v72. Preview for this pass: `https://617d865a.little-depths.pages.dev/`.
 
 ## v71 Update
 

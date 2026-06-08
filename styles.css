@@ -1793,7 +1793,7 @@ body.fullscreen-active .layout {
 }
 
 .floor[data-type="garden"] .room {
-  --room-art: url("assets/art/room-garden-v2.webp");
+  --room-art: url("assets/art/room-garden-v3.webp");
   --room-bg:
     radial-gradient(ellipse at 48% 86%, rgba(150, 255, 170, 0.36), transparent 32%),
     linear-gradient(160deg, #6c8f58, #315f4e 54%, #1b2530);
