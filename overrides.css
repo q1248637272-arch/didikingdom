@@ -6330,3 +6330,110 @@ body.fullscreen-active .build-grid {
     gap: 5px;
   }
 }
+
+/* v73 mobile layout polish: keep assets visible and lift feedback above the dock drawer. */
+.modal-backdrop {
+  z-index: 78;
+}
+
+.inventory-backdrop {
+  z-index: 82;
+}
+
+@media (max-width: 980px) {
+  body.mobile-panel-layout .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 8px;
+  }
+
+  body.mobile-panel-layout .brand {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  body.mobile-panel-layout .top-actions {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  body.mobile-panel-layout .resources {
+    position: static;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: flex-start;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+    padding: 7px 0 0;
+    overflow-x: auto;
+    background: transparent;
+    border-top: 1px solid rgba(255, 210, 87, 0.28);
+    border-bottom: 0;
+    box-shadow: none;
+    scrollbar-width: none;
+  }
+
+  body.mobile-panel-layout .resources::-webkit-scrollbar {
+    display: none;
+  }
+
+  body.mobile-panel-layout .resource {
+    flex: 0 0 auto;
+    min-width: 58px;
+    min-height: 32px;
+    padding: 5px 8px;
+    border-width: 1px;
+    border-radius: 8px;
+    background:
+      linear-gradient(180deg, rgba(98, 48, 28, 0.94), rgba(39, 22, 18, 0.96)),
+      rgba(19, 18, 22, 0.9);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  }
+
+  body.mobile-panel-layout .resource:nth-child(1)::before,
+  body.mobile-panel-layout .resource:nth-child(2)::before {
+    display: none;
+  }
+
+  body.mobile-panel-layout.mobile-panel-open .toast {
+    bottom: calc(134px + min(50dvh, 460px) + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 620px) {
+  body.mobile-panel-layout .topbar {
+    row-gap: 6px;
+  }
+
+  body.mobile-panel-layout .resources {
+    gap: 5px;
+    padding-top: 6px;
+  }
+
+  body.mobile-panel-layout .resource {
+    min-width: 52px;
+    min-height: 30px;
+    padding: 5px 7px;
+  }
+
+  body.mobile-panel-layout .resource strong {
+    font-size: 12px;
+  }
+
+  body.mobile-panel-layout.mobile-panel-open .toast {
+    bottom: calc(132px + min(48dvh, 430px) + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 360px) {
+  body.mobile-panel-layout .resources {
+    gap: 4px;
+  }
+
+  body.mobile-panel-layout .resource {
+    min-width: 48px;
+    padding-inline: 6px;
+  }
+}

@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v72`
-- Latest preview deployment: `https://617d865a.little-depths.pages.dev/`
-- Local server used for v72 verification: `http://127.0.0.1:8822/`
+- Latest deployed version: `v73`
+- Latest preview deployment: `https://3bb48ae2.little-depths.pages.dev/`
+- Local server used for v73 verification: `http://127.0.0.1:8824/`
 
 ## Current State
 
@@ -22,11 +22,19 @@ wrangler pages deploy dist --project-name little-depths
 ```
 
 - GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`, but current release practice is to deploy Cloudflare with local Wrangler OAuth from `dist`, then sync GitHub separately. Use `[skip ci]` when pushing documentation/code sync commits that should not ask GitHub Actions to deploy Cloudflare.
-- Current caveat: v72 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
+- Current caveat: v73 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v73 Mobile Layout Audit / Dock Overlap Fix
+
+- Audited the main gameplay view, mobile dock/panel states, inventory, guide, and build modal across desktop, tablet, mobile, and narrow mobile using `tmp/verify-v73-layout-audit.mjs`.
+- Fixed the repeated mobile resource/dock overlap by moving `.resources` into a compact topbar row under `body.mobile-panel-layout`, so coins, gems, population, happiness, and streak remain visible while the bottom function dock stays dedicated to panel switching.
+- Raised mobile `.toast` feedback above expanded mobile panels, and lifted `.modal-backdrop` / `.inventory-backdrop` layers above toast feedback so guide/build/inventory dialogs do not get covered.
+- Bumped `index.html` / `sw.js` to v73, synced `dist`, and verified the final v73 layout audit at `0` issues and `0` runtime errors.
+- Deployed v73 to Cloudflare Pages with local Wrangler direct upload. Production: `https://little-depths.pages.dev/`; preview: `https://3bb48ae2.little-depths.pages.dev/`.
 
 ### v72 Comfort Focus / Garden Afterglow Refresh
 
@@ -884,8 +892,8 @@ wrangler pages deploy dist --project-name little-depths
 继续开发 C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4 里的迪迪王国项目。
 
 线上地址：https://little-depths.pages.dev/
-最新部署版本：v72
-最新预览：https://617d865a.little-depths.pages.dev/
+最新部署版本：v73
+最新预览：https://3bb48ae2.little-depths.pages.dev/
 交接文档：docs/HANDOFF.md
 
 请先读取项目代码、README.md、docs/HANDOFF.md 和最近状态，再继续优化。方向：从游戏内容、玩法、画面、图像质量等层面更新迭代，不只新增内容，也要把旧楼层和旧系统做得更好。涉及图像绘制时使用 gpt-image-2；如果网关不可用，不要写入或打印密钥，改为保存可直接用于网页端生成的提示词。
