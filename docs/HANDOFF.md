@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v76`
-- Latest preview deployment: `https://ccbda666.little-depths.pages.dev/`
-- Local server used for v76 verification: `http://127.0.0.1:8827/`
+- Latest deployed version: `v77`
+- Latest preview deployment: `https://de65b1b7.little-depths.pages.dev/`
+- Local server used for v77 verification: `http://127.0.0.1:8828/`
 
 ## Current State
 
@@ -22,11 +22,20 @@ wrangler pages deploy dist --project-name little-depths
 ```
 
 - GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`, but current release practice is to deploy Cloudflare with local Wrangler OAuth from `dist`, then sync GitHub separately. Use `[skip ci]` when pushing documentation/code sync commits that should not ask GitHub Actions to deploy Cloudflare.
-- Current caveat: v76 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
+- Current caveat: v77 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v77 All-Room Footing Fix
+
+- Generalized the v76 dwelling-only footing patch into a shared `.floor { --room-person-footing: ... }` baseline, so every current and future non-lobby room uses the same safe sprite foot line.
+- Removed the too-low generic v75/v76 fallback that let food/service/craft/market/library/garden/observatory and later rooms sink into the bottom foreground.
+- Kept the capped `--person-lift` / `--pair-lift` depth variables, but now all `.life-stage` resident/worker/social sprites combine them with the shared footing offset.
+- Added `tmp/verify-v77-all-room-footing.mjs`. It seeds all known non-lobby room types and verified no missing room types, safe `stageBottomGap` / `sceneBottomGap`, no mobile horizontal overflow, and preserved transient-toast behavior.
+- Local QA covered: dwelling, food, service, craft, entertainment, kingdom, market, library, garden, observatory, skyport, festival, bathhouse, clinic, clockwork, aquarium, alchemy, training, and treasure. Screenshot: `verification-v77-all-room-footing-room-local.png`.
+- Bumped `index.html` / `sw.js` to v77, synced `dist`, and deployed v77 to Cloudflare Pages with local Wrangler direct upload. Production: `https://little-depths.pages.dev/`; preview: `https://de65b1b7.little-depths.pages.dev/`.
 
 ### v76 Dwelling Footing Follow-Up
 

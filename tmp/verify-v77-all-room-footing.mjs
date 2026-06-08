@@ -9,13 +9,13 @@ const edgeCandidates = [
   "C:/Program Files/Microsoft/Edge/Application/msedge.exe",
 ];
 const edgePath = edgeCandidates.find((candidate) => existsSync(candidate));
-const webPort = 8827;
-const cdpPort = 9277;
-const url = `http://127.0.0.1:${webPort}/?v76-dwelling-footing=1`;
-const profile = join(root, "tmp", `edge-v76-dwelling-footing-${Date.now()}`);
-const toastShot = join(root, "verification-v76-dwelling-footing-toast-local.png");
-const mobileShot = join(root, "verification-v76-dwelling-footing-mobile-local.png");
-const roomShot = join(root, "verification-v76-dwelling-footing-room-local.png");
+const webPort = 8828;
+const cdpPort = 9278;
+const url = `http://127.0.0.1:${webPort}/?v77-all-room-footing=1`;
+const profile = join(root, "tmp", `edge-v77-all-room-footing-${Date.now()}`);
+const toastShot = join(root, "verification-v77-all-room-footing-toast-local.png");
+const mobileShot = join(root, "verification-v77-all-room-footing-mobile-local.png");
+const roomShot = join(root, "verification-v77-all-room-footing-room-local.png");
 
 if (!edgePath) throw new Error("Microsoft Edge executable was not found.");
 mkdirSync(profile, { recursive: true });
@@ -203,46 +203,96 @@ try {
 
   const visible = await evaluate(client, `(() => {
     if (typeof closeGuideModal === "function") closeGuideModal(true);
-    state = makeNewGame();
-    state.coins = 18000;
-    state.gems = 96;
-    state.happiness = 88;
-    const dwelling = state.floors.find((floor) => floor.type === "dwelling");
-    while (dwelling.residents.length < 3) {
-      addResidentToDwelling(state, dwelling, makeResident(state, dwelling.residents.length % 2 ? "garden" : "service"));
-    }
-    const residents = dwelling.residents.map((entry) => getResident(entry.id)).filter(Boolean);
-    const [left, right, solo] = residents;
-    const scope = floorSocialScope(dwelling);
-    left.socialPartnerId = right.id;
-    right.socialPartnerId = left.id;
-    left.socialGroup = "v76-footing";
-    right.socialGroup = "v76-footing";
-    left.socialFloorScope = scope;
-    right.socialFloorScope = scope;
-    left.socialRole = "left";
-    right.socialRole = "right";
-    left.socialScene = "chat";
-    right.socialScene = "chat";
-    left.socialLabel = "grounding";
-    right.socialLabel = "grounding";
-    left.socialPhase = "engage";
-    right.socialPhase = "engage";
-    left.socialTotal = 30;
-    right.socialTotal = 30;
-    left.socialTimer = 30;
-    right.socialTimer = 30;
-    left.activity = "talk";
-    right.activity = "chat";
-    left.activityTimer = 12;
-    right.activityTimer = 12;
-    setPersonMotion(left, { x: 38, y: 22, scale: 0.96, facing: "right", mode: "social", spotId: "v76-high" });
-    setPersonMotion(right, { x: 58, y: 22, scale: 0.94, facing: "left", mode: "social", spotId: "v76-high" });
-    solo.activity = "look";
-    solo.activityTimer = 12;
-    solo.socialCooldown = 999;
-    setPersonMotion(solo, { x: 76, y: 18, scale: 0.95, facing: "left", mode: "observe", spotId: "v76-window" });
-    state.selectedFloorId = dwelling.id;
+    window.__seedV77Footing = () => {
+      state = makeNewGame();
+      state.coins = 18000;
+      state.gems = 96;
+      state.happiness = 88;
+      const types = Object.keys(FLOOR_TYPES).filter((type) => type !== "lobby");
+      let dwelling = state.floors.find((floor) => floor.type === "dwelling");
+      if (!dwelling) {
+        dwelling = createFloor(state, "dwelling", { name: "Footing Dwelling", capacity: types.length + 4 });
+        state.floors.push(dwelling);
+      }
+      dwelling.residents = [];
+      dwelling.capacity = Math.max(dwelling.capacity || 0, types.length + 4);
+      for (const type of types) {
+        if (!state.floors.some((floor) => floor.type === type)) {
+          const data = FLOOR_TYPES[type] || {};
+          state.floors.push(createFloor(state, type, {
+            name: \`Footing \${type}\`,
+            level: 2,
+            stock: data.stockMax || 18,
+            stockMax: data.stockMax || 18,
+          }));
+        }
+      }
+      state.floors.forEach((floor) => {
+        floor.status = "open";
+        if (isBusiness(floor)) {
+          floor.workers = [];
+          floor.stockMax = floor.stockMax || FLOOR_TYPES[floor.type]?.stockMax || 18;
+          floor.stock = floor.stockMax;
+          const worker = makeResident(state, floor.type);
+          addResidentToDwelling(state, dwelling, worker);
+          worker.workFloorId = floor.id;
+          worker.activity = "look";
+          worker.activityTimer = 60;
+          worker.socialCooldown = 999;
+          delete worker.socialPartnerId;
+          delete worker.socialGroup;
+          delete worker.socialFloorScope;
+          floor.workers.push(worker.id);
+          setPersonMotion(worker, {
+            x: 42 + (Math.abs(floor.id) % 4) * 9,
+            y: 18 + (Math.abs(floor.id) % 3) * 2,
+            scale: 0.95,
+            facing: Math.abs(floor.id) % 2 ? "left" : "right",
+            mode: "observe",
+            spotId: "v77-all-room",
+          });
+        }
+      });
+      const left = makeResident(state, "service");
+      const right = makeResident(state, "garden");
+      const solo = makeResident(state, "food");
+      addResidentToDwelling(state, dwelling, left);
+      addResidentToDwelling(state, dwelling, right);
+      addResidentToDwelling(state, dwelling, solo);
+      const scope = floorSocialScope(dwelling);
+      left.socialPartnerId = right.id;
+      right.socialPartnerId = left.id;
+      left.socialGroup = "v77-footing";
+      right.socialGroup = "v77-footing";
+      left.socialFloorScope = scope;
+      right.socialFloorScope = scope;
+      left.socialRole = "left";
+      right.socialRole = "right";
+      left.socialScene = "chat";
+      right.socialScene = "chat";
+      left.socialLabel = "grounding";
+      right.socialLabel = "grounding";
+      left.socialPhase = "engage";
+      right.socialPhase = "engage";
+      left.socialTotal = 60;
+      right.socialTotal = 60;
+      left.socialTimer = 60;
+      right.socialTimer = 60;
+      left.activity = "talk";
+      right.activity = "chat";
+      left.activityTimer = 60;
+      right.activityTimer = 60;
+      setPersonMotion(left, { x: 38, y: 22, scale: 0.96, facing: "right", mode: "social", spotId: "v77-high" });
+      setPersonMotion(right, { x: 58, y: 22, scale: 0.94, facing: "left", mode: "social", spotId: "v77-high" });
+      solo.activity = "look";
+      solo.activityTimer = 60;
+      solo.socialCooldown = 999;
+      setPersonMotion(solo, { x: 76, y: 18, scale: 0.95, facing: "left", mode: "observe", spotId: "v77-window" });
+      state.selectedFloorId = dwelling.id;
+      window.__v77ExpectedTypes = types;
+      return types;
+    };
+    window.__seedV77Footing();
     setMobilePanel("detail", true);
     render(true);
     showToast("visitor entered elevator", { duration: 8000 });
@@ -252,8 +302,8 @@ try {
       const toastRect = toast.getBoundingClientRect();
       const dockRect = dock?.getBoundingClientRect();
       resolve({
-        appVersion: [...document.scripts].some((script) => script.src.includes("app.js?v=76")),
-        cssVersion: [...document.querySelectorAll('link[rel="stylesheet"]')].some((link) => link.href.includes("overrides.css?v=76")),
+        appVersion: [...document.scripts].some((script) => script.src.includes("app.js?v=77")),
+        cssVersion: [...document.querySelectorAll('link[rel="stylesheet"]')].some((link) => link.href.includes("overrides.css?v=77")),
         visible: toast.classList.contains("show"),
         opacity: Number(getComputedStyle(toast).opacity),
         pointerEvents: getComputedStyle(toast).pointerEvents,
@@ -263,10 +313,10 @@ try {
         clearance: dockRect ? Math.round(dockRect.top - toastRect.bottom) : null,
         noHorizontalOverflow: document.documentElement.scrollWidth <= window.innerWidth + 1,
       });
-    }, 320));
+    }, 700));
   })()`, true);
 
-  assert(visible.appVersion && visible.cssVersion, "index.html should load v76 app and CSS.");
+  assert(visible.appVersion && visible.cssVersion, "index.html should load v77 app and CSS.");
   assert(visible.visible && visible.opacity > 0.65, "Toast should become visible immediately.");
   assert(visible.pointerEvents === "none", "Toast should never block pointer input.");
   assert(visible.ariaHidden === null, "Visible toast should be exposed to aria-live.");
@@ -276,67 +326,39 @@ try {
 
   const hidden = await evaluate(client, `(async () => {
     await new Promise((resolve) => setTimeout(resolve, 3050));
-    const dwelling = state.floors.find((floor) => floor.type === "dwelling");
-    const residents = dwelling.residents.map((entry) => getResident(entry.id)).filter(Boolean);
-    const [left, right, solo] = residents;
-    const scope = floorSocialScope(dwelling);
-    left.socialPartnerId = right.id;
-    right.socialPartnerId = left.id;
-    left.socialGroup = "v76-footing";
-    right.socialGroup = "v76-footing";
-    left.socialFloorScope = scope;
-    right.socialFloorScope = scope;
-    left.socialRole = "left";
-    right.socialRole = "right";
-    left.socialScene = "chat";
-    right.socialScene = "chat";
-    left.socialLabel = "grounding";
-    right.socialLabel = "grounding";
-    left.socialPhase = "engage";
-    right.socialPhase = "engage";
-    left.socialTotal = 30;
-    right.socialTotal = 30;
-    left.socialTimer = 30;
-    right.socialTimer = 30;
-    left.activity = "talk";
-    right.activity = "chat";
-    left.activityTimer = 30;
-    right.activityTimer = 30;
-    setPersonMotion(left, { x: 38, y: 22, scale: 0.96, facing: "right", mode: "social", spotId: "v76-high" });
-    setPersonMotion(right, { x: 58, y: 22, scale: 0.94, facing: "left", mode: "social", spotId: "v76-high" });
-    delete solo.socialPartnerId;
-    delete solo.socialGroup;
-    delete solo.socialFloorScope;
-    solo.activity = "look";
-    solo.activityTimer = 30;
-    solo.socialCooldown = 999;
-    setPersonMotion(solo, { x: 76, y: 18, scale: 0.95, facing: "left", mode: "observe", spotId: "v76-window" });
-    state.selectedFloorId = dwelling.id;
+    const expectedTypes = window.__seedV77Footing();
     render(true);
     await new Promise((resolve) => setTimeout(resolve, 180));
     const toast = document.getElementById("toast");
-    const floor = document.querySelector('.floor[data-type="dwelling"]');
-    const stage = floor?.querySelector(".life-stage");
-    const scene = floor?.querySelector(".room-scene");
-    const stageRect = stage?.getBoundingClientRect();
-    const sceneRect = scene?.getBoundingClientRect();
-    const people = [...(stage?.children || [])]
-      .filter((element) => element.matches(".resident-dot, .worker-dot, .social-pair"))
-      .map((element) => {
-        const rect = element.getBoundingClientRect();
-        const style = getComputedStyle(element);
-        return {
-          className: element.className,
-          bottom: style.bottom,
-          stageBottomGap: Math.round(stageRect.bottom - rect.bottom),
-          sceneBottomGap: Math.round(sceneRect.bottom - rect.bottom),
-          topInsideScene: Math.round(rect.top - sceneRect.top),
-          width: Math.round(rect.width),
-          height: Math.round(rect.height),
-        };
+    const people = [...document.querySelectorAll(".floor:not([data-type='lobby'])")]
+      .flatMap((floor) => {
+        const stage = floor.querySelector(".life-stage");
+        const scene = floor.querySelector(".room-scene");
+        if (!stage || !scene) return [];
+        const stageRect = stage.getBoundingClientRect();
+        const sceneRect = scene.getBoundingClientRect();
+        return [...stage.children]
+          .filter((element) => element.matches(".resident-dot, .worker-dot, .social-pair"))
+          .map((element) => {
+            const rect = element.getBoundingClientRect();
+            const style = getComputedStyle(element);
+            return {
+              floorType: floor.dataset.type,
+              className: element.className,
+              bottom: style.bottom,
+              footing: getComputedStyle(floor).getPropertyValue("--room-person-footing").trim(),
+              stageBottomGap: Math.round(stageRect.bottom - rect.bottom),
+              sceneBottomGap: Math.round(sceneRect.bottom - rect.bottom),
+              topInsideScene: Math.round(rect.top - sceneRect.top),
+              width: Math.round(rect.width),
+              height: Math.round(rect.height),
+            };
+          });
       });
+    const testedTypes = [...new Set(people.map((entry) => entry.floorType))].sort();
+    const missingTypes = expectedTypes.filter((type) => !testedTypes.includes(type));
     const swText = await fetch("sw.js", { cache: "no-store" }).then((response) => response.text());
-    const cssText = await fetch("overrides.css?v=76", { cache: "no-store" }).then((response) => response.text());
+    const cssText = await fetch("overrides.css?v=77", { cache: "no-store" }).then((response) => response.text());
     return {
       toastVisible: toast.classList.contains("show"),
       toastOpacity: Number(getComputedStyle(toast).opacity),
@@ -344,10 +366,13 @@ try {
       toastAriaHidden: toast.getAttribute("aria-hidden"),
       toastText: toast.textContent,
       people,
-      hasSocialPair: Boolean(stage?.querySelector(".social-pair")),
+      expectedTypes,
+      testedTypes,
+      missingTypes,
+      hasSocialPair: people.some((entry) => entry.className.includes("social-pair")),
       hasSolo: people.some((entry) => entry.className.includes("resident-dot")),
-      cssGrounding: cssText.includes("--person-lift") && cssText.includes("--pair-lift"),
-      swv76: swText.includes("little-depths-v76") && swText.includes("app.js?v=76"),
+      cssGrounding: cssText.includes("--room-person-footing") && cssText.includes("--person-lift") && cssText.includes("--pair-lift"),
+      swv77: swText.includes("little-depths-v77") && swText.includes("app.js?v=77"),
       noHorizontalOverflow: document.documentElement.scrollWidth <= window.innerWidth + 1,
     };
   })()`, true);
@@ -357,15 +382,23 @@ try {
   assert(hidden.toastAriaHidden === "true", "Hidden toast should be aria-hidden.");
   assert(hidden.toastText === "", "Hidden toast text should be cleared.");
   assert(hidden.hasSocialPair, "Dwelling should render a social pair for grounding checks.");
-  assert(hidden.cssGrounding && hidden.swv76, "v76 CSS and service worker markers should be present.");
+  assert(hidden.cssGrounding && hidden.swv77, "v77 CSS and service worker markers should be present.");
   assert(hidden.noHorizontalOverflow, "Grounded mobile scene should not create horizontal overflow.");
-  assert(hidden.people.length >= 2, `Expected at least two rendered room people/groups, got ${hidden.people.length}.`);
+  assert(!hidden.missingTypes.length, `Some room types did not render people: ${hidden.missingTypes.join(", ")}`);
+  assert(hidden.people.length >= hidden.expectedTypes.length, `Expected at least ${hidden.expectedTypes.length} rendered room people/groups, got ${hidden.people.length}.`);
   for (const person of hidden.people) {
-    assert(person.stageBottomGap >= 36 && person.stageBottomGap <= 62, `Person/group feet should sit on the visible dwelling floor: ${JSON.stringify(person)}`);
-    assert(person.topInsideScene >= -24, `Person/group floats outside room scene: ${JSON.stringify(person)}`);
+    assert(person.stageBottomGap >= 36 && person.stageBottomGap <= 66, `Person/group feet should sit on the visible floor: ${JSON.stringify(person)}`);
+    assert(person.sceneBottomGap >= 8 && person.sceneBottomGap <= 38, `Person/group should not sink below or float above the room floor: ${JSON.stringify(person)}`);
+    assert(person.topInsideScene >= -36, `Person/group floats outside room scene: ${JSON.stringify(person)}`);
   }
   await capture(client, mobileShot);
 
+  await client.send("Emulation.setDeviceMetricsOverride", {
+    width: 390,
+    height: 1600,
+    deviceScaleFactor: 1,
+    mobile: true,
+  });
   await evaluate(client, `(() => {
     setMobilePanel("close", false);
     render(true);

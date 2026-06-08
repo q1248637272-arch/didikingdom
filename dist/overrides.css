@@ -6661,7 +6661,7 @@ body.fullscreen-active .build-grid {
   }
 }
 
-/* v75/v76 transient feedback and grounded room people. */
+/* v75-v77 transient feedback and grounded room people. */
 .toast {
   opacity: 0;
   pointer-events: none;
@@ -6678,40 +6678,21 @@ body.fullscreen-active .build-grid {
   position: absolute;
 }
 
+.floor {
+  --room-person-footing: 44px;
+}
+
 .life-stage > .resident-dot,
 .life-stage > .worker-dot {
-  bottom: calc(var(--person-lift, 0px) + 14px);
+  bottom: calc(var(--person-lift, 0px) + var(--room-person-footing, 44px));
 }
 
 .life-stage > .social-pair {
-  bottom: calc(var(--pair-lift, 0px) + 14px);
-}
-
-.floor[data-type="dwelling"] .life-stage > .resident-dot,
-.floor[data-type="dwelling"] .life-stage > .worker-dot {
-  bottom: calc(var(--person-lift, 0px) + 44px);
-}
-
-.floor[data-type="dwelling"] .life-stage > .social-pair {
-  bottom: calc(var(--pair-lift, 0px) + 44px);
+  bottom: calc(var(--pair-lift, 0px) + var(--room-person-footing, 44px));
 }
 
 @media (max-width: 620px) {
-  .life-stage > .resident-dot,
-  .life-stage > .worker-dot {
-    bottom: calc(var(--person-lift, 0px) + 12px);
-  }
-
-  .life-stage > .social-pair {
-    bottom: calc(var(--pair-lift, 0px) + 12px);
-  }
-
-  .floor[data-type="dwelling"] .life-stage > .resident-dot,
-  .floor[data-type="dwelling"] .life-stage > .worker-dot {
-    bottom: calc(var(--person-lift, 0px) + 40px);
-  }
-
-  .floor[data-type="dwelling"] .life-stage > .social-pair {
-    bottom: calc(var(--pair-lift, 0px) + 40px);
+  .floor {
+    --room-person-footing: 40px;
   }
 }

@@ -1,10 +1,10 @@
-const CACHE_NAME = "little-depths-v76";
+const CACHE_NAME = "little-depths-v77";
 const ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=76",
-  "./overrides.css?v=76",
-  "./app.js?v=76",
+  "./styles.css?v=77",
+  "./overrides.css?v=77",
+  "./app.js?v=77",
   "./manifest.webmanifest",
   "./icons/icon.svg",
   "./icons/icon-512.png",
