@@ -1736,7 +1736,7 @@ body.fullscreen-active .layout {
 }
 
 .floor[data-type="craft"] .room {
-  --room-art: url("assets/art/room-craft-v2.webp");
+  --room-art: url("assets/art/room-craft-v3.webp");
   --room-bg:
     radial-gradient(ellipse at 72% 84%, rgba(242, 184, 75, 0.34), transparent 28%),
     linear-gradient(160deg, #9b7b45, #5c4650 54%, #242030);

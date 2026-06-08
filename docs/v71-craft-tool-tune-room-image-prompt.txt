@@ -1,0 +1,9 @@
+Create a polished 1280x720 no-text fantasy workshop room background for a cozy vertical kingdom-management browser game.
+
+Scene: an old stone castle workshop / artisan forge inside a stacked tower, designed as a readable side-view room. It should clearly support an active "tool tuning" gameplay loop: a long workbench, hand tools, tuned wrenches, small glowing calibration marks, crates of spare parts, an anvil, forge warmth, shelves, ropes, pulleys, and a practical craft table. Keep the central and lower foreground usable for small character sprites and UI overlays.
+
+Art direction: warm forge amber mixed with cool teal-blue highlights, painterly high-quality game background, crisp silhouettes, rich materials, no visible text, no signage, no numbers, no logos, no UI. The room must be bright enough to inspect details at gameplay size, not dark, blurred, stock-like, or overly atmospheric.
+
+Composition: horizontal room cutaway, readable floor plane, stable left/right anchors, wall props and depth layers, open center lane for characters, lower foreground with a belt/workbench feel but no text. It should match the existing cozy castle-room set with warm lamps, stone arches, wood, brass, and craft clutter.
+
+Avoid: text, icons, brand marks, posters, exaggerated fantasy weapons, modern machinery, dark fog, heavy blur, cropped product-style closeups, empty room with no gameplay props.
