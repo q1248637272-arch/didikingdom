@@ -1,0 +1,9 @@
+Create a polished fantasy side-view room background for a cozy vertical tower management browser game.
+
+Scene: an old underground dwelling floor refreshed around resident life routes and story follow-ups. Show a warm compact apartment cutaway with bunk beds, tiny shelves, quilts, soft lanterns, a small shoe rack, hanging cloaks, a shared tea nook, a quiet memory board made only of abstract shapes, and a clear horizontal front walkway where tiny character sprites can travel. Add route-friendly details such as floor inlays, stepping stones, tiny glowing teal wayfinding beads, warm doorway arches to other tower floors, and calm lived-in props that imply residents return to tell stories. The room should be readable at small size and calmer than a busy market.
+
+Style: painterly stylized 2D game background, fantasy tower cutaway, crisp silhouettes, soft atmospheric depth, warm amber lamplight with muted teal route accents, high-quality raster illustration. No characters, no UI, no readable text, no letters, no numbers, no signage, no logos, no watermark. Keep the lower foreground clear for tiny sprites and path overlays. Clean horizontal room composition suitable for a side-view web game room tile.
+
+Output: high quality raster illustration, web game asset, no transparent border.
+
+Generation note: v74 attempted to continue the dwelling/life-route refresh through the configured gpt-image-2 gateway, but the gateway connection closed on the first request and timed out on the retry. No unstable or missing bitmap was wired into the game. Reuse this prompt when the image gateway is healthy.

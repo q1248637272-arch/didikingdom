@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v73`
-- Latest preview deployment: `https://3bb48ae2.little-depths.pages.dev/`
-- Local server used for v73 verification: `http://127.0.0.1:8824/`
+- Latest deployed version: `v74`
+- Latest preview deployment: `https://584e0548.little-depths.pages.dev/`
+- Local server used for v74 verification: `http://127.0.0.1:8825/`
 
 ## Current State
 
@@ -27,6 +27,17 @@ wrangler pages deploy dist --project-name little-depths
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v74 Dwelling Life Reviews / Old Room Polish
+
+- Deepened the old `dwelling` / 宿舍 and `lifeStories` loop instead of adding a new floor. Completed life stories now become manual `回访` cards in the selected floor detail panel.
+- Added `lifeStoryReviewsDone`, the `life_story_reviews` / `生活回访` quest, saved-story `reviewed` / `reviewedAt` fields, `lifeStoriesForFloor()`, `pendingLifeStoryReviewsForFloor()`, `lifeStoryReviewBonus()`, and `reviewLifeStory()`.
+- Reviews mark the story as reviewed, extend its readable lifetime, raise happiness slightly, boost the linked resident/companion motive and relationship, and add rent preparation to the associated dwelling. Quest coins/gems still use the existing manual claim button.
+- Improved old dwelling-map readability with `.life-story-review-ready`, `data-life-story-reviews`, `data-state="life-story"`, textless path beads, a small memory-board glyph, and refreshed story-card button states over the existing `room-dwelling-v3.webp`.
+- The asset backpack now records `生活回访`, pending review count, and the small reviewed-story dwelling journey bonus, keeping coins, gems, records, relics, stock, and task rewards in one player-facing entrance.
+- Saved the reusable dwelling/life-route image prompt at `docs/v74-dwelling-life-room-image-prompt.txt`. The configured `gpt-image-2` gateway closed the first request and timed out on retry, so no unstable bitmap was connected.
+- Bumped the save version to `27`, bumped `index.html` / `sw.js` to v74, and verified desktop/mobile with Edge CDP using `tmp/verify-v74-life-reviews.mjs`. Screenshots: `verification-v74-life-reviews-local.png`, `verification-v74-life-reviews-reviewed-local.png`, and `verification-v74-life-reviews-mobile-local.png`.
+- Deployed v74 to Cloudflare Pages with local Wrangler direct upload. Production: `https://little-depths.pages.dev/`; preview: `https://584e0548.little-depths.pages.dev/`.
 
 ### v73 Mobile Layout Audit / Dock Overlap Fix
 
@@ -846,6 +857,7 @@ wrangler pages deploy dist --project-name little-depths
 - The user wants image work to use `gpt-image-2` through their configured gateway.
 - Read credentials only from `GPT_IMAGE_2_API_KEY`, `GPT_IMAGE_2_BASE_URL`, and `GPT_IMAGE_2_MODEL`.
 - Never print, echo, commit, or store API keys.
+- v74 attempted refreshed dwelling/life-route review room art through the configured `gpt-image-2` gateway, but the gateway connection closed on the first request and timed out on retry. No unstable image was connected; the saved web-ready prompt is `docs/v74-dwelling-life-room-image-prompt.txt`.
 - v72 generated refreshed sky-garden comfort-focus room art through the configured `gpt-image-2` gateway. The source PNG is `tmp/imagegen/v72-comfort-focus/room-garden-v3.png`, the connected asset is `assets/art/room-garden-v3.webp`, and the saved prompt is `docs/v72-comfort-focus-garden-image-prompt.txt`.
 - v71 generated refreshed craft/tool-tune room art through the configured `gpt-image-2` gateway. The source PNG was saved in the current thread outputs as `room-craft-v3.png`, the connected asset is `assets/art/room-craft-v3.webp`, and the saved prompt is `docs/v71-craft-tool-tune-room-image-prompt.txt`.
 - v69 generated refreshed rooftop observatory star-chart room art through the configured `gpt-image-2` gateway. The source PNG was saved in the current thread outputs as `room-observatory-v2.png`, the connected asset is `assets/art/room-observatory-v2.webp`, and the saved prompt is `docs/v69-observatory-star-chart-image-prompt.txt`.
@@ -867,8 +879,8 @@ wrangler pages deploy dist --project-name little-depths
 ## Suggested Next Iterations
 
 - Continue improving older floors instead of only adding new floors. Good next targets:
-  - `character life`: add short interruptions, route conflicts, remembered preferences, or player-clickable story follow-ups now that visible trails and receipts exist.
-  - `dwelling`: refresh the dwelling/life-trail room art when the `gpt-image-2` gateway is healthy, using `docs/v62-life-trails-dwelling-image-prompt.txt`.
+  - `character life`: add short interruptions, route conflicts, remembered preferences, or second-step choices after player-clickable story reviews.
+  - `dwelling`: refresh the dwelling/life-trail/review room art when the `gpt-image-2` gateway is healthy, using `docs/v74-dwelling-life-room-image-prompt.txt`.
   - `garden/bathhouse`: add second-step follow-ups after `余韵调息`, such as resident story choices or floor-specialist modifiers for each focus.
   - `kingdom`: deepen downstream city effects, courier specialization, or refreshed council-room art now that signing and receipt follow-through exist.
   - `food`: deepen dining needs with table rushes, staff serving feedback, and clearer kitchen UI.
@@ -892,8 +904,8 @@ wrangler pages deploy dist --project-name little-depths
 继续开发 C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4 里的迪迪王国项目。
 
 线上地址：https://little-depths.pages.dev/
-最新部署版本：v73
-最新预览：https://3bb48ae2.little-depths.pages.dev/
+最新部署版本：v74
+最新预览：https://584e0548.little-depths.pages.dev/
 交接文档：docs/HANDOFF.md
 
 请先读取项目代码、README.md、docs/HANDOFF.md 和最近状态，再继续优化。方向：从游戏内容、玩法、画面、图像质量等层面更新迭代，不只新增内容，也要把旧楼层和旧系统做得更好。涉及图像绘制时使用 gpt-image-2；如果网关不可用，不要写入或打印密钥，改为保存可直接用于网页端生成的提示词。

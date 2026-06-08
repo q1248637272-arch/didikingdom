@@ -1044,6 +1044,14 @@ const QUEST_DEFS = [
     text: "让居民完成 6 段可读的生活小故事",
   },
   {
+    id: "life_story_reviews",
+    title: "生活回访",
+    goal: 4,
+    metric: "lifeStoryReviewsDone",
+    reward: { coins: 460, gems: 2 },
+    text: "手动整理 4 段生活足迹回访",
+  },
+  {
     id: "relics",
     title: "地底珍藏",
     goal: 3,
@@ -1131,7 +1139,7 @@ let guideReady = false;
 
 function makeNewGame() {
   const game = {
-    version: 26,
+    version: 27,
     coins: 560,
     gems: 7,
     happiness: 72,
@@ -1191,6 +1199,7 @@ function makeNewGame() {
       royalMandatesDone: 0,
       royalCourierReceiptsDone: 0,
       lifeStoriesDone: 0,
+      lifeStoryReviewsDone: 0,
       libraryStudiesDone: 0,
       comfortSessionsDone: 0,
       comfortEchoesDone: 0,
@@ -1662,6 +1671,7 @@ function migrateGame(game) {
     royalMandatesDone: 0,
     royalCourierReceiptsDone: 0,
     lifeStoriesDone: 0,
+    lifeStoryReviewsDone: 0,
     libraryStudiesDone: 0,
     comfortSessionsDone: 0,
     comfortEchoesDone: 0,
@@ -1685,7 +1695,7 @@ function migrateGame(game) {
     aquariumFloorsBuilt: 0,
     festivalFloorsBuilt: 0,
   };
-  game.version = Math.max(Number(game.version) || 0, 26);
+  game.version = Math.max(Number(game.version) || 0, 27);
   game.nextExpeditionId ||= 1;
   game.nextExpeditionReportId ||= 1;
   game.nextLifeStoryId ||= 1;
@@ -2535,6 +2545,8 @@ function normalizeLifeStory(story) {
     detail: typeof story.detail === "string" ? story.detail.slice(0, 120) : "",
     motiveGain: clamp(Number(story.motiveGain) || 0, 0, 100),
     tone: ["bright", "shared", "steady", "soft"].includes(story.tone) ? story.tone : "steady",
+    reviewed: Boolean(story.reviewed),
+    reviewedAt: Number(story.reviewedAt) || null,
     remaining: Number.isFinite(Number(story.remaining)) ? clamp(Number(story.remaining), 0, 180) : 80,
     createdAt: Number(story.createdAt) || Date.now(),
   };
@@ -2577,6 +2589,7 @@ function recordLifeStory(person, visit, options = {}) {
     detail: lifeStoryDetail(person, visit, origin, target, companion, motiveGain, options.outcome),
     motiveGain,
     tone: companion ? "shared" : motiveGain >= 22 ? "bright" : options.outcome === "settled" ? "soft" : "steady",
+    reviewed: false,
     remaining: 96,
     createdAt: Date.now(),
   });
@@ -2701,18 +2714,104 @@ function renderComfortMemoryBadge(person) {
   return `<span class="comfort-memory-chip" data-type="${escapeAttr(memory.type || "garden")}">${escapeHtml(label)} · ${left}s · ${escapeHtml(source)}</span>`;
 }
 
+function lifeStoriesForFloor(floor, game = state) {
+  if (!floor || floor.status !== "open" || !Array.isArray(game.lifeStories)) return [];
+  return game.lifeStories
+    .filter((story) => story && (Number(story.floorId) === Number(floor.id) || Number(story.fromFloorId) === Number(floor.id)))
+    .sort((a, b) => Number(a.reviewed) - Number(b.reviewed) || (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
+}
+
+function pendingLifeStoryReviewsForFloor(floor, game = state) {
+  return lifeStoriesForFloor(floor, game).filter((story) => !story.reviewed);
+}
+
+function pendingLifeStoryReviewCount(game = state) {
+  return Array.isArray(game.lifeStories) ? game.lifeStories.filter((story) => story && !story.reviewed).length : 0;
+}
+
+function lifeStoryReviewMapKey(floor) {
+  return lifeStoriesForFloor(floor)
+    .map((story) => `${story.id}:${story.reviewed ? 1 : 0}`)
+    .join(",");
+}
+
+function lifeStoryReviewBonus(game = state) {
+  return Math.min(0.08, (game.stats?.lifeStoryReviewsDone || 0) * 0.004);
+}
+
+function lifeStoryReviewTargetFloor(story, fallbackFloor = null) {
+  return [story?.fromFloorId, story?.floorId, fallbackFloor?.id]
+    .map((id) => (Number.isFinite(Number(id)) ? findFloor(Number(id)) : null))
+    .find((floor) => floor?.type === "dwelling" && floor.status === "open") || null;
+}
+
+function lifeStoryReviewReward(story, floor = null) {
+  const target = lifeStoryReviewTargetFloor(story, floor);
+  const level = target?.level || floor?.level || 1;
+  const motive = Number(story?.motiveGain) || 8;
+  const rentBonus = Math.max(12, Math.round(10 + level * 5 + motive * 0.45 + (story?.companionId ? 6 : 0)));
+  const coinBonus = target ? 0 : Math.max(8, Math.round(rentBonus * 0.65));
+  const motiveGain = Math.max(5, Math.round(4 + motive * 0.22));
+  return { target, rentBonus, coinBonus, motiveGain };
+}
+
+function reviewLifeStory(storyId, floorId) {
+  const story = (state.lifeStories || []).find((entry) => Number(entry.id) === Number(storyId));
+  const floor = findFloor(floorId) || findFloor(state.selectedFloorId);
+  if (!story) {
+    showToast("这段生活足迹已经消散");
+    return;
+  }
+  if (story.reviewed) {
+    showToast("这段足迹已经回访过");
+    return;
+  }
+
+  const reward = lifeStoryReviewReward(story, floor);
+  story.reviewed = true;
+  story.reviewedAt = Date.now();
+  story.remaining = Math.max(Number(story.remaining) || 0, 48);
+  state.stats.lifeStoryReviewsDone = (state.stats.lifeStoryReviewsDone || 0) + 1;
+  state.happiness = clamp(state.happiness + 0.9, 0, 100);
+
+  const person = getResident(Number(story.personId));
+  const companion = story.companionId ? getResident(Number(story.companionId)) : null;
+  const need = PERSON_MOTIVE_KEYS.includes(story.need) ? story.need : "social";
+  if (person) boostPersonMotive(person, need, reward.motiveGain);
+  if (companion) boostPersonMotive(companion, need, Math.max(3, Math.round(reward.motiveGain * 0.65)));
+  if (person && companion) {
+    const scene = { kind: "life-review", need };
+    bumpRelationship(person, companion, scene, 4);
+    bumpRelationship(companion, person, scene, 4);
+  }
+
+  if (reward.target) {
+    reward.target.rentReady = Math.min(420, (reward.target.rentReady || 0) + reward.rentBonus);
+    addLog(`${story.personName} 的生活足迹完成回访，${reward.target.name} 增加 ${reward.rentBonus} 点租金准备。`);
+    showFloat(`回访 +${reward.rentBonus}`);
+  } else {
+    addCoins(reward.coinBonus);
+    addLog(`${story.personName} 的生活足迹完成回访，获得 ${reward.coinBonus} 金币。`);
+    showFloat(`回访 +${reward.coinBonus}`);
+  }
+  showToast("生活回访已整理");
+  lastKingdomKey = "";
+  render(true);
+  saveGame(false);
+}
+
 function renderLifeStoryPanel(floor) {
   if (!floor || floor.status !== "open") return "";
   const active = lifeTrailsForFloor(floor).slice(0, 3);
-  const stories = (state.lifeStories || [])
-    .filter((story) => Number(story.floorId) === Number(floor.id) || Number(story.fromFloorId) === Number(floor.id))
-    .slice(0, 3);
+  const allStories = lifeStoriesForFloor(floor);
+  const stories = allStories.slice(0, 4);
+  const pending = allStories.filter((story) => !story.reviewed).length;
   if (!active.length && !stories.length) return "";
   return `
-    <div class="life-story-panel">
+    <div class="life-story-panel ${pending ? "review-ready" : ""}" data-pending-reviews="${pending}">
       <div class="life-story-head">
         <strong>生活足迹</strong>
-        <em>${state.stats.lifeStoriesDone || 0} 段</em>
+        <em>${state.stats.lifeStoriesDone || 0} 段 · ${pending ? `${pending} 待回访` : `${state.stats.lifeStoryReviewsDone || 0} 已回访`}</em>
       </div>
       ${active.length
         ? `<div class="life-story-routes">${active
@@ -2721,13 +2820,21 @@ function renderLifeStoryPanel(floor) {
         : ""}
       ${stories.length
         ? `<div class="life-story-list">${stories
-            .map(
-              (story) => `
-                <article class="life-story-card" data-tone="${escapeAttr(story.tone)}" data-need="${escapeAttr(story.need)}">
-                  <strong>${escapeHtml(story.title)}</strong>
+            .map((story) => {
+              const reward = lifeStoryReviewReward(story, floor);
+              const rewardText = reward.target ? `租金准备 +${reward.rentBonus}` : `金币 +${reward.coinBonus}`;
+              return `
+                <article class="life-story-card ${story.reviewed ? "reviewed" : "reviewable"}" data-tone="${escapeAttr(story.tone)}" data-need="${escapeAttr(story.need)}" data-reviewed="${story.reviewed ? "true" : "false"}">
+                  <div class="life-story-card-head">
+                    <strong>${escapeHtml(story.title)}</strong>
+                    ${story.reviewed
+                      ? `<span class="life-story-review-state">已回访</span>`
+                      : `<button class="life-story-review-btn" type="button" data-action="review-life-story" data-story-id="${story.id}" data-floor-id="${floor.id}">回访</button>`}
+                  </div>
                   <span>${escapeHtml(story.detail)}</span>
-                </article>`
-            )
+                  <small class="life-story-reward">${escapeHtml(rewardText)} · 心情 +${reward.motiveGain}</small>
+                </article>`;
+            })
             .join("")}</div>`
         : ""}
     </div>`;
@@ -6661,11 +6768,12 @@ function lobbyDispatchBonus(game = state) {
 function dwellingJourneyBonus(game = state) {
   return Math.min(
     0.22,
-    dwellingFloors(game).reduce((sum, floor) => {
-      const residents = floor.residents?.length || 0;
-      const away = (floor.residents || []).filter((resident) => resident.expeditionId).length;
-      return sum + residents * 0.012 + away * 0.018 + Math.max(0, (floor.level || 1) - 1) * 0.018;
-    }, 0)
+    lifeStoryReviewBonus(game) +
+      dwellingFloors(game).reduce((sum, floor) => {
+        const residents = floor.residents?.length || 0;
+        const away = (floor.residents || []).filter((resident) => resident.expeditionId).length;
+        return sum + residents * 0.012 + away * 0.018 + Math.max(0, (floor.level || 1) - 1) * 0.018;
+      }, 0)
   );
 }
 
@@ -7953,7 +8061,7 @@ function getKingdomRenderKey() {
         return `${floor.id}:${floor.type}:build:${Math.ceil(floor.buildRemaining)}:${state.selectedFloorId}`;
       }
       if (floor.type === "dwelling") {
-        return `${floor.id}:dw:${floor.level}:${floor.residents.length}:${floor.capacity}:${floor.rentReady}:${floor.residents.map((resident) => resident.expeditionId || 0).join("-")}:${lifeTrailMapKey(floor)}:${expeditionWaymarkMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
+        return `${floor.id}:dw:${floor.level}:${floor.residents.length}:${floor.capacity}:${floor.rentReady}:${floor.residents.map((resident) => resident.expeditionId || 0).join("-")}:${lifeTrailMapKey(floor)}:${lifeStoryReviewMapKey(floor)}:${expeditionWaymarkMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
       }
       if (floor.type === "lobby") {
         return `${floor.id}:lobby:${state.queue.map((visitor) => `${visitor.id}:${visitor.need || ""}:${visitor.activity || ""}:${Math.floor(lobbyWaitSeconds(visitor) / 5)}:${visitor.targetFloorId || ""}`).join("-")}:${lobbyPressureInfo(state).tone}:${state.selectedFloorId}`;
@@ -7984,8 +8092,14 @@ function renderResources() {
   els.happiness.textContent = `${Math.round(state.happiness)}`;
   els.streak.textContent = `x${state.streak || 0}`;
   const pending = pendingQuestRewards();
-  els.inventoryBtn?.classList.toggle("attention", pending.count > 0);
-  els.inventoryBtn?.setAttribute("aria-label", pending.count > 0 ? `资产背包，${pending.count} 个任务奖励待领取` : "资产背包");
+  const pendingReviews = pendingLifeStoryReviewCount(state);
+  els.inventoryBtn?.classList.toggle("attention", pending.count > 0 || pendingReviews > 0);
+  els.inventoryBtn?.setAttribute(
+    "aria-label",
+    pending.count > 0 || pendingReviews > 0
+      ? `资产背包，${pending.count} 个任务奖励待领取，${pendingReviews} 段生活足迹待回访`
+      : "资产背包"
+  );
 }
 
 function renderKingdom() {
@@ -8001,6 +8115,11 @@ function renderFloor(floor) {
   const lifeTrailClass = lifeTrailItems.length ? "life-trail-active" : "";
   const lifeTrailAttrs = lifeTrailItems.length
     ? ` data-life-trail-count="${lifeTrailItems.length}" data-life-trail-need="${escapeAttr(lifeTrailItems[0].need)}"`
+    : "";
+  const lifeStoryReviewItems = pendingLifeStoryReviewsForFloor(floor);
+  const lifeStoryReviewClass = lifeStoryReviewItems.length ? "life-story-review-ready" : "";
+  const lifeStoryReviewAttrs = lifeStoryReviewItems.length
+    ? ` data-life-story-reviews="${lifeStoryReviewItems.length}" data-life-story-need="${escapeAttr(lifeStoryReviewItems[0].need)}"`
     : "";
   const expeditionWaymarkItems = expeditionWaymarksForFloor(floor);
   const expeditionWaymarkClass = expeditionWaymarkItems.length ? "expedition-waymark-active" : "";
@@ -8046,7 +8165,7 @@ function renderFloor(floor) {
     : "";
   const zone = getFloorZone(floor);
   return `
-    <article class="floor ${selected} ${constructing} ${routeClass} ${lifeTrailClass} ${expeditionWaymarkClass} ${foodRushClass} ${serviceCareClass} ${starChartClass} ${toolTuneClass} ${marketParcelClass} ${royalMandateClass} ${royalCourierClass} ${comfortClass} ${comfortEchoClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${lifeTrailAttrs}${expeditionWaymarkAttrs}${foodRushAttrs}${serviceCareAttrs}${starChartAttrs}${toolTuneAttrs}${marketParcelAttrs}${royalMandateAttrs}${royalCourierAttrs}${comfortEchoAttrs}${showtimeAttrs}>
+    <article class="floor ${selected} ${constructing} ${routeClass} ${lifeTrailClass} ${lifeStoryReviewClass} ${expeditionWaymarkClass} ${foodRushClass} ${serviceCareClass} ${starChartClass} ${toolTuneClass} ${marketParcelClass} ${royalMandateClass} ${royalCourierClass} ${comfortClass} ${comfortEchoClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${lifeTrailAttrs}${lifeStoryReviewAttrs}${expeditionWaymarkAttrs}${foodRushAttrs}${serviceCareAttrs}${starChartAttrs}${toolTuneAttrs}${marketParcelAttrs}${royalMandateAttrs}${royalCourierAttrs}${comfortEchoAttrs}${showtimeAttrs}>
       ${renderFloorIndex(floor)}
       <div class="room" data-action="select-floor" data-floor-id="${floor.id}" title="${escapeAttr(floorMapLabel(floor))}" aria-label="${escapeAttr(floorMapLabel(floor))}">
         ${floor.status === "construction" ? renderConstruction(floor) : renderOpenFloor(floor)}
@@ -8466,6 +8585,10 @@ function renderRoomStateTag(floor) {
       const mark = waymarks[0].mark;
       return `<span class="room-state-tag good icon-only" data-state="expedition-report" title="${escapeAttr(`探险${mark.label}`)}" aria-label="${escapeAttr(`探险${mark.label}`)}"></span>`;
     }
+    const pendingReviews = pendingLifeStoryReviewsForFloor(floor);
+    if (pendingReviews.length) {
+      return `<span class="room-state-tag good icon-only" data-state="life-story" title="生活足迹待回访" aria-label="生活足迹待回访"></span>`;
+    }
     const vacancy = getVacancy(floor);
     return vacancy
       ? `<span class="room-state-tag calm icon-only" data-state="vacancy" title="余 ${vacancy} 间" aria-label="余 ${vacancy} 间"></span>`
@@ -8504,7 +8627,7 @@ function renderFloorStatusGlyph(floor) {
   const status = renderFloorStatus(floor);
   let stateName = "open";
   if (floor.type === "lobby") stateName = state.queue.length ? "queue" : "idle";
-  else if (floor.type === "dwelling") stateName = expeditionWaymarksForFloor(floor).length ? "expedition-report" : floor.rentReady ? "rent" : "home";
+  else if (floor.type === "dwelling") stateName = expeditionWaymarksForFloor(floor).length ? "expedition-report" : pendingLifeStoryReviewsForFloor(floor).length ? "life-story" : floor.rentReady ? "rent" : "home";
   else if (isActiveComfortSession(floor)) stateName = "comfort";
   else if (isActiveComfortAfterglow(floor)) stateName = floor.comfortAfterglow.focus ? "comfort-focus" : "comfort-echo";
   else if (isActiveFoodRush(floor)) stateName = "meal-rush";
@@ -8751,6 +8874,8 @@ function renderFloorStatus(floor) {
   if (floor.type === "dwelling") {
     const waymarks = expeditionWaymarksForFloor(floor);
     if (waymarks.length) return `探险${waymarks[0].mark.label} ${Math.round(waymarks[0].progress * 100)}%`;
+    const pendingReviews = pendingLifeStoryReviewsForFloor(floor).length;
+    if (pendingReviews) return `待回访 ${pendingReviews}`;
     return floor.rentReady ? `租金 ${floor.rentReady}` : "居住";
   }
   if (isActiveComfortSession(floor)) return `${COMFORT_SESSION_LABELS[floor.type] || "休整"} ${Math.ceil(floor.comfortSession.remaining)}s`;
@@ -8784,6 +8909,8 @@ function renderFloorStatus(floor) {
   if (floor.type === "dwelling") {
     const waymarks = expeditionWaymarksForFloor(floor);
     if (waymarks.length) return `探险${waymarks[0].mark.label} ${Math.round(waymarks[0].progress * 100)}%`;
+    const pendingReviews = pendingLifeStoryReviewsForFloor(floor).length;
+    if (pendingReviews) return `待回访 ${pendingReviews}`;
     return floor.rentReady ? `租金 ${floor.rentReady}` : "居住";
   }
   if (isActiveComfortSession(floor)) return `${COMFORT_SESSION_LABELS[floor.type] || "休整"} ${Math.ceil(floor.comfortSession.remaining)}s`;
@@ -8957,6 +9084,7 @@ function renderFloorDetail() {
       const full = getResident(resident.id);
       return full && !full.workFloorId && !full.expeditionId;
     }).length;
+    const pendingReviews = pendingLifeStoryReviewsForFloor(floor).length;
     els.floorDetail.innerHTML = `
       <strong>${escapeHtml(floor.name)}</strong>
       <p>${FLOOR_TYPES.dwelling.desc}</p>
@@ -8965,6 +9093,7 @@ function renderFloorDetail() {
         <div class="stat"><b>Lv${floor.level}</b><span>楼层等级</span></div>
         <div class="stat"><b>${unemployed}</b><span>空闲居民</span></div>
         <div class="stat"><b>${floor.rentReady || 0}</b><span>待收租金</span></div>
+        <div class="stat"><b>${pendingReviews}</b><span>待回访</span></div>
       </div>
       ${renderFloorPerks(floor)}
       ${renderLifeStoryPanel(floor)}
@@ -9060,6 +9189,8 @@ function renderFloorPerks(floor) {
   } else if (floor.type === "dwelling") {
     perks.push(`远行整备 +${Math.round(dwellingJourneyBonus(state) * 100)}%`);
     perks.push(`租金回响 +${Math.round(dwellingJourneyBonus(state) * 30)}%`);
+    perks.push(`生活回访 +${Math.round(lifeStoryReviewBonus(state) * 100)}%`);
+    perks.push(`已回访 ${state.stats.lifeStoryReviewsDone || 0}`);
     perks.push(`探险回执 ${state.stats.expeditionReportsDone || 0}`);
     perks.push(`路线档案 +${Math.round(expeditionReportBonus(state) * 100)}%`);
   } else if (!isBusiness(floor)) {
@@ -9195,6 +9326,7 @@ function renderFloorDetail() {
       const full = getResident(resident.id);
       return full && !full.workFloorId && !full.expeditionId;
     }).length;
+    const pendingReviews = pendingLifeStoryReviewsForFloor(floor).length;
     els.floorDetail.innerHTML = `
       <strong>${escapeHtml(floor.name)}</strong>
       <p>${FLOOR_TYPES.dwelling.desc}</p>
@@ -9203,6 +9335,7 @@ function renderFloorDetail() {
         <div class="stat"><b>Lv${floor.level}</b><span>楼层等级</span></div>
         <div class="stat"><b>${unemployed}</b><span>空闲居民</span></div>
         <div class="stat"><b>${floor.rentReady || 0}</b><span>待收租金</span></div>
+        <div class="stat"><b>${pendingReviews}</b><span>待回访</span></div>
       </div>
       ${renderFloorPerks(floor)}
       ${renderLifeStoryPanel(floor)}
@@ -9343,6 +9476,8 @@ function renderFloorPerks(floor) {
   } else if (floor.type === "dwelling") {
     perks.push(`远行整备 +${Math.round(dwellingJourneyBonus(state) * 100)}%`);
     perks.push(`租金回响 +${Math.round(dwellingJourneyBonus(state) * 30)}%`);
+    perks.push(`生活回访 +${Math.round(lifeStoryReviewBonus(state) * 100)}%`);
+    perks.push(`已回访 ${state.stats.lifeStoryReviewsDone || 0}`);
     perks.push(`探险回执 ${state.stats.expeditionReportsDone || 0}`);
     perks.push(`路线档案 +${Math.round(expeditionReportBonus(state) * 100)}%`);
   } else if (!isBusiness(floor)) {
@@ -9711,9 +9846,11 @@ function renderInventoryPanel() {
   const activeExpeditions = state.expeditions.length;
   const reportCount = state.expeditionReports?.length || 0;
   const lifeStoryCount = state.lifeStories?.length || 0;
+  const pendingReviews = pendingLifeStoryReviewCount(state);
   const recordItems = [
     renderInventoryMetric("余韵调息", `${state.stats.comfortFocusesDone || 0} 次`, `租金 ${state.stats.comfortRentFocusesDone || 0} / 探险 ${state.stats.comfortExpeditionFocusesDone || 0} / 恢复 ${state.stats.comfortRecoveryFocusesDone || 0}`),
     renderInventoryMetric("生活记录", `${lifeStoryCount} 段`, "居民外出与日常片段"),
+    renderInventoryMetric("生活回访", `${state.stats.lifeStoryReviewsDone || 0} 次`, pendingReviews ? `${pendingReviews} 段待整理 / 家园 +${Math.round(lifeStoryReviewBonus(state) * 100)}%` : `家园 +${Math.round(lifeStoryReviewBonus(state) * 100)}%`),
     renderInventoryMetric("探险回执", `${reportCount} 份`, `路线档案 +${Math.round(expeditionReportBonus(state) * 100)}%`),
     renderInventoryMetric("餐桌高峰", `${state.stats.foodRushCoursesDone || 0} 桌次`, `${state.stats.foodRushesDone || 0} 次 / ${state.stats.foodServingsDone || 0} 份`),
     renderInventoryMetric("礼宾照看", `${state.stats.serviceCareTouchesDone || 0} 次`, `${state.stats.serviceCareSessionsDone || 0} 场 / 缓冲 +${Math.round(serviceCareBonus(state) * 90)}%`),
@@ -9786,7 +9923,7 @@ function renderInventoryPanel() {
     <section class="inventory-section compact">
       <div class="inventory-section-head">
         <h3>记录</h3>
-        <span>${lifeStoryCount} 段生活 / ${reportCount} 份探险</span>
+        <span>${lifeStoryCount} 段生活 / ${state.stats.lifeStoryReviewsDone || 0} 次回访 / ${reportCount} 份探险</span>
       </div>
       <div class="inventory-grid inventory-grid-compact">${recordItems}</div>
     </section>`;
@@ -10355,6 +10492,9 @@ function bindEvents() {
         break;
       case "start-dwelling-expedition":
         startDwellingExpedition(floorId);
+        break;
+      case "review-life-story":
+        reviewLifeStory(button.dataset.storyId, floorId);
         break;
       case "market-deal":
         startMarketDeal(floorId);

@@ -6437,3 +6437,226 @@ body.fullscreen-active .build-grid {
     padding-inline: 6px;
   }
 }
+
+/* v74 dwelling life-story review loop and old-room polish. */
+.floor[data-type="dwelling"] .room {
+  --room-bg:
+    radial-gradient(circle at 50% 18%, rgba(255, 218, 143, 0.2), transparent 22%),
+    radial-gradient(circle at 22% 35%, rgba(115, 215, 208, 0.16), transparent 20%),
+    linear-gradient(160deg, #816556 0%, #3d4a61 52%, #20293a 100%);
+}
+
+.floor.life-story-review-ready[data-type="dwelling"] .room {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 224, 138, 0.22),
+    inset 0 -18px 34px rgba(115, 215, 208, 0.08),
+    0 0 24px rgba(255, 224, 138, 0.12);
+}
+
+.floor[data-type="dwelling"] .room-scene {
+  position: relative;
+}
+
+.floor.life-story-review-ready[data-type="dwelling"] .life-stage::before {
+  content: "";
+  position: absolute;
+  left: 15%;
+  right: 15%;
+  bottom: 29px;
+  height: 10px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 12% 50%, rgba(255, 241, 195, 0.92) 0 3px, transparent 4px),
+    radial-gradient(circle at 34% 50%, rgba(115, 215, 208, 0.86) 0 3px, transparent 4px),
+    radial-gradient(circle at 58% 50%, rgba(255, 224, 138, 0.88) 0 3px, transparent 4px),
+    radial-gradient(circle at 82% 50%, rgba(115, 215, 208, 0.82) 0 3px, transparent 4px),
+    linear-gradient(90deg, transparent, rgba(255, 224, 138, 0.36), rgba(115, 215, 208, 0.3), transparent);
+  filter: drop-shadow(0 0 9px rgba(115, 215, 208, 0.36));
+  opacity: 0.86;
+  pointer-events: none;
+  animation: life-review-path 2.4s ease-in-out infinite;
+}
+
+.floor.life-story-review-ready[data-type="dwelling"] .room-scene::after {
+  content: "";
+  position: absolute;
+  right: 13%;
+  top: 14%;
+  width: 32px;
+  height: 22px;
+  border: 1px solid rgba(255, 224, 138, 0.38);
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 28% 35%, rgba(255, 224, 138, 0.76) 0 2px, transparent 3px),
+    radial-gradient(circle at 68% 58%, rgba(115, 215, 208, 0.76) 0 2px, transparent 3px),
+    linear-gradient(135deg, rgba(35, 47, 62, 0.72), rgba(24, 31, 43, 0.58));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 14px rgba(255, 224, 138, 0.16);
+  pointer-events: none;
+}
+
+.life-story-panel.review-ready {
+  border-color: rgba(255, 224, 138, 0.36);
+  background:
+    linear-gradient(135deg, rgba(255, 224, 138, 0.12), rgba(115, 215, 208, 0.1)),
+    rgba(255, 255, 255, 0.05);
+}
+
+.life-story-head {
+  min-width: 0;
+}
+
+.life-story-head strong,
+.life-story-head em {
+  min-width: 0;
+}
+
+.life-story-card {
+  border-radius: 8px;
+}
+
+.life-story-card.reviewable {
+  border-color: rgba(255, 224, 138, 0.3);
+  background:
+    linear-gradient(135deg, rgba(255, 224, 138, 0.11), rgba(115, 215, 208, 0.07)),
+    rgba(12, 18, 28, 0.34);
+}
+
+.life-story-card.reviewed {
+  opacity: 0.78;
+  border-color: rgba(185, 214, 255, 0.18);
+}
+
+.life-story-card-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.life-story-card-head strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.life-story-review-btn,
+.life-story-review-state {
+  min-height: 28px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.life-story-review-btn {
+  padding: 0 10px;
+  border: 1px solid rgba(255, 224, 138, 0.54);
+  color: #241715;
+  background: linear-gradient(180deg, #ffe08a, #e9a95f);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    0 6px 12px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+.life-story-review-btn:hover,
+.life-story-review-btn:focus-visible {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+
+.life-story-review-state {
+  display: inline-grid;
+  place-items: center;
+  padding: 0 9px;
+  border: 1px solid rgba(185, 214, 255, 0.22);
+  color: #b9d6ff;
+  background: rgba(185, 214, 255, 0.09);
+}
+
+.life-story-reward {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 7px;
+  overflow: hidden;
+  border: 1px solid rgba(115, 215, 208, 0.24);
+  border-radius: 999px;
+  color: #dffbf5;
+  background: rgba(115, 215, 208, 0.09);
+  font-size: 10px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-glyph[data-state="life-story"],
+.room-state-tag[data-state="life-story"] {
+  color: #73d7d0;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255, 224, 138, 0.24), transparent 48%),
+    rgba(15, 21, 32, 0.74);
+}
+
+.status-glyph[data-state="life-story"]::before,
+.room-state-tag[data-state="life-story"]::before {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 224, 138, 0.92);
+  border-radius: 5px;
+  background:
+    radial-gradient(circle at 35% 35%, #fff1c3 0 2px, transparent 3px),
+    radial-gradient(circle at 68% 68%, #73d7d0 0 2px, transparent 3px),
+    rgba(22, 35, 45, 0.92);
+  box-shadow:
+    0 0 12px rgba(115, 215, 208, 0.52),
+    0 0 10px rgba(255, 224, 138, 0.24);
+  animation: life-review-glyph 1.5s ease-in-out infinite;
+}
+
+@keyframes life-review-path {
+  0%,
+  100% {
+    opacity: 0.58;
+    transform: scaleX(0.96);
+  }
+  50% {
+    opacity: 0.92;
+    transform: scaleX(1.02);
+  }
+}
+
+@keyframes life-review-glyph {
+  0%,
+  100% {
+    transform: rotate(-4deg) scale(1);
+  }
+  50% {
+    transform: rotate(5deg) scale(1.1);
+  }
+}
+
+@media (max-width: 620px) {
+  .life-story-card-head {
+    align-items: start;
+  }
+
+  .life-story-review-btn,
+  .life-story-review-state {
+    min-height: 26px;
+    padding-inline: 8px;
+    font-size: 10px;
+  }
+
+  .life-story-reward {
+    font-size: 9px;
+  }
+
+  .floor.life-story-review-ready[data-type="dwelling"] .life-stage::before {
+    left: 10%;
+    right: 10%;
+    bottom: 25px;
+  }
+}

@@ -4,10 +4,10 @@
 
 ## 本地运行
 
-直接打开 `index.html` 可以游玩；最近一次 v73 本地验证使用：
+直接打开 `index.html` 可以游玩；最近一次 v74 本地验证使用：
 
 ```text
-http://127.0.0.1:8824
+http://127.0.0.1:8825
 ```
 
 ## 玩法切片
@@ -27,6 +27,7 @@ http://127.0.0.1:8824
 - v66 翻新旧入口大厅：大厅访客会累积等待压力，推荐派号会按贵宾、久候、库存/空房等综合排序；旧地图大厅增加候车道和路线信号，电梯面板和路线票显示“顺畅/繁忙/压线”等状态，并用 `gpt-image-2` 刷新了无文字大厅背景 `room-lobby-v3.webp`。
 - v67 翻新旧餐饮楼层：餐桌高峰现在会显示服务轨、桌况点、菜序灯和下一次上菜倒计时；新增 `流水上菜` 手动领取任务，资产背包也会记录高峰桌次、组织次数和上菜份数，并用 `gpt-image-2` 刷新了无文字厨房背景 `room-food-v3.webp`。
 - v69 翻新旧观星台：观星台现在可主动 `星图校准`，消耗星盘耗材拉居民读星、为正在进行的探险缩短时间并沉淀星图预报奖励；新增 `星图校准` 手动领取任务，资产背包记录校准场次和星标，并用 `gpt-image-2` 刷新了无文字云顶观星背景 `room-observatory-v2.webp`。
+- v74 深化旧宿舍/生活足迹系统：生活小故事现在会进入可手动点击的 `回访` 循环，回访会标记故事、增加宿舍租金准备、回补居民动机与关系，并新增 `生活回访` 手动领取任务；资产背包记录待回访和已回访次数，宿舍地图用无文字状态符号和路径光点提示可整理故事。
 - v73 修复全局排版审查发现的移动端重叠：金币/宝石/人口等资源条固定回顶部可见，底部功能栏不再盖住资源，互动提示会抬到展开面板上方，弹窗层级也会压住 toast。
 - v72 深化旧花园/温泉余韵：茶会或休整结束后的余韵现在可手动导向 `租金回响`、`探险整备` 或 `居民恢复`，新增 `余韵调息` 手动领取任务，资产背包记录三种导向次数；同时修复参与者提前离场导致余韵丢失的旧玩法边界，并用 `gpt-image-2` 刷新无文字花园背景 `room-garden-v3.webp`。
 - v71 翻新旧工坊：工坊现在可主动 `工具校准`，消耗工坊零件拉居民到工具台，分阶段积累校准点，支援施工、补货、探险和工坊订单；新增 `工具校准` 手动领取任务，资产背包记录校准场次和校准点，并用 `gpt-image-2` 刷新了无文字工坊背景 `room-craft-v3.webp`。
@@ -55,6 +56,17 @@ http://127.0.0.1:8824
 - 键盘支持 `W / ↑`、`S / ↓` 移动升降梯，`Space / Enter` 下客，`B` 打开建设。
 - v54 进行了轻量化清理：发布包移除了已被新版替代的旧房间图和旧表演者 PNG，表演者素材改为无损 WebP；发布运行目录只保留当前必要资产，本地旧浏览器配置、旧截图、图像中间产物和过期生成记录已清理。
 - v55 深化了旧演艺玩法：新增小剧任务、演出冷却、观众需求撮合、掌声金币奖励和娱乐/社交恢复，并保留 `docs/v55-entertainment-showtime-image-prompt.txt` 供后续图像网关恢复后刷新演艺房间背景。
+
+## v74 Update
+
+- v74 deepens the old dwelling / life-trail loop instead of adding a new floor. Completed life stories now become manual `回访` cards in the floor detail panel.
+- Added `lifeStoryReviewsDone`, the `life_story_reviews` / `生活回访` quest, review state on saved stories, and `reviewLifeStory()`. Reviews do not auto-award quest coins or gems; they use the existing manual claim flow.
+- A story review marks the story as reviewed, boosts linked resident motives/relationships, raises happiness slightly, and adds rent preparation back to the related dwelling.
+- The old dwelling map now exposes `.life-story-review-ready`, `data-life-story-reviews`, `data-state="life-story"`, and a textless route/memory-board visual pass over `room-dwelling-v3.webp`.
+- The asset backpack now records `生活回访`, pending review count, and the small dwelling journey bonus from reviewed stories.
+- `gpt-image-2` was attempted for refreshed dwelling/life-route room art, but the gateway connection closed/timed out. No unstable bitmap was connected; the reusable prompt is saved at `docs/v74-dwelling-life-room-image-prompt.txt`.
+- The save version is bumped to `27`; local verification used `http://127.0.0.1:8825/` with `tmp/verify-v74-life-reviews.mjs`.
+- Cloudflare production and preview both load v74. Preview for this pass: `https://584e0548.little-depths.pages.dev/`.
 
 ## v73 Update
 
