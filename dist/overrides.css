@@ -6696,3 +6696,292 @@ body.fullscreen-active .build-grid {
     --room-person-footing: 40px;
   }
 }
+
+/* v78 room objective pass: make old rooms stateful, readable, and actionable. */
+.floor-objective-panel {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 221, 139, 0.22);
+  background:
+    linear-gradient(135deg, rgba(255, 218, 122, 0.12), rgba(100, 196, 176, 0.08)),
+    rgba(255, 255, 255, 0.045);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.floor-objective-panel[data-tone="ready"] {
+  border-color: rgba(100, 196, 176, 0.42);
+  background:
+    linear-gradient(135deg, rgba(100, 196, 176, 0.16), rgba(255, 218, 122, 0.1)),
+    rgba(255, 255, 255, 0.045);
+}
+
+.floor-objective-panel[data-tone="running"],
+.floor-objective-panel[data-tone="build"] {
+  border-color: rgba(123, 169, 224, 0.44);
+  background:
+    linear-gradient(135deg, rgba(123, 169, 224, 0.15), rgba(255, 226, 155, 0.09)),
+    rgba(255, 255, 255, 0.045);
+}
+
+.floor-objective-panel[data-tone="warn"] {
+  border-color: rgba(236, 111, 93, 0.46);
+  background:
+    linear-gradient(135deg, rgba(236, 111, 93, 0.16), rgba(242, 184, 75, 0.09)),
+    rgba(255, 255, 255, 0.045);
+}
+
+.floor-objective-head,
+.floor-objective-copy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.floor-objective-head strong {
+  color: #ffe48a;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.floor-objective-head span {
+  min-width: 0;
+  color: #f7e8c4;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.25;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.floor-objective-copy small {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.floor-objective-action {
+  min-width: 64px;
+  min-height: 30px;
+  padding-inline: 10px;
+}
+
+.floor-objective-meter {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(7, 12, 19, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.floor-objective-meter i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #64c4b0, #ffe48a 58%, #f2b84b);
+  box-shadow: 0 0 12px rgba(242, 184, 75, 0.28);
+  transition: width 0.25s ease;
+}
+
+.floor-objective-panel[data-tone="warn"] .floor-objective-meter i {
+  background: linear-gradient(90deg, #ec6f5d, #f2b84b);
+}
+
+.floor-objective-panel[data-tone="running"] .floor-objective-meter i,
+.floor-objective-panel[data-tone="build"] .floor-objective-meter i {
+  background: linear-gradient(90deg, #7ba9e0, #64c4b0, #ffe48a);
+}
+
+.room-objective-cue {
+  position: absolute;
+  top: -7px;
+  right: 0;
+  z-index: 7;
+  display: inline-grid;
+  grid-template-columns: 20px minmax(0, auto);
+  align-items: center;
+  gap: 4px;
+  max-width: min(45%, 108px);
+  min-height: 28px;
+  padding: 3px 7px 3px 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 234, 166, 0.36);
+  color: #fff4cd;
+  background:
+    linear-gradient(180deg, rgba(55, 42, 30, 0.92), rgba(20, 24, 30, 0.95)),
+    rgba(255, 255, 255, 0.04);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 6px 14px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+.room-objective-cue i {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background:
+    conic-gradient(currentColor var(--objective, 0%), rgba(255, 255, 255, 0.13) 0),
+    rgba(8, 13, 18, 0.72);
+  box-shadow: inset 0 0 0 2px rgba(9, 13, 18, 0.72);
+}
+
+.room-objective-cue i::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: inherit;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.room-objective-cue b {
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-objective-cue[data-tone="ready"] {
+  color: #64c4b0;
+  border-color: rgba(100, 196, 176, 0.58);
+}
+
+.room-objective-cue[data-tone="running"],
+.room-objective-cue[data-tone="build"] {
+  color: #b9d6ff;
+  border-color: rgba(123, 169, 224, 0.56);
+}
+
+.room-objective-cue[data-tone="warn"] {
+  color: #ffb09a;
+  border-color: rgba(236, 111, 93, 0.58);
+}
+
+.floor.objective-ready .room {
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.13),
+    inset 0 -28px 34px rgba(0, 0, 0, 0.24),
+    0 0 0 1px rgba(100, 196, 176, 0.2),
+    0 12px 24px rgba(0, 0, 0, 0.34);
+}
+
+.floor.objective-running .room,
+.floor.objective-build .room {
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.13),
+    inset 0 -28px 34px rgba(0, 0, 0, 0.24),
+    0 0 0 1px rgba(123, 169, 224, 0.22),
+    0 12px 24px rgba(0, 0, 0, 0.34);
+}
+
+.floor.objective-warn .room {
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -28px 34px rgba(0, 0, 0, 0.27),
+    0 0 0 1px rgba(236, 111, 93, 0.26),
+    0 12px 24px rgba(0, 0, 0, 0.36);
+}
+
+.floor.objective-ready .room-content::before,
+.floor.objective-running .room-content::before,
+.floor.objective-build .room-content::before,
+.floor.objective-warn .room-content::before {
+  opacity: 0.78;
+}
+
+.floor.objective-ready[data-type="library"] .room,
+.floor.objective-ready[data-type="market"] .room,
+.floor.objective-ready[data-type="kingdom"] .room {
+  filter: saturate(1.08) contrast(1.03);
+}
+
+@media (max-width: 620px) {
+  body.mobile-panel-layout .resources {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+    overflow: visible;
+    padding-inline: 4px;
+  }
+
+  body.mobile-panel-layout .resource {
+    min-width: 0;
+    width: 100%;
+    gap: 3px;
+    padding: 4px 3px;
+  }
+
+  body.mobile-panel-layout .res-icon {
+    width: 13px;
+    height: 13px;
+    flex-basis: 13px;
+  }
+
+  body.mobile-panel-layout .resource strong {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+    font-size: 11px;
+  }
+
+  .floor-objective-head,
+  .floor-objective-copy {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .floor-objective-head span {
+    text-align: left;
+  }
+
+  .floor-objective-action {
+    width: 100%;
+  }
+
+  .room-objective-cue {
+    top: -6px;
+    max-width: 42%;
+    min-height: 24px;
+    padding: 2px 6px 2px 3px;
+    grid-template-columns: 18px minmax(0, auto);
+  }
+
+  .room-objective-cue i {
+    width: 18px;
+    height: 18px;
+  }
+
+  .room-objective-cue b {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 360px) {
+  body.mobile-panel-layout .resources {
+    gap: 3px;
+    padding-inline: 3px;
+  }
+
+  body.mobile-panel-layout .resource {
+    padding-inline: 2px;
+  }
+
+  body.mobile-panel-layout .res-icon {
+    width: 12px;
+    height: 12px;
+    flex-basis: 12px;
+  }
+
+  body.mobile-panel-layout .resource strong {
+    font-size: 10.5px;
+  }
+}

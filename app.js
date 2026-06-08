@@ -8041,6 +8041,7 @@ function render(force = false) {
   }
   renderElevatorPanel();
   renderFloorDetail();
+  injectFloorObjectivePanel();
   renderResidentRoster();
   renderQuests();
   renderOrders();
@@ -8059,16 +8060,17 @@ function getKingdomRenderKey() {
   const passenger = state.elevator?.passenger;
   const floorKey = state.floors
     .map((floor) => {
+      const objectiveKey = floorObjectiveMapKey(floor);
       if (floor.status === "construction") {
-        return `${floor.id}:${floor.type}:build:${Math.ceil(floor.buildRemaining)}:${state.selectedFloorId}`;
+        return `${floor.id}:${floor.type}:build:${Math.ceil(floor.buildRemaining)}:${objectiveKey}:${state.selectedFloorId}`;
       }
       if (floor.type === "dwelling") {
-        return `${floor.id}:dw:${floor.level}:${floor.residents.length}:${floor.capacity}:${floor.rentReady}:${floor.residents.map((resident) => resident.expeditionId || 0).join("-")}:${lifeTrailMapKey(floor)}:${lifeStoryReviewMapKey(floor)}:${expeditionWaymarkMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
+        return `${floor.id}:dw:${floor.level}:${floor.residents.length}:${floor.capacity}:${floor.rentReady}:${floor.residents.map((resident) => resident.expeditionId || 0).join("-")}:${lifeTrailMapKey(floor)}:${lifeStoryReviewMapKey(floor)}:${expeditionWaymarkMapKey(floor)}:${floorPeopleMotionKey(floor)}:${objectiveKey}:${state.selectedFloorId}`;
       }
       if (floor.type === "lobby") {
-        return `${floor.id}:lobby:${state.queue.map((visitor) => `${visitor.id}:${visitor.need || ""}:${visitor.activity || ""}:${Math.floor(lobbyWaitSeconds(visitor) / 5)}:${visitor.targetFloorId || ""}`).join("-")}:${lobbyPressureInfo(state).tone}:${state.selectedFloorId}`;
+        return `${floor.id}:lobby:${state.queue.map((visitor) => `${visitor.id}:${visitor.need || ""}:${visitor.activity || ""}:${Math.floor(lobbyWaitSeconds(visitor) / 5)}:${visitor.targetFloorId || ""}`).join("-")}:${lobbyPressureInfo(state).tone}:${objectiveKey}:${state.selectedFloorId}`;
       }
-      return `${floor.id}:${floor.type}:${floor.level}:${floor.stock}:${floor.stockMax}:${floor.workers.length}:${Boolean(floor.production)}:${foodRushMapKey(floor)}:${serviceCareMapKey(floor)}:${starChartMapKey(floor)}:${toolTuneMapKey(floor)}:${marketParcelMapKey(floor)}:${royalMandateMapKey(floor)}:${comfortSessionMapKey(floor)}:${showtimeMapKey(floor)}:${lifeTrailMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
+      return `${floor.id}:${floor.type}:${floor.level}:${floor.stock}:${floor.stockMax}:${floor.workers.length}:${Boolean(floor.production)}:${foodRushMapKey(floor)}:${serviceCareMapKey(floor)}:${starChartMapKey(floor)}:${toolTuneMapKey(floor)}:${marketParcelMapKey(floor)}:${royalMandateMapKey(floor)}:${comfortSessionMapKey(floor)}:${showtimeMapKey(floor)}:${lifeTrailMapKey(floor)}:${floorPeopleMotionKey(floor)}:${objectiveKey}:${state.selectedFloorId}`;
     })
     .join("|");
   const arrivalKey = (state.arrivals || []).map((arrival) => `${arrival.id}:${arrival.floorId}`).join("-");
@@ -8112,6 +8114,11 @@ function renderKingdom() {
 function renderFloor(floor) {
   const selected = floor.id === state.selectedFloorId ? "selected" : "";
   const constructing = floor.status === "construction" ? "constructing" : "";
+  const objective = floorObjective(floor);
+  const objectiveClass = objective ? `objective-${objective.tone}` : "";
+  const objectiveAttrs = objective
+    ? ` data-objective-tone="${escapeAttr(objective.tone)}" data-objective-label="${escapeAttr(objective.mapLabel || objective.label)}"`
+    : "";
   const routeClass = floorRouteClass(floor);
   const lifeTrailItems = lifeTrailsForFloor(floor);
   const lifeTrailClass = lifeTrailItems.length ? "life-trail-active" : "";
@@ -8167,7 +8174,7 @@ function renderFloor(floor) {
     : "";
   const zone = getFloorZone(floor);
   return `
-    <article class="floor ${selected} ${constructing} ${routeClass} ${lifeTrailClass} ${lifeStoryReviewClass} ${expeditionWaymarkClass} ${foodRushClass} ${serviceCareClass} ${starChartClass} ${toolTuneClass} ${marketParcelClass} ${royalMandateClass} ${royalCourierClass} ${comfortClass} ${comfortEchoClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${lifeTrailAttrs}${lifeStoryReviewAttrs}${expeditionWaymarkAttrs}${foodRushAttrs}${serviceCareAttrs}${starChartAttrs}${toolTuneAttrs}${marketParcelAttrs}${royalMandateAttrs}${royalCourierAttrs}${comfortEchoAttrs}${showtimeAttrs}>
+    <article class="floor ${selected} ${constructing} ${objectiveClass} ${routeClass} ${lifeTrailClass} ${lifeStoryReviewClass} ${expeditionWaymarkClass} ${foodRushClass} ${serviceCareClass} ${starChartClass} ${toolTuneClass} ${marketParcelClass} ${royalMandateClass} ${royalCourierClass} ${comfortClass} ${comfortEchoClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${objectiveAttrs}${lifeTrailAttrs}${lifeStoryReviewAttrs}${expeditionWaymarkAttrs}${foodRushAttrs}${serviceCareAttrs}${starChartAttrs}${toolTuneAttrs}${marketParcelAttrs}${royalMandateAttrs}${royalCourierAttrs}${comfortEchoAttrs}${showtimeAttrs}>
       ${renderFloorIndex(floor)}
       <div class="room" data-action="select-floor" data-floor-id="${floor.id}" title="${escapeAttr(floorMapLabel(floor))}" aria-label="${escapeAttr(floorMapLabel(floor))}">
         ${floor.status === "construction" ? renderConstruction(floor) : renderOpenFloor(floor)}
@@ -8189,7 +8196,509 @@ function floorRouteClass(floor) {
 function floorMapLabel(floor) {
   if (!floor) return "";
   if (floor.status === "construction") return `${FLOOR_TYPES[floor.type]?.label || "楼层"}施工中，剩余 ${Math.ceil(floor.buildRemaining || 0)} 秒`;
-  return `${floor.name}，${renderFloorStatus(floor)}`;
+  const objective = floorObjective(floor);
+  return `${floor.name}，${renderFloorStatus(floor)}${objective?.label ? `，目标：${objective.label}` : ""}`;
+}
+
+function makeFloorObjective(floor, options = {}) {
+  const progress = clamp(Number(options.progress) || 0, 0, 1);
+  return {
+    floorId: floor?.id,
+    tone: options.tone || "calm",
+    title: options.title || "房间目标",
+    label: options.label || "观察",
+    detail: options.detail || "",
+    mapLabel: options.mapLabel || options.actionLabel || options.label || "",
+    progress,
+    action: options.action || "",
+    actionLabel: options.actionLabel || "",
+    disabled: Boolean(options.disabled),
+    storyId: options.storyId || "",
+    direction: options.direction || "",
+  };
+}
+
+function floorStockRatio(floor) {
+  if (!isBusiness(floor)) return 0;
+  return clamp((Number(floor.stock) || 0) / Math.max(1, Number(floor.stockMax) || 1), 0, 1);
+}
+
+function idleResidentCount(game = state) {
+  return allResidents(game).filter((resident) => resident && !resident.workFloorId && !resident.expeditionId).length;
+}
+
+function dwellingIdleResidents(floor) {
+  if (!floor || floor.type !== "dwelling") return [];
+  return floor.residents
+    .map((entry) => getResident(entry.id))
+    .filter((resident) => resident && !resident.workFloorId && !resident.expeditionId);
+}
+
+function activeFloorEventObjective(floor) {
+  if (isActiveFoodRush(floor)) {
+    return makeFloorObjective(floor, {
+      tone: "running",
+      title: "餐桌高峰",
+      label: `${currentFoodRushPace(floor).label} · 上菜 ${floor.foodRush.served || 0}/${floor.foodRush.targetServings || 0}`,
+      detail: `居民正在用餐，忙场 ${Math.round(floor.foodRush.heat || 0)}%。`,
+      mapLabel: "上菜",
+      progress: foodRushProgress(floor),
+    });
+  }
+  if (isActiveServiceCare(floor)) {
+    return makeFloorObjective(floor, {
+      tone: "running",
+      title: "礼宾照看",
+      label: `${currentServiceCarePhase(floor).label} · ${floor.serviceCare.touches || 0}/${floor.serviceCare.targetTouches || 0}`,
+      detail: `照看正在推进，妥帖度 ${Math.round(floor.serviceCare.care || 0)}%。`,
+      mapLabel: "照看",
+      progress: serviceCareProgress(floor),
+    });
+  }
+  if (isActiveStarChart(floor)) {
+    return makeFloorObjective(floor, {
+      tone: "running",
+      title: "星图校准",
+      label: `${currentStarChartPhase(floor).label} · 星标 ${floor.starChart.marks || 0}/${floor.starChart.targetMarks || 0}`,
+      detail: `星路清晰度 ${Math.round(floor.starChart.focus || 0)}%，探险和订单收益正在受益。`,
+      mapLabel: "星标",
+      progress: starChartProgress(floor),
+    });
+  }
+  if (isActiveToolTune(floor)) {
+    return makeFloorObjective(floor, {
+      tone: "running",
+      title: "工具校准",
+      label: `${currentToolTunePhase(floor).label} · 校准点 ${floor.toolTune.marks || 0}/${floor.toolTune.targetMarks || 0}`,
+      detail: `工具精度 ${Math.round(floor.toolTune.precision || 0)}%，会帮助施工、补货和订单。`,
+      mapLabel: "校准",
+      progress: toolTuneProgress(floor),
+    });
+  }
+  if (isActiveMarketParcel(floor)) {
+    return makeFloorObjective(floor, {
+      tone: "running",
+      title: "市集包裹",
+      label: `${currentMarketParcelPhase(floor).label} · 打包 ${floor.marketParcel.packed || 0}`,
+      detail: "摊位正在把现货装入王室订单，完成后会提高订单奖励。",
+      mapLabel: "包裹",
+      progress: 1 - Number(floor.marketParcel.remaining || 0) / Math.max(1, Number(floor.marketParcel.total) || 1),
+    });
+  }
+  if (isActiveRoyalMandate(floor)) {
+    return makeFloorObjective(floor, {
+      tone: "running",
+      title: "王令签发",
+      label: `${currentRoyalMandatePhase(floor).label} · ${currentRoyalCourierPhase(floor).label}`,
+      detail: `${floor.royalMandate.routeLabel || "信使路线"}，剩余 ${Math.ceil(floor.royalMandate.remaining || 0)} 秒。`,
+      mapLabel: "王令",
+      progress: 1 - Number(floor.royalMandate.remaining || 0) / Math.max(1, Number(floor.royalMandate.total) || 1),
+    });
+  }
+  if (isActiveComfortSession(floor)) {
+    const progress = 1 - Number(floor.comfortSession.remaining || 0) / Math.max(1, Number(floor.comfortSession.total) || 1);
+    return makeFloorObjective(floor, {
+      tone: "running",
+      title: COMFORT_SESSION_LABELS[floor.type] || "休整",
+      label: `${floor.comfortSession.label || COMFORT_SESSION_LABELS[floor.type] || "休整"} · ${Math.ceil(floor.comfortSession.remaining || 0)}s`,
+      detail: "居民正在恢复状态，结束后会留下可调息的舒缓余韵。",
+      mapLabel: "休整",
+      progress,
+    });
+  }
+  if (isActiveComfortAfterglow(floor)) {
+    return makeFloorObjective(floor, {
+      tone: floor.comfortAfterglow.focus ? "ready" : "running",
+      title: floor.comfortAfterglow.label || "舒缓余韵",
+      label: floor.comfortAfterglow.focus ? `已调息 · ${comfortFocusLabel(floor.comfortAfterglow)}` : "余韵待调息",
+      detail: floor.comfortAfterglow.focus
+        ? `剩余 ${Math.ceil(floor.comfortAfterglow.remaining || 0)} 秒，继续影响租金、探险和恢复。`
+        : "可以在详情里选择余韵用途，让旧房间的休整收益更明确。",
+      mapLabel: floor.comfortAfterglow.focus ? "余韵" : "调息",
+      progress: Number(floor.comfortAfterglow.remaining || 0) / Math.max(1, Number(floor.comfortAfterglow.total) || 1),
+    });
+  }
+  if (isActiveShowtime(floor)) {
+    return makeFloorObjective(floor, {
+      tone: "running",
+      title: SHOWTIME_LABELS[floor.type] || "常驻小剧",
+      label: `${currentShowtimeBeat(floor).label} · 热度 ${Math.round(floor.showtime.heat || 0)}%`,
+      detail: "观众反应越好，连送和金币奖励越稳定。",
+      mapLabel: "演出",
+      progress: showtimeProgress(floor),
+    });
+  }
+  return null;
+}
+
+function readyFloorEventObjective(floor) {
+  if (isFoodRushFloorType(floor.type)) {
+    const reason = foodRushActionBlockReason(floor);
+    return makeFloorObjective(floor, {
+      tone: reason ? "calm" : "ready",
+      title: "厨房目标",
+      label: reason || "组织一轮用餐高峰",
+      detail: reason || "让饥饿居民入座，补足需求并把老厨房的热闹感拉起来。",
+      mapLabel: reason ? "待桌" : "开桌",
+      progress: floorStockRatio(floor),
+      action: reason ? "" : "food-rush",
+      actionLabel: "开桌",
+    });
+  }
+  if (isServiceCareFloorType(floor.type)) {
+    const reason = serviceCareActionBlockReason(floor);
+    return makeFloorObjective(floor, {
+      tone: reason ? "calm" : "ready",
+      title: "礼宾目标",
+      label: reason || "安排礼宾照看",
+      detail: reason || "照看需要社交和恢复的居民，同时压低大厅等待压力。",
+      mapLabel: reason ? "候客" : "照看",
+      progress: floorStockRatio(floor),
+      action: reason ? "" : "service-care",
+      actionLabel: "照看",
+    });
+  }
+  if (isStarChartFloorType(floor.type)) {
+    const reason = starChartActionBlockReason(floor);
+    return makeFloorObjective(floor, {
+      tone: reason ? "calm" : "ready",
+      title: "观星目标",
+      label: reason || "校准星图",
+      detail: reason || "为探险、订单和居民路线校准星象，提升旧观星台的战略感。",
+      mapLabel: reason ? "候星" : "星图",
+      progress: floorStockRatio(floor),
+      action: reason ? "" : "star-chart",
+      actionLabel: "校准",
+    });
+  }
+  if (isToolTuneFloorType(floor.type)) {
+    const reason = toolTuneActionBlockReason(floor);
+    return makeFloorObjective(floor, {
+      tone: reason ? "calm" : "ready",
+      title: "工坊目标",
+      label: reason || "校准工具",
+      detail: reason || "把工坊从单纯补货变成全城效率支点。",
+      mapLabel: reason ? "候件" : "校准",
+      progress: floorStockRatio(floor),
+      action: reason ? "" : "tool-tune",
+      actionLabel: "校准",
+    });
+  }
+  if (floor.type === "market") {
+    const reason = marketDealActionBlockReason(floor);
+    return makeFloorObjective(floor, {
+      tone: reason ? "calm" : "ready",
+      title: "市集目标",
+      label: reason || "撮合一张快单",
+      detail: reason || "让旧市集主动发现现货需求，并把包裹流转展示在地图上。",
+      mapLabel: reason ? "候单" : "撮合",
+      progress: floorStockRatio(floor),
+      action: reason ? "" : "market-deal",
+      actionLabel: "撮合",
+    });
+  }
+  if (floor.type === "kingdom") {
+    const target = bestRoyalMandateOrder(state);
+    const reason = royalMandateActionBlockReason(floor, target);
+    return makeFloorObjective(floor, {
+      tone: reason ? "calm" : "ready",
+      title: "王国目标",
+      label: reason || "签发王令补足缺口",
+      detail: reason || `优先支援 ${FLOOR_TYPES[target.type].label} 订单，让王国旧玩法更像调度中心。`,
+      mapLabel: reason ? "候令" : "王令",
+      progress: floorStockRatio(floor),
+      action: reason ? "" : "royal-mandate",
+      actionLabel: "签发",
+    });
+  }
+  if (floor.type === "library") {
+    let reason = "";
+    if (!floor.workers?.length) reason = "书库需要馆员整理典藏";
+    else if ((floor.stock || 0) <= 0) reason = "书库卷宗不足，先补货";
+    else if ((floor.libraryCooldown || 0) > 0) reason = `馆员还在编目：${Math.ceil(floor.libraryCooldown)}s`;
+    const next = nextCollectionItem(state);
+    return makeFloorObjective(floor, {
+      tone: reason ? "calm" : "ready",
+      title: "书库目标",
+      label: reason || (next ? `整理典藏：下枚 ${next.name}` : "整理典藏换取宝石"),
+      detail: reason || "让旧书库更明确地服务珍藏图鉴、探险碎片和典藏订单。",
+      mapLabel: reason ? "候卷" : "典藏",
+      progress: collectionProgress(state).completed / Math.max(1, COLLECTION_DEFS.length),
+      action: reason ? "" : "library-study",
+      actionLabel: "整理",
+    });
+  }
+  if (isShowtimeFloorType(floor.type)) {
+    const reason = showtimeActionBlockReason(floor);
+    return makeFloorObjective(floor, {
+      tone: reason ? "calm" : "ready",
+      title: "演艺目标",
+      label: reason || "排演常驻小剧",
+      detail: reason || "用清楚的段落和热度反馈强化旧演艺房间。",
+      mapLabel: reason ? "候场" : "排演",
+      progress: floorStockRatio(floor),
+      action: reason ? "" : "entertainment-show",
+      actionLabel: "排演",
+    });
+  }
+  if (isComfortFloorType(floor.type)) {
+    const reason = comfortActionBlockReason(floor);
+    return makeFloorObjective(floor, {
+      tone: reason ? "calm" : "ready",
+      title: "休整目标",
+      label: reason || `${COMFORT_SESSION_ACTIONS[floor.type] || "组织休整"}`,
+      detail: reason || "把花园、温泉等旧休整房间变成可见的恢复节奏。",
+      mapLabel: reason ? "候息" : "休整",
+      progress: floorStockRatio(floor),
+      action: reason ? "" : "comfort-session",
+      actionLabel: COMFORT_SESSION_ACTIONS[floor.type] || "休整",
+    });
+  }
+  return null;
+}
+
+function floorObjective(floor) {
+  if (!floor) return null;
+  if (floor.status === "construction") {
+    const progress = 1 - Number(floor.buildRemaining || 0) / Math.max(1, Number(floor.buildTotal) || 1);
+    return makeFloorObjective(floor, {
+      tone: "build",
+      title: "施工目标",
+      label: `施工 ${Math.round(clamp(progress, 0, 1) * 100)}%`,
+      detail: `剩余 ${Math.ceil(floor.buildRemaining || 0)} 秒，完工后会加入地图目标系统。`,
+      mapLabel: "施工",
+      progress,
+      action: "speed",
+      actionLabel: "加速",
+      disabled: state.gems <= 0,
+    });
+  }
+  if (floor.type === "lobby") {
+    const pressure = lobbyPressureInfo(state);
+    const best = bestLobbyVisitor(state);
+    const route = best ? visitorRouteInfo(best, state) : null;
+    const hasPassenger = Boolean(state.elevator?.passenger);
+    return makeFloorObjective(floor, {
+      tone: pressure.tone === "urgent" ? "warn" : state.queue.length ? "ready" : "calm",
+      title: "大厅目标",
+      label: route ? `推荐 ${route.floorLabel} ${route.floorName}` : "保持入口节奏",
+      detail: route ? `${best.title} · ${route.text}` : pressure.text,
+      mapLabel: state.queue.length ? "派号" : "待客",
+      progress: pressure.percent / 100,
+      action: "dispatch-lobby",
+      actionLabel: "派号",
+      disabled: !state.queue.length || hasPassenger,
+    });
+  }
+  if (floor.type === "dwelling") {
+    const waymarks = expeditionWaymarksForFloor(floor);
+    if (waymarks.length) {
+      const first = waymarks[0];
+      return makeFloorObjective(floor, {
+        tone: "running",
+        title: "公寓目标",
+        label: `探险${first.mark.label} ${Math.round(first.progress * 100)}%`,
+        detail: first.mark.text,
+        mapLabel: "探险",
+        progress: first.progress,
+      });
+    }
+    const pendingReviews = pendingLifeStoryReviewsForFloor(floor);
+    if (pendingReviews.length) {
+      const story = pendingReviews[0];
+      return makeFloorObjective(floor, {
+        tone: "ready",
+        title: "公寓目标",
+        label: `生活足迹待回访 ${pendingReviews.length}`,
+        detail: story.detail || "整理居民生活足迹，补强公寓租金和人物关系。",
+        mapLabel: "回访",
+        progress: Math.min(1, pendingReviews.length / 4),
+        action: "review-life-story",
+        actionLabel: "回访",
+        storyId: story.id,
+      });
+    }
+    if ((floor.rentReady || 0) > 0) {
+      return makeFloorObjective(floor, {
+        tone: "ready",
+        title: "公寓目标",
+        label: `收取 ${floor.rentReady} 金币租金`,
+        detail: "旧公寓的生活收益已经结算，可以手动领取。",
+        mapLabel: "收租",
+        progress: Math.min(1, (floor.rentReady || 0) / 180),
+        action: "collect-rent",
+        actionLabel: "收租",
+      });
+    }
+    const idle = dwellingIdleResidents(floor);
+    if (idle.length && state.expeditions.length < expeditionCapacity(state)) {
+      return makeFloorObjective(floor, {
+        tone: "ready",
+        title: "公寓目标",
+        label: "派出空闲居民探险",
+        detail: "公寓会记录远行整备，把旧居住玩法和地底探险连起来。",
+        mapLabel: "远行",
+        progress: idle.length / Math.max(1, floor.residents.length || 1),
+        action: "start-dwelling-expedition",
+        actionLabel: "探险",
+      });
+    }
+    return makeFloorObjective(floor, {
+      tone: getVacancy(floor) ? "calm" : "ready",
+      title: "公寓目标",
+      label: getVacancy(floor) ? `空房 ${getVacancy(floor)} 间` : "住户已满",
+      detail: getVacancy(floor) ? "等待大厅派来的新居民入住。" : "可升级公寓，继续扩充居住容量。",
+      mapLabel: getVacancy(floor) ? "空房" : "满员",
+      progress: floor.residents.length / Math.max(1, floor.capacity || 1),
+      action: getVacancy(floor) ? "" : "upgrade-floor",
+      actionLabel: getVacancy(floor) ? "" : "升级",
+    });
+  }
+  if (!isBusiness(floor)) return null;
+  const active = activeFloorEventObjective(floor);
+  if (active) return active;
+  if (floor.production) {
+    const progress = 1 - Number(floor.production.remaining || 0) / Math.max(1, Number(floor.production.total) || 1);
+    return makeFloorObjective(floor, {
+      tone: "running",
+      title: "补货目标",
+      label: `补货 ${Math.ceil(floor.production.remaining || 0)}s`,
+      detail: "货架正在恢复，完成后会刷新经营节奏。",
+      mapLabel: "补货",
+      progress,
+      action: "speed",
+      actionLabel: "加速",
+      disabled: state.gems <= 0,
+    });
+  }
+  if (!floor.workers?.length) {
+    return makeFloorObjective(floor, {
+      tone: "warn",
+      title: "房间目标",
+      label: "先安排员工",
+      detail: idleResidentCount(state) ? "有空闲居民可直接派到这个房间。" : "没有空闲居民，先接待访客入住公寓。",
+      mapLabel: "雇佣",
+      progress: 0,
+      action: "hire",
+      actionLabel: "雇佣",
+      disabled: idleResidentCount(state) <= 0,
+    });
+  }
+  if ((floor.stock || 0) <= 0) {
+    return makeFloorObjective(floor, {
+      tone: "warn",
+      title: "房间目标",
+      label: "库存见底",
+      detail: "旧房间缺货时会中断订单、事件和访客收益，建议优先补货。",
+      mapLabel: "缺货",
+      progress: 0,
+      action: "stock",
+      actionLabel: "补货",
+    });
+  }
+  const eventObjective = readyFloorEventObjective(floor);
+  if (eventObjective && (eventObjective.tone === "ready" || eventObjective.action)) return eventObjective;
+  if (floorStockRatio(floor) <= 0.36) {
+    return makeFloorObjective(floor, {
+      tone: "ready",
+      title: "房间目标",
+      label: "库存偏低，补货更稳",
+      detail: "提前补货可以避免旧玩法事件启动时被库存卡住。",
+      mapLabel: "补货",
+      progress: floorStockRatio(floor),
+      action: "stock",
+      actionLabel: "补货",
+    });
+  }
+  if ((floor.workers || []).length < 3 && idleResidentCount(state) > 0) {
+    return makeFloorObjective(floor, {
+      tone: "ready",
+      title: "房间目标",
+      label: "补齐员工位",
+      detail: "更多员工会提高补货速度、事件产出和订单效率。",
+      mapLabel: "雇佣",
+      progress: (floor.workers || []).length / 3,
+      action: "hire",
+      actionLabel: "雇佣",
+    });
+  }
+  return eventObjective || makeFloorObjective(floor, {
+    tone: "calm",
+    title: "房间目标",
+    label: `${FLOOR_TYPES[floor.type]?.label || "房间"}运转稳定`,
+    detail: "可以继续升级、扩建，或等待新的居民需求触发房间事件。",
+    mapLabel: "稳定",
+    progress: floorStockRatio(floor),
+    action: "upgrade-floor",
+    actionLabel: "升级",
+  });
+}
+
+function floorObjectiveMapKey(floor) {
+  const objective = floorObjective(floor);
+  if (!objective) return "";
+  return [
+    objective.tone,
+    objective.mapLabel,
+    objective.action,
+    objective.disabled ? 1 : 0,
+    Math.round(objective.progress * 100),
+  ].join(":");
+}
+
+function renderRoomObjectiveCue(floor) {
+  const objective = floorObjective(floor);
+  if (!objective || objective.tone === "calm") return "";
+  const label = objective.mapLabel || objective.actionLabel || objective.label;
+  return `
+    <span class="room-objective-cue" data-tone="${escapeAttr(objective.tone)}" style="--objective:${Math.round(objective.progress * 100)}%" title="${escapeAttr(`${objective.title}：${objective.label}`)}" aria-label="${escapeAttr(`${objective.title}：${objective.label}`)}">
+      <i aria-hidden="true"></i>
+      <b>${escapeHtml(label)}</b>
+    </span>`;
+}
+
+function renderFloorObjectivePanel(floor) {
+  const objective = floorObjective(floor);
+  if (!objective) return "";
+  const disabled = objective.disabled ? "disabled" : "";
+  const actionButton = objective.action
+    ? `<button class="floor-objective-action detail-btn primary" type="button" data-action="${escapeAttr(objective.action)}" data-floor-id="${escapeAttr(objective.floorId)}"${objective.storyId ? ` data-story-id="${escapeAttr(objective.storyId)}"` : ""}${objective.direction ? ` data-direction="${escapeAttr(objective.direction)}"` : ""} ${disabled}>${escapeHtml(objective.actionLabel || "执行")}</button>`
+    : "";
+  return `
+    <div class="floor-objective-panel" data-tone="${escapeAttr(objective.tone)}">
+      <div class="floor-objective-head">
+        <strong>${escapeHtml(objective.title)}</strong>
+        <span>${escapeHtml(objective.label)}</span>
+      </div>
+      <div class="floor-objective-meter" aria-hidden="true"><i style="width:${Math.round(objective.progress * 100)}%"></i></div>
+      <div class="floor-objective-copy">
+        <small>${escapeHtml(objective.detail)}</small>
+        ${actionButton}
+      </div>
+    </div>`;
+}
+
+function injectFloorObjectivePanel() {
+  if (!els.floorDetail) return;
+  const floor = findFloor(state.selectedFloorId) || state.floors[0];
+  const html = renderFloorObjectivePanel(floor);
+  els.floorDetail.querySelector(".floor-objective-panel")?.remove();
+  if (!html) return;
+  const template = document.createElement("template");
+  template.innerHTML = html.trim();
+  const node = template.content.firstElementChild;
+  if (!node) return;
+  const intro = els.floorDetail.querySelector(":scope > p");
+  if (intro) {
+    intro.insertAdjacentElement("afterend", node);
+    return;
+  }
+  const anchor = els.floorDetail.querySelector(":scope > strong");
+  if (anchor?.nextSibling) {
+    anchor.parentNode.insertBefore(node, anchor.nextSibling);
+  } else {
+    els.floorDetail.prepend(node);
+  }
 }
 
 function renderFloorIndex(floorOrId) {
@@ -8224,6 +8733,7 @@ function renderOpenFloor(floor) {
       </div>
       <div class="room-scene">
         ${renderRoomStateTag(floor)}
+        ${renderRoomObjectiveCue(floor)}
         ${renderFoodRushServiceLayer(floor)}
         ${renderServiceCareLayer(floor)}
         ${renderStarChartLayer(floor)}

@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v77`
-- Latest preview deployment: `https://de65b1b7.little-depths.pages.dev/`
-- Local server used for v77 verification: `http://127.0.0.1:8828/`
+- Latest deployed version: `v78`
+- Latest preview deployment: `https://83e19efd.little-depths.pages.dev/`
+- Local server used for v78 verification: `http://127.0.0.1:8830/`
 
 ## Current State
 
@@ -22,11 +22,21 @@ wrangler pages deploy dist --project-name little-depths
 ```
 
 - GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`, but current release practice is to deploy Cloudflare with local Wrangler OAuth from `dist`, then sync GitHub separately. Use `[skip ci]` when pushing documentation/code sync commits that should not ask GitHub Actions to deploy Cloudflare.
-- Current caveat: v77 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
+- Current caveat: v78 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v78 Room Objectives / Old UI Readability
+
+- Added a save-compatible `floorObjective()` system that computes each room's current goal without adding new save fields.
+- The selected floor detail receives a `floor-objective-panel` with progress, explanation, and a one-click action wired to existing handlers such as `market-deal`, `library-study`, `royal-mandate`, `food-rush`, `service-care`, `tool-tune`, `star-chart`, `comfort-session`, `entertainment-show`, `collect-rent`, `hire`, and `stock`.
+- Room maps now expose `data-objective-tone`, `data-objective-label`, `objective-ready` / `objective-running` / `objective-warn` classes, and compact `room-objective-cue` badges so old rooms show what is actionable without adding text to the room art.
+- Mobile resource cards were tightened at the v78 override layer so long coin/population values stay readable instead of truncating under the bottom dock layout.
+- Added `tmp/verify-v78-room-objectives.mjs`. It seeds all known non-lobby room types, verifies objective panels/cues, clicks the market objective to start parcel flow, rechecks all-room sprite footing, checks no cue/state-tag overlap, checks mobile resource text, and verifies no horizontal overflow.
+- Bumped `index.html` / `sw.js` to v78, synced `dist`, and deployed v78 to Cloudflare Pages with local Wrangler direct upload. Production: `https://little-depths.pages.dev/`; preview: `https://83e19efd.little-depths.pages.dev/`.
+- Remote verification confirmed both production and preview load `app.js?v=78`, `overrides.css?v=78`, and `little-depths-v78`.
 
 ### v77 All-Room Footing Fix
 
