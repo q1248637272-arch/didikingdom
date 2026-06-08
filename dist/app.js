@@ -407,6 +407,19 @@ const FOOD_RUSH_COURSES = [
   { id: "share", label: "拼盘", threshold: 0.58 },
   { id: "finale", label: "加桌", threshold: 0.84 },
 ];
+const SERVICE_CARE_FLOOR_TYPES = ["service"];
+const SERVICE_CARE_LABELS = {
+  service: "礼宾照看",
+};
+const SERVICE_CARE_ACTIONS = {
+  service: "安排礼宾照看",
+};
+const SERVICE_CARE_PHASES = [
+  { id: "greet", label: "迎候", threshold: 0, worker: ["serve", "wave"], guest: ["wait", "talk"] },
+  { id: "wrap", label: "整理", threshold: 0.32, worker: ["work", "serve"], guest: ["look", "chat"] },
+  { id: "deliver", label: "递送", threshold: 0.64, worker: ["serve", "work"], guest: ["talk", "look"] },
+  { id: "thanks", label: "致谢", threshold: 0.86, worker: ["wave", "talk"], guest: ["wave", "chat"] },
+];
 const ROYAL_MANDATE_PHASES = [
   { id: "draft", label: "拟令", threshold: 0 },
   { id: "seal", label: "盖印", threshold: 0.38 },
@@ -734,6 +747,14 @@ const QUEST_DEFS = [
     text: "拥有 1 层服务楼层",
   },
   {
+    id: "care_line",
+    title: "礼宾照看",
+    goal: 5,
+    metric: "serviceCareTouchesDone",
+    reward: { coins: 430, gems: 2 },
+    text: "在服务楼层完成 5 次礼宾照看",
+  },
+  {
     id: "opening_night",
     title: "烛光开幕",
     goal: 1,
@@ -1021,7 +1042,7 @@ let guideReady = false;
 
 function makeNewGame() {
   const game = {
-    version: 22,
+    version: 23,
     coins: 560,
     gems: 7,
     happiness: 72,
@@ -1070,6 +1091,8 @@ function makeNewGame() {
       foodServingsDone: 0,
       foodRushCoursesDone: 0,
       serviceFloorsBuilt: 1,
+      serviceCareSessionsDone: 0,
+      serviceCareTouchesDone: 0,
       craftFloorsBuilt: 0,
       marketDealsDone: 0,
       marketParcelsDone: 0,
@@ -1158,6 +1181,8 @@ function createFloor(game, type, options = {}) {
     saleRemainder: 0,
     foodRushCooldown: FOOD_RUSH_FLOOR_TYPES.includes(type) ? 0 : undefined,
     foodRush: FOOD_RUSH_FLOOR_TYPES.includes(type) ? null : undefined,
+    serviceCareCooldown: SERVICE_CARE_FLOOR_TYPES.includes(type) ? 0 : undefined,
+    serviceCare: SERVICE_CARE_FLOOR_TYPES.includes(type) ? null : undefined,
     royalMandateCooldown: type === "kingdom" ? 0 : undefined,
     royalMandate: type === "kingdom" ? null : undefined,
     marketCooldown: type === "market" ? 0 : undefined,
@@ -1221,6 +1246,8 @@ function finalizeConstruction(floor) {
     saleRemainder: 0,
     foodRushCooldown: FOOD_RUSH_FLOOR_TYPES.includes(floor.type) ? 0 : undefined,
     foodRush: FOOD_RUSH_FLOOR_TYPES.includes(floor.type) ? null : undefined,
+    serviceCareCooldown: SERVICE_CARE_FLOOR_TYPES.includes(floor.type) ? 0 : undefined,
+    serviceCare: SERVICE_CARE_FLOOR_TYPES.includes(floor.type) ? null : undefined,
     royalMandateCooldown: floor.type === "kingdom" ? 0 : undefined,
     royalMandate: floor.type === "kingdom" ? null : undefined,
     marketCooldown: floor.type === "market" ? 0 : undefined,
@@ -1519,6 +1546,8 @@ function migrateGame(game) {
     foodServingsDone: 0,
     foodRushCoursesDone: 0,
     serviceFloorsBuilt: 0,
+    serviceCareSessionsDone: 0,
+    serviceCareTouchesDone: 0,
     craftFloorsBuilt: 0,
     marketDealsDone: 0,
     marketParcelsDone: 0,
@@ -1543,7 +1572,7 @@ function migrateGame(game) {
     aquariumFloorsBuilt: 0,
     festivalFloorsBuilt: 0,
   };
-  game.version = Math.max(Number(game.version) || 0, 22);
+  game.version = Math.max(Number(game.version) || 0, 23);
   game.nextExpeditionId ||= 1;
   game.nextExpeditionReportId ||= 1;
   game.nextLifeStoryId ||= 1;
@@ -1681,6 +1710,29 @@ function migrateGame(game) {
                 course: floor.foodRush.course || "starter",
                 servicePulse: clamp(Number(floor.foodRush.servicePulse) || 0, 0, 1),
                 tableFocus: Math.max(0, Number(floor.foodRush.tableFocus) || 0),
+              }
+            : null;
+      }
+      if (SERVICE_CARE_FLOOR_TYPES.includes(floor.type)) {
+        floor.serviceCareCooldown = Math.max(0, Number(floor.serviceCareCooldown) || 0);
+        floor.serviceCare =
+          floor.serviceCare && typeof floor.serviceCare === "object" && Number(floor.serviceCare.remaining) > 0
+            ? {
+                ...floor.serviceCare,
+                remaining: Math.max(0, Number(floor.serviceCare.remaining) || 0),
+                total: Math.max(1, Number(floor.serviceCare.total) || Number(floor.serviceCare.remaining) || 1),
+                participantIds: Array.isArray(floor.serviceCare.participantIds)
+                  ? floor.serviceCare.participantIds.map(Number).filter(Boolean)
+                  : [],
+                phase: floor.serviceCare.phase || "greet",
+                care: clamp(Number(floor.serviceCare.care) || 24, 0, 100),
+                touches: Math.max(0, Number(floor.serviceCare.touches) || 0),
+                targetTouches: Math.max(1, Number(floor.serviceCare.targetTouches) || 1),
+                touchTimer: Math.max(0, Number(floor.serviceCare.touchTimer) || 0),
+                earned: Math.max(0, Number(floor.serviceCare.earned) || 0),
+                finalRewarded: Boolean(floor.serviceCare.finalRewarded),
+                carePulse: clamp(Number(floor.serviceCare.carePulse) || 0, 0, 1),
+                focusGuest: Math.max(0, Number(floor.serviceCare.focusGuest) || 0),
               }
             : null;
       }
@@ -3177,6 +3229,9 @@ function updateTimers(dt) {
     if (isFoodRushFloorType(floor.type) && updateFoodRushFloor(floor, dt)) {
       lastKingdomKey = "";
     }
+    if (isServiceCareFloorType(floor.type) && updateServiceCareFloor(floor, dt)) {
+      lastKingdomKey = "";
+    }
     if (isShowtimeFloorType(floor.type) && updateShowtimeFloor(floor, dt)) {
       lastKingdomKey = "";
     }
@@ -4534,6 +4589,372 @@ function foodRushMapKey(floor) {
   return `foodRush:${Math.ceil(floor.foodRushCooldown || 0)}:${Math.ceil(floor.foodRush?.remaining || 0)}:${participants.join("-")}:${floor.foodRush?.pace || ""}:${floor.foodRush?.course || ""}:${Math.round(floor.foodRush?.heat || 0)}:${floor.foodRush?.served || 0}:${floor.foodRush?.targetServings || 0}:${floor.foodRush?.earned || 0}:${floor.foodRush?.courses || 0}:${Math.round((floor.foodRush?.servicePulse || 0) * 10)}:${floor.foodRush?.tableFocus || 0}`;
 }
 
+function isServiceCareFloorType(type) {
+  return SERVICE_CARE_FLOOR_TYPES.includes(type);
+}
+
+function isActiveServiceCare(floor) {
+  return Boolean(isServiceCareFloorType(floor?.type) && floor.serviceCare && Number(floor.serviceCare.remaining) > 0);
+}
+
+function serviceCarePracticeBonus(game = state) {
+  return Math.min(0.13, (game.stats?.serviceCareSessionsDone || 0) * 0.004 + (game.stats?.serviceCareTouchesDone || 0) * 0.002);
+}
+
+function activeServiceCareBonus(game = state) {
+  return businessFloors(game).some((floor) => isActiveServiceCare(floor)) ? 0.036 : 0;
+}
+
+function serviceCareProgress(floor) {
+  if (!isActiveServiceCare(floor)) return 0;
+  const total = Math.max(1, Number(floor.serviceCare.total) || 1);
+  const touches = Math.max(1, Number(floor.serviceCare.targetTouches) || 1);
+  const timeProgress = clamp(1 - Number(floor.serviceCare.remaining || 0) / total, 0, 1);
+  const touchProgress = clamp(Number(floor.serviceCare.touches || 0) / touches, 0, 1);
+  return clamp(Math.max(timeProgress, touchProgress * 0.92), 0, 1);
+}
+
+function serviceCarePhaseForProgress(progress = 0) {
+  return SERVICE_CARE_PHASES.reduce((current, phase) => (progress >= phase.threshold ? phase : current), SERVICE_CARE_PHASES[0]);
+}
+
+function currentServiceCarePhase(floor) {
+  if (!isServiceCareFloorType(floor?.type)) return SERVICE_CARE_PHASES[0];
+  const activePhase = SERVICE_CARE_PHASES.find((phase) => phase.id === floor.serviceCare?.phase);
+  return activePhase || serviceCarePhaseForProgress(serviceCareProgress(floor));
+}
+
+function serviceCareTone(floor) {
+  const care = Number(floor?.serviceCare?.care || 0);
+  if (care >= 76) return "polished";
+  if (care >= 46) return "busy";
+  return "gentle";
+}
+
+function serviceCareToneLabel(floor) {
+  const care = Number(floor?.serviceCare?.care || 0);
+  if (care >= 76) return "妥帖";
+  if (care >= 46) return "忙碌";
+  return "温和";
+}
+
+function serviceCareCooldown(floor) {
+  const skill = averageSkill(floor.workers || [], floor.type);
+  return Math.max(22, Math.round(54 - skill * 2 - serviceCarePracticeBonus(state) * 34 - clockworkTempoBonus(state) * 6));
+}
+
+function serviceCareCandidatesForFloor(floor) {
+  if (!isServiceCareFloorType(floor?.type)) return [];
+  const staff = new Set(floor.workers || []);
+  return allResidents(state)
+    .filter((person) => person && !staff.has(person.id) && !person.expeditionId && !isActiveLifeVisit(person))
+    .map((person) => {
+      ensurePersonLife(person);
+      const currentFloor = currentFloorForPerson(person);
+      const socialNeed = personNeedUrgency(person, "social") * 1.45;
+      const energyNeed = personNeedUrgency(person, "energy") * 0.9;
+      const favorite = (person.favoriteTypes || []).includes("service") ? 0.46 : 0;
+      const dream = person.dreamType === "service" || person.dreamType === "garden" ? 0.3 : 0;
+      const queuePressure = Math.min(0.42, (state.queue?.length || 0) * 0.08);
+      const familiarStaff = (floor.workers || []).reduce((sum, id) => {
+        const worker = getResident(id);
+        return sum + (worker ? relationshipScore(person, worker) / 125 : 0);
+      }, 0);
+      const near = currentFloor ? Math.max(0, 0.36 - Math.abs(Number(currentFloor.id) - Number(floor.id)) * 0.04) : 0;
+      const mood = personMotiveMood(person);
+      const moodNeed = mood === "strained" ? 0.5 : mood === "seeking" ? 0.24 : 0;
+      return { person, score: socialNeed + energyNeed + favorite + dream + queuePressure + familiarStaff + near + moodNeed + Math.random() * 0.18 };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.person);
+}
+
+function serviceCareActionBlockReason(floor) {
+  if (!isServiceCareFloorType(floor?.type)) return "这个楼层不能安排礼宾照看";
+  if (!floor.workers?.length) return `${FLOOR_TYPES[floor.type].label}需要员工接待访客`;
+  if ((floor.stock || 0) <= 0) return `${FLOOR_TYPES[floor.type].label}花礼不足，先补货`;
+  if (isActiveServiceCare(floor)) return "礼宾照看正在进行";
+  if ((floor.serviceCareCooldown || 0) > 0) return `还要 ${Math.ceil(floor.serviceCareCooldown)}s 才能再次照看`;
+  if (!serviceCareCandidatesForFloor(floor).length) return "暂时没有居民需要礼宾照看";
+  return "";
+}
+
+function applyServiceCareMotiveBurst(floor, person, scale = 1) {
+  boostPersonMotive(person, "social", 14 * scale);
+  boostPersonMotive(person, "energy", 7 * scale);
+  boostPersonMotive(person, "entertainment", 4 * scale);
+  if (floor.level > 2) boostPersonMotive(person, "social", 2 * scale);
+}
+
+function serviceCareParticipants(floor) {
+  if (!isServiceCareFloorType(floor?.type) || !floor.serviceCare?.id) return [];
+  const sessionId = floor.serviceCare.id;
+  return allResidents(state).filter((person) => {
+    return person?.lifeVisit?.reason === "serviceCare" && person.lifeVisit.sessionId === sessionId && Number(person.lifeVisit.floorId) === Number(floor.id);
+  });
+}
+
+function applyServiceCarePhaseMotion(floor, guests = serviceCareParticipants(floor), staff = null) {
+  if (!isActiveServiceCare(floor)) return;
+  const phase = currentServiceCarePhase(floor);
+  const workers = staff || (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
+  workers.forEach((worker, index) => {
+    endSocialForPerson(worker);
+    worker.need = "social";
+    worker.activity = phase.worker[index % phase.worker.length] || "serve";
+    worker.activityTimer = Math.max(worker.activityTimer || 0, randFloat(7, 11));
+    worker.activityLane = "c";
+    worker.lifeWish = `${phase.label}${SERVICE_CARE_LABELS[floor.type] || "礼宾照看"}`;
+    assignPersonMotion(worker, floor.type, worker.activity);
+  });
+  guests.forEach((person, index) => {
+    person.need = index % 2 ? "energy" : "social";
+    person.activity = phase.guest[index % phase.guest.length] || "talk";
+    person.activityTimer = Math.max(person.activityTimer || 0, randFloat(6, 10));
+    person.lifeWish = `${phase.label}照看，${floor.name}`;
+    assignPersonMotion(person, floor.type, person.activity);
+  });
+}
+
+function pairServiceCareGuests(floor, guests, staff, seed = 0) {
+  if (!guests.length) return;
+  const scene = SOCIAL_SCENES.service[0] || SOCIAL_SCENES.default[0];
+  const servers = staff.filter((person) => person && !person.socialPartnerId);
+  const visitors = guests.filter((person) => person && !person.socialPartnerId);
+  servers.forEach((worker, index) => {
+    const guest = visitors[(index + seed) % visitors.length];
+    if (!guest || guest.socialPartnerId) return;
+    applySocialScene(worker, guest, scene, `service-care-${floor.id}-${worker.id}-${guest.id}-${Date.now()}`, randFloat(7, 11), floor.type, floorSocialScope(floor));
+  });
+}
+
+function serveServiceCareTouch(floor, guests = serviceCareParticipants(floor), staff = null) {
+  if (!isActiveServiceCare(floor) || !guests.length) return 0;
+  const workers = staff || (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
+  const care = floor.serviceCare;
+  const skill = averageSkill(floor.workers || [], floor.type);
+  const remaining = Math.max(0, (care.targetTouches || 0) - (care.touches || 0));
+  const capacity = clamp(1 + Math.floor(skill / 4) + Math.min(2, workers.length), 1, Math.max(1, guests.length));
+  const touchedNow = Math.min(remaining || 1, capacity, Math.max(1, Math.ceil(guests.length / 2)));
+  care.touches = (care.touches || 0) + touchedNow;
+  care.carePulse = 1;
+  care.focusGuest = ((care.focusGuest || 0) + 1) % Math.max(1, guests.length);
+  state.stats.serviceCareTouchesDone = (state.stats.serviceCareTouchesDone || 0) + touchedNow;
+  care.care = clamp(Number(care.care || 0) + 6 + touchedNow * 5 + skill * 0.25 + serviceCarePracticeBonus(state) * 36, 0, 100);
+  applyServiceCarePhaseMotion(floor, guests, workers);
+  for (let index = 0; index < touchedNow; index += 1) {
+    const guest = guests[(index + care.touches - 1) % guests.length];
+    if (!guest) continue;
+    guest.activity = index % 2 ? "chat" : "talk";
+    guest.activityTimer = Math.max(guest.activityTimer || 0, randFloat(7, 11));
+    assignPersonMotion(guest, floor.type, guest.activity);
+    applyServiceCareMotiveBurst(floor, guest, 0.68);
+    const home = findFloor(guest.homeFloorId);
+    if (home?.type === "dwelling") {
+      home.rentReady = Math.min(360, (home.rentReady || 0) + 3);
+    }
+  }
+  workers.forEach((worker) => {
+    boostPersonMotive(worker, "social", 2.4);
+    boostPersonMotive(worker, "energy", 1.2);
+  });
+  pairServiceCareGuests(floor, guests, workers, care.touches || 0);
+  (state.queue || []).forEach((visitor) => {
+    visitor.lobbyWait = Math.max(0, lobbyWaitSeconds(visitor) - (1.4 + touchedNow * 0.6));
+  });
+  state.spawnTimer = Math.max(2.8, Math.min(state.spawnTimer || 8, getNextVisitorDelay((state.queue || []).length) * 0.82));
+  const tips = Math.round((5 + touchedNow * (3.6 + state.happiness / 100) + skill * 0.65) * (1 + serviceCarePracticeBonus(state) * 0.8));
+  addCoins(tips);
+  showFloat(`照看 +${tips}`);
+  care.earned = (care.earned || 0) + tips;
+  if (care.care >= 76 && !care.polishedLogged) {
+    care.polishedLogged = true;
+    addLog(`${floor.name} 的礼宾动线变得格外妥帖，大厅也安静了下来。`);
+  }
+  return tips;
+}
+
+function settleServiceCareFinale(floor, guests = serviceCareParticipants(floor)) {
+  if (!isActiveServiceCare(floor) || floor.serviceCare.finalRewarded) return 0;
+  const care = floor.serviceCare;
+  const target = Math.max(1, Number(care.targetTouches) || 1);
+  const ratio = clamp((care.touches || 0) / target, 0, 1.35);
+  const bonus = Math.round((care.earned || 0) * (0.1 + ratio * 0.18) + (care.care || 0) * 0.45 + (care.touches || 0) * 3);
+  care.finalRewarded = true;
+  care.earned = (care.earned || 0) + bonus;
+  if (bonus > 0) addCoins(bonus);
+  state.happiness = clamp(state.happiness + Math.min(5, 1 + Math.floor((care.touches || 0) / 2)), 0, 100);
+  guests.forEach((person) => {
+    applyServiceCareMotiveBurst(floor, person, 0.38);
+    const home = findFloor(person.homeFloorId);
+    if (home?.type === "dwelling") {
+      home.rentReady = Math.min(420, (home.rentReady || 0) + 4);
+    }
+  });
+  return bonus;
+}
+
+function startServiceCare(floorId) {
+  const floor = findFloor(floorId);
+  if (!isBusiness(floor) || !isServiceCareFloorType(floor.type)) return;
+  const reason = serviceCareActionBlockReason(floor);
+  if (reason) {
+    showToast(reason);
+    return;
+  }
+  const skill = averageSkill(floor.workers || [], floor.type);
+  const capacity = clamp(2 + (floor.level || 1) + Math.floor(skill / 5), 2, 6);
+  const guests = serviceCareCandidatesForFloor(floor).slice(0, Math.min(capacity, Math.max(2, (floor.stock || 0) * 2)));
+  if (!guests.length) {
+    showToast("暂时没有居民需要礼宾照看");
+    return;
+  }
+  const stockCost = Math.min(floor.stock || 0, Math.max(1, Math.ceil(guests.length / 3)));
+  const label = SERVICE_CARE_LABELS[floor.type] || "礼宾照看";
+  const sessionId = `service-care-${floor.id}-${Date.now()}-${randInt(10, 99)}`;
+  const duration = randFloat(32, 42);
+  const targetTouches = Math.max(guests.length + 1, guests.length * 2 + Math.floor(skill / 4));
+  const openingCare = clamp(20 + guests.length * 7 + skill * 0.75 + serviceCarePracticeBonus(state) * 68 + serviceCareBonus(state) * 22, 18, 68);
+  floor.stock = Math.max(0, (floor.stock || 0) - stockCost);
+  floor.serviceCareCooldown = serviceCareCooldown(floor);
+  floor.serviceCare = {
+    id: sessionId,
+    label,
+    remaining: duration,
+    total: duration,
+    participantIds: guests.map((person) => person.id),
+    phase: "greet",
+    care: openingCare,
+    touches: 0,
+    targetTouches,
+    touchTimer: randFloat(4.0, 5.6),
+    earned: 0,
+    finalRewarded: false,
+    carePulse: 0,
+    focusGuest: 0,
+  };
+  const staff = (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
+  staff.forEach((worker, index) => {
+    endSocialForPerson(worker);
+    worker.need = "social";
+    worker.activity = index % 2 ? "wave" : "serve";
+    worker.activityTimer = Math.max(worker.activityTimer || 0, duration);
+    worker.activityLane = "c";
+    assignPersonMotion(worker, floor.type, worker.activity);
+    boostPersonMotive(worker, "social", 3);
+  });
+  guests.forEach((person, index) => {
+    startLifeVisit(person, floor, index % 2 ? "energy" : "social", {
+      allowCompanion: false,
+      label: `参加${label}`,
+      reason: "serviceCare",
+      duration: duration + randFloat(-3, 4),
+      minStay: Math.max(12, duration * 0.35),
+      targetGoal: 90,
+      sessionId,
+    });
+    person.activity = index % 2 ? "wait" : "talk";
+    person.activityTimer = Math.max(person.activityTimer || 0, duration * 0.42);
+    assignPersonMotion(person, floor.type, person.activity);
+    applyServiceCareMotiveBurst(floor, person, 0.5);
+  });
+  applyServiceCarePhaseMotion(floor, guests, staff);
+  pairServiceCareGuests(floor, guests, staff, 0);
+  state.stats.serviceCareSessionsDone = (state.stats.serviceCareSessionsDone || 0) + 1;
+  state.happiness = clamp(state.happiness + Math.min(4, 1 + Math.ceil(guests.length / 2)), 0, 100);
+  const names = guests.map((person) => person.name).slice(0, 3).join("、");
+  const extra = guests.length > 3 ? `等 ${guests.length} 人` : "";
+  showToast(`${label}开始：${guests.length} 位居民被安排照看`);
+  addLog(`${floor.name} 安排${label}，${names}${extra}入座等候，用掉 ${stockCost} 份花礼。`);
+  lastKingdomKey = "";
+  render(true);
+}
+
+function updateServiceCareFloor(floor, dt) {
+  if (!isServiceCareFloorType(floor?.type)) return false;
+  const before = serviceCareMapKey(floor);
+  floor.serviceCareCooldown = Math.max(0, (floor.serviceCareCooldown || 0) - dt * (1 + clockworkTempoBonus(state) * 0.18));
+  if (!isActiveServiceCare(floor)) return before !== serviceCareMapKey(floor);
+  floor.serviceCare.remaining = Math.max(0, Number(floor.serviceCare.remaining || 0) - dt);
+  floor.serviceCare.carePulse = Math.max(0, Number(floor.serviceCare.carePulse || 0) - dt * 0.9);
+  const guests = serviceCareParticipants(floor);
+  floor.serviceCare.participantIds = guests.map((person) => person.id);
+  guests.forEach((person) => applyServiceCareMotiveBurst(floor, person, dt * 0.055));
+  const staff = (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
+  staff.forEach((person) => {
+    boostPersonMotive(person, "social", dt * 0.07);
+    boostPersonMotive(person, "energy", dt * 0.035);
+  });
+  const phase = serviceCarePhaseForProgress(serviceCareProgress(floor));
+  if (floor.serviceCare.phase !== phase.id) {
+    floor.serviceCare.phase = phase.id;
+    floor.serviceCare.care = clamp(Number(floor.serviceCare.care || 0) + 6 + guests.length, 0, 100);
+    applyServiceCarePhaseMotion(floor, guests, staff);
+    addLog(`${floor.name} 的${floor.serviceCare.label || "礼宾照看"}进入${phase.label}。`);
+  }
+  floor.serviceCare.touchTimer = Math.max(0, Number(floor.serviceCare.touchTimer || 0) - dt * (1 + serviceCarePracticeBonus(state) * 0.5));
+  if (floor.serviceCare.touchTimer <= 0 && guests.length) {
+    serveServiceCareTouch(floor, guests, staff);
+    floor.serviceCare.touchTimer = randFloat(4.0, 5.8);
+  }
+  if (floor.serviceCare.remaining <= 0 || !guests.length || (floor.serviceCare.touches || 0) >= (floor.serviceCare.targetTouches || 1)) {
+    const label = SERVICE_CARE_LABELS[floor.type] || "礼宾照看";
+    const touches = floor.serviceCare.touches || 0;
+    const care = Math.round(floor.serviceCare.care || 0);
+    const finale = guests.length ? settleServiceCareFinale(floor, guests) : 0;
+    floor.serviceCare = null;
+    if (guests.length) addLog(`${floor.name} 的${label}收尾，完成 ${touches} 次照看，妥帖 ${care}，追加 ${finale} 金币。`);
+  }
+  return before !== serviceCareMapKey(floor);
+}
+
+function renderServiceCarePanel(floor) {
+  if (!isServiceCareFloorType(floor?.type)) return "";
+  const active = isActiveServiceCare(floor);
+  const guests = active ? serviceCareParticipants(floor) : [];
+  const phase = currentServiceCarePhase(floor);
+  const care = active ? Math.round(Number(floor.serviceCare.care || 0)) : 0;
+  const tone = active ? serviceCareTone(floor) : "gentle";
+  const touches = active ? floor.serviceCare.touches || 0 : state.stats.serviceCareTouchesDone || 0;
+  const target = active ? Math.max(1, Number(floor.serviceCare.targetTouches) || 1) : Math.max(1, touches || 1);
+  const progress = active ? clamp(touches / target, 0, 1) : 0;
+  const nextTouch = active ? Math.ceil(floor.serviceCare.touchTimer || 0) : 0;
+  const names = guests.length ? guests.map((person) => person.name).slice(0, 4).join("、") : "等待居民到访";
+  const status = active
+    ? `${phase.label} ${Math.ceil(floor.serviceCare.remaining)}s · ${names}`
+    : (floor.serviceCareCooldown || 0) > 0
+      ? `冷却 ${Math.ceil(floor.serviceCareCooldown)}s`
+      : "就绪";
+  const extra = active ? ` · 收益 ${floor.serviceCare.earned || 0}` : "";
+  const phaseRow = SERVICE_CARE_PHASES.map((entry) => {
+    const done = active && serviceCareProgress(floor) >= entry.threshold;
+    const current = active && entry.id === phase.id;
+    return `<i class="${done ? "done" : ""} ${current ? "current" : ""}" title="${escapeAttr(entry.label)}"><b></b><span>${escapeHtml(entry.label)}</span></i>`;
+  }).join("");
+  return `
+    <div class="service-care-panel ${active ? "active" : ""}" data-care="${escapeAttr(tone)}" data-phase="${escapeAttr(phase.id)}">
+      <div class="service-care-panel-head">
+        <strong>${SERVICE_CARE_LABELS[floor.type] || "礼宾照看"}</strong>
+        <em>${active ? `${serviceCareToneLabel(floor)} ${care}%` : "待安排"}</em>
+      </div>
+      <div class="service-care-meter" aria-hidden="true"><i style="width:${Math.round(progress * 100)}%"></i></div>
+      <div class="service-care-phase-row" aria-hidden="true">${phaseRow}</div>
+      <div class="service-care-readout">
+        <b><span>阶段</span><strong>${active ? escapeHtml(phase.label) : "待开"}</strong></b>
+        <b><span>照看</span><strong>${active ? `${touches}/${target}` : `${state.stats.serviceCareTouchesDone || 0}`}</strong></b>
+        <b><span>下次</span><strong>${active ? `${nextTouch}s` : "就绪"}</strong></b>
+      </div>
+      <span>${escapeHtml(status)}${extra}</span>
+      <small>照看 ${touches}/${target} · 已安排 ${state.stats.serviceCareSessionsDone || 0} 次</small>
+    </div>`;
+}
+
+function serviceCareMapKey(floor) {
+  if (!isServiceCareFloorType(floor?.type)) return "";
+  const participants = floor.serviceCare?.participantIds || [];
+  return `serviceCare:${Math.ceil(floor.serviceCareCooldown || 0)}:${Math.ceil(floor.serviceCare?.remaining || 0)}:${participants.join("-")}:${floor.serviceCare?.phase || ""}:${Math.round(floor.serviceCare?.care || 0)}:${floor.serviceCare?.touches || 0}:${floor.serviceCare?.targetTouches || 0}:${floor.serviceCare?.earned || 0}:${Math.round((floor.serviceCare?.carePulse || 0) * 10)}:${floor.serviceCare?.focusGuest || 0}`;
+}
+
 function isShowtimeFloorType(type) {
   return SHOWTIME_FLOOR_TYPES.includes(type);
 }
@@ -5180,7 +5601,7 @@ function gardenComfortBonus(game = state) {
 }
 
 function serviceCareBonus(game = state) {
-  return Math.min(0.22, floorTypeInfluence(game, "service") * 0.046);
+  return Math.min(0.26, floorTypeInfluence(game, "service") * 0.046 + serviceCarePracticeBonus(game) * 0.72 + activeServiceCareBonus(game));
 }
 
 function observatoryStarBonus(game = state) {
@@ -6436,7 +6857,7 @@ function getKingdomRenderKey() {
       if (floor.type === "lobby") {
         return `${floor.id}:lobby:${state.queue.map((visitor) => `${visitor.id}:${visitor.need || ""}:${visitor.activity || ""}:${Math.floor(lobbyWaitSeconds(visitor) / 5)}:${visitor.targetFloorId || ""}`).join("-")}:${lobbyPressureInfo(state).tone}:${state.selectedFloorId}`;
       }
-      return `${floor.id}:${floor.type}:${floor.level}:${floor.stock}:${floor.stockMax}:${floor.workers.length}:${Boolean(floor.production)}:${foodRushMapKey(floor)}:${marketParcelMapKey(floor)}:${royalMandateMapKey(floor)}:${comfortSessionMapKey(floor)}:${showtimeMapKey(floor)}:${lifeTrailMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
+      return `${floor.id}:${floor.type}:${floor.level}:${floor.stock}:${floor.stockMax}:${floor.workers.length}:${Boolean(floor.production)}:${foodRushMapKey(floor)}:${serviceCareMapKey(floor)}:${marketParcelMapKey(floor)}:${royalMandateMapKey(floor)}:${comfortSessionMapKey(floor)}:${showtimeMapKey(floor)}:${lifeTrailMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
     })
     .join("|");
   const arrivalKey = (state.arrivals || []).map((arrival) => `${arrival.id}:${arrival.floorId}`).join("-");
@@ -6489,6 +6910,10 @@ function renderFloor(floor) {
   const foodRushAttrs = isActiveFoodRush(floor)
     ? ` data-food-rush-pace="${escapeAttr(currentFoodRushPace(floor).id)}" data-food-rush-heat="${escapeAttr(foodRushHeatTone(floor))}"`
     : "";
+  const serviceCareClass = isActiveServiceCare(floor) ? "service-care-active" : "";
+  const serviceCareAttrs = isActiveServiceCare(floor)
+    ? ` data-service-care-phase="${escapeAttr(currentServiceCarePhase(floor).id)}" data-service-care-tone="${escapeAttr(serviceCareTone(floor))}"`
+    : "";
   const royalMandateClass = isActiveRoyalMandate(floor) ? "royal-mandate-active" : "";
   const royalMandateAttrs = isActiveRoyalMandate(floor)
     ? ` data-royal-mandate-phase="${escapeAttr(currentRoyalMandatePhase(floor).id)}"`
@@ -6512,7 +6937,7 @@ function renderFloor(floor) {
     : "";
   const zone = getFloorZone(floor);
   return `
-    <article class="floor ${selected} ${constructing} ${routeClass} ${lifeTrailClass} ${expeditionWaymarkClass} ${foodRushClass} ${marketParcelClass} ${royalMandateClass} ${royalCourierClass} ${comfortClass} ${comfortEchoClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${lifeTrailAttrs}${expeditionWaymarkAttrs}${foodRushAttrs}${marketParcelAttrs}${royalMandateAttrs}${royalCourierAttrs}${comfortEchoAttrs}${showtimeAttrs}>
+    <article class="floor ${selected} ${constructing} ${routeClass} ${lifeTrailClass} ${expeditionWaymarkClass} ${foodRushClass} ${serviceCareClass} ${marketParcelClass} ${royalMandateClass} ${royalCourierClass} ${comfortClass} ${comfortEchoClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${lifeTrailAttrs}${expeditionWaymarkAttrs}${foodRushAttrs}${serviceCareAttrs}${marketParcelAttrs}${royalMandateAttrs}${royalCourierAttrs}${comfortEchoAttrs}${showtimeAttrs}>
       ${renderFloorIndex(floor)}
       <div class="room" data-action="select-floor" data-floor-id="${floor.id}" title="${escapeAttr(floorMapLabel(floor))}" aria-label="${escapeAttr(floorMapLabel(floor))}">
         ${floor.status === "construction" ? renderConstruction(floor) : renderOpenFloor(floor)}
@@ -6570,6 +6995,7 @@ function renderOpenFloor(floor) {
       <div class="room-scene">
         ${renderRoomStateTag(floor)}
         ${renderFoodRushServiceLayer(floor)}
+        ${renderServiceCareLayer(floor)}
         ${floor.type === "lobby" ? renderLobbyRouteLayer() : ""}
         ${renderLifeTrailLayer(floor)}
         ${renderExpeditionWaymarkLayer(floor)}
@@ -6795,6 +7221,34 @@ function renderFoodRushServiceLayer(floor) {
     </span>`;
 }
 
+function renderServiceCareLayer(floor) {
+  if (!isActiveServiceCare(floor)) return "";
+  const care = floor.serviceCare;
+  const guests = serviceCareParticipants(floor);
+  const phase = currentServiceCarePhase(floor);
+  const tone = serviceCareTone(floor);
+  const progress = Math.round(serviceCareProgress(floor) * 100);
+  const touchProgress = Math.round(clamp(Number(care.touches || 0) / Math.max(1, Number(care.targetTouches) || 1), 0, 1) * 100);
+  const focus = clamp(Number(care.focusGuest) || 0, 0, Math.max(0, guests.length - 1));
+  const tokens = Array.from({ length: 5 }, (_, index) => {
+    const active = index < Math.min(5, Math.max(2, guests.length || 1));
+    const handled = active && index < Math.ceil((touchProgress / 100) * Math.min(5, Math.max(2, guests.length || 1)));
+    const current = active && index === focus % Math.min(5, Math.max(1, guests.length || 1));
+    return `<b class="${active ? "active" : ""} ${handled ? "handled" : ""} ${current ? "current" : ""}" style="--care-index:${index}"><i></i></b>`;
+  }).join("");
+  const phases = SERVICE_CARE_PHASES.map((entry) => {
+    const lit = progress >= Math.round(entry.threshold * 100);
+    return `<i class="${lit ? "lit" : ""} ${entry.id === phase.id ? "current" : ""}" data-phase="${escapeAttr(entry.id)}"></i>`;
+  }).join("");
+  return `
+    <span class="service-care-layer" data-phase="${escapeAttr(phase.id)}" data-tone="${escapeAttr(tone)}" data-pulse="${care.carePulse > 0 ? "pulse" : "idle"}" style="--care-progress:${progress}%; --touch-progress:${touchProgress}%; --care-score:${Math.round(care.care || 0)};" title="${escapeAttr(`${phase.label} · 照看 ${care.touches || 0}/${care.targetTouches || 0}`)}" aria-label="${escapeAttr(`${phase.label} · 照看 ${care.touches || 0}/${care.targetTouches || 0}`)}">
+      <span class="service-care-ribbon"><i></i><b></b></span>
+      <span class="service-care-phase-stack">${phases}</span>
+      <span class="service-care-token-lane">${tokens}</span>
+      <span class="service-care-bloom"><i></i><i></i><i></i></span>
+    </span>`;
+}
+
 function renderRoyalCourierLayer(floor) {
   if (!isActiveRoyalMandate(floor)) return "";
   const phase = currentRoyalCourierPhase(floor);
@@ -6837,6 +7291,10 @@ function renderRoomStateTag(floor) {
   if (isActiveFoodRush(floor)) {
     const label = FOOD_RUSH_LABELS[floor.type] || "餐桌高峰";
     return `<span class="room-state-tag good icon-only" data-state="meal-rush" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"></span>`;
+  }
+  if (isActiveServiceCare(floor)) {
+    const label = SERVICE_CARE_LABELS[floor.type] || "礼宾照看";
+    return `<span class="room-state-tag good icon-only" data-state="service-care" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"></span>`;
   }
   if (isActiveMarketParcel(floor)) {
     const phase = currentMarketParcelPhase(floor);
@@ -6901,6 +7359,7 @@ function renderFloorStatusGlyph(floor) {
   else if (isActiveComfortSession(floor)) stateName = "comfort";
   else if (isActiveComfortAfterglow(floor)) stateName = "comfort-echo";
   else if (isActiveFoodRush(floor)) stateName = "meal-rush";
+  else if (isActiveServiceCare(floor)) stateName = "service-care";
   else if (isActiveMarketParcel(floor)) stateName = "market-parcel";
   else if (isActiveRoyalMandate(floor)) stateName = "royal-mandate";
   else if (isActiveShowtime(floor)) stateName = "showtime";
@@ -7104,6 +7563,14 @@ function renderFloorMeter(floor) {
     const ratio = floor.capacity ? floor.residents.length / floor.capacity : 0;
     return `<div class="meter"><span style="width:${Math.round(ratio * 100)}%"></span></div>`;
   }
+  if (isActiveFoodRush(floor)) {
+    const progress = foodRushProgress(floor);
+    return `<div class="meter food-rush-inline-meter"><span style="width:${Math.round(progress * 100)}%"></span></div>`;
+  }
+  if (isActiveServiceCare(floor)) {
+    const progress = serviceCareProgress(floor);
+    return `<div class="meter service-care-inline-meter"><span style="width:${Math.round(progress * 100)}%"></span></div>`;
+  }
   if (floor.production) {
     const progress = 1 - floor.production.remaining / floor.production.total;
     return `<div class="meter"><span style="width:${clamp(progress * 100, 0, 100)}%"></span></div>`;
@@ -7129,6 +7596,7 @@ function renderFloorStatus(floor) {
   }
   if (isActiveComfortSession(floor)) return `${COMFORT_SESSION_LABELS[floor.type] || "休整"} ${Math.ceil(floor.comfortSession.remaining)}s`;
   if (isActiveComfortAfterglow(floor)) return `${floor.comfortAfterglow.label || "余韵"} ${Math.ceil(floor.comfortAfterglow.remaining)}s`;
+  if (isActiveServiceCare(floor)) return `${currentServiceCarePhase(floor).label}${SERVICE_CARE_LABELS[floor.type] || "礼宾照看"} · 照看 ${floor.serviceCare.touches || 0}/${floor.serviceCare.targetTouches || 0}`;
   if (isActiveRoyalMandate(floor)) return `${currentRoyalMandatePhase(floor).label}王令 · ${currentRoyalCourierPhase(floor).label} ${Math.ceil(floor.royalMandate.remaining)}s`;
   if (isActiveShowtime(floor)) return `${currentShowtimeBeat(floor).label}${SHOWTIME_LABELS[floor.type] || "小剧"} · 热度 ${Math.round(floor.showtime.heat || 0)}%`;
   if (floor.production) return `补货 ${Math.ceil(floor.production.remaining)}s`;
@@ -7160,6 +7628,7 @@ function renderFloorStatus(floor) {
   if (isActiveComfortSession(floor)) return `${COMFORT_SESSION_LABELS[floor.type] || "休整"} ${Math.ceil(floor.comfortSession.remaining)}s`;
   if (isActiveComfortAfterglow(floor)) return `${floor.comfortAfterglow.label || "余韵"} ${Math.ceil(floor.comfortAfterglow.remaining)}s`;
   if (isActiveFoodRush(floor)) return `${currentFoodRushPace(floor).label}${FOOD_RUSH_LABELS[floor.type] || "餐桌高峰"} · 上菜 ${floor.foodRush.served || 0}/${floor.foodRush.targetServings || 0}`;
+  if (isActiveServiceCare(floor)) return `${currentServiceCarePhase(floor).label}${SERVICE_CARE_LABELS[floor.type] || "礼宾照看"} · 照看 ${floor.serviceCare.touches || 0}/${floor.serviceCare.targetTouches || 0}`;
   if (isActiveMarketParcel(floor)) return `${currentMarketParcelPhase(floor).label}包裹 · 打包 ${floor.marketParcel.packed || 0}`;
   if (isActiveRoyalMandate(floor)) return `${currentRoyalMandatePhase(floor).label}王令 · ${currentRoyalCourierPhase(floor).label} ${Math.ceil(floor.royalMandate.remaining)}s`;
   if (isActiveShowtime(floor)) return `${currentShowtimeBeat(floor).label}${SHOWTIME_LABELS[floor.type] || "小剧"} · 热度 ${Math.round(floor.showtime.heat || 0)}%`;
@@ -7471,6 +7940,8 @@ function renderFloorPerks(floor) {
   } else if (floor.type === "service") {
     perks.push(`排队缓冲 +${Math.round(serviceCareBonus(state) * 90)}%`);
     perks.push(`到站接待 +${Math.round(serviceCareBonus(state) * 55)}%`);
+    perks.push(`照看 ${state.stats.serviceCareTouchesDone || 0}`);
+    if (isActiveServiceCare(floor)) perks.push(`${currentServiceCarePhase(floor).label}妥帖 ${Math.round(floor.serviceCare.care || 0)}%`);
   } else if (floor.type === "observatory") {
     perks.push(`探险收益 +${Math.round(observatoryStarBonus(state) * 55)}%`);
     perks.push(`宝石概率 +${Math.round(observatoryStarBonus(state) * 35)}%`);
@@ -7594,6 +8065,12 @@ function renderFloorDetail() {
   const foodRushPaceValue = foodRushActive ? currentFoodRushPace(floor).label : foodRushCooldownValue ? `${foodRushCooldownValue}s` : "就绪";
   const foodRushCourseValue = foodRushActive ? currentFoodRushCourse(floor).label : `${state.stats.foodRushCoursesDone || 0}`;
   const foodRushServedValue = foodRushActive ? `${floor.foodRush.served || 0}/${floor.foodRush.targetServings || 0}` : `${state.stats.foodServingsDone || 0}`;
+  const serviceCareCooldownValue = isServiceCareFloorType(floor.type) ? Math.ceil(floor.serviceCareCooldown || 0) : 0;
+  const serviceCareActive = isActiveServiceCare(floor);
+  const serviceCareReason = isServiceCareFloorType(floor.type) ? serviceCareActionBlockReason(floor) : "";
+  const serviceCareToneValue = serviceCareActive ? `${Math.round(floor.serviceCare.care || 0)}%` : "-";
+  const serviceCarePhaseValue = serviceCareActive ? currentServiceCarePhase(floor).label : serviceCareCooldownValue ? `${serviceCareCooldownValue}s` : "就绪";
+  const serviceCareTouchValue = serviceCareActive ? `${floor.serviceCare.touches || 0}/${floor.serviceCare.targetTouches || 0}` : `${state.stats.serviceCareTouchesDone || 0}`;
   const comfortCooldown = isComfortFloorType(floor.type) ? Math.ceil(floor.comfortCooldown || 0) : 0;
   const comfortActive = isActiveComfortSession(floor);
   const comfortAfterglow = isActiveComfortAfterglow(floor) ? floor.comfortAfterglow : null;
@@ -7636,6 +8113,7 @@ function renderFloorDetail() {
       <div class="stat"><b>${skill.toFixed(1)}</b><span>技能</span></div>
       <div class="stat"><b>${floor.production ? Math.ceil(floor.production.remaining) + "s" : "就绪"}</b><span>补货</span></div>
       ${isFoodRushFloorType(floor.type) ? `<div class="stat"><b>${foodRushActive ? Math.ceil(floor.foodRush.remaining) + "s" : foodRushCooldownValue ? foodRushCooldownValue + "s" : "就绪"}</b><span>高峰</span></div><div class="stat"><b>${foodRushPaceValue}</b><span>节奏</span></div><div class="stat"><b>${foodRushCourseValue}</b><span>菜序</span></div><div class="stat"><b>${foodRushHeatValue}</b><span>忙场</span></div><div class="stat"><b>${foodRushServedValue}</b><span>上菜</span></div>` : ""}
+      ${isServiceCareFloorType(floor.type) ? `<div class="stat"><b>${serviceCareActive ? Math.ceil(floor.serviceCare.remaining) + "s" : serviceCareCooldownValue ? serviceCareCooldownValue + "s" : "就绪"}</b><span>照看</span></div><div class="stat"><b>${serviceCarePhaseValue}</b><span>阶段</span></div><div class="stat"><b>${serviceCareToneValue}</b><span>妥帖</span></div><div class="stat"><b>${serviceCareTouchValue}</b><span>次数</span></div>` : ""}
       ${floor.type === "market" ? `<div class="stat"><b>${state.orders.length}/${orderCapacity(state)}</b><span>订单栏</span></div><div class="stat"><b>${marketCooldown ? marketCooldown + "s" : "就绪"}</b><span>撮合</span></div><div class="stat"><b>${marketParcelStageValue}</b><span>包裹</span></div><div class="stat"><b>${marketParcelPackedValue}</b><span>打包</span></div><div class="stat"><b>${state.stats.marketParcelsDone || 0}</b><span>流转</span></div>` : ""}
       ${floor.type === "kingdom" ? `<div class="stat"><b>${royalMandateStageValue}</b><span>王令</span></div><div class="stat"><b>${royalMandatePreparedValue}</b><span>预备</span></div><div class="stat"><b>${state.stats.royalMandatesDone || 0}</b><span>签发</span></div><div class="stat"><b>${state.stats.royalCourierReceiptsDone || 0}</b><span>回执</span></div><div class="stat"><b>${royalMandateInfo ? royalMandateInfo.missing : "-"}</b><span>缺口</span></div>` : ""}
       ${floor.type === "library" ? `<div class="stat"><b>${catalog.completed}/${COLLECTION_DEFS.length}</b><span>图鉴</span></div><div class="stat"><b>${libraryCooldown ? libraryCooldown + "s" : "就绪"}</b><span>编目</span></div>` : ""}
@@ -7648,12 +8126,14 @@ function renderFloorDetail() {
     ${renderMarketParcelPanel(floor)}
     ${renderRoyalMandatePanel(floor)}
     ${renderFoodRushPanel(floor)}
+    ${renderServiceCarePanel(floor)}
     ${renderComfortSessionPanel(floor)}
     ${renderShowtimePanel(floor)}
     ${renderResidentList(workers, floor.type)}
     <div class="detail-actions">
       <button class="detail-btn primary" data-action="stock" data-floor-id="${floor.id}">补货</button>
       ${isFoodRushFloorType(floor.type) ? `<button class="detail-btn" data-action="food-rush" data-floor-id="${floor.id}" title="${escapeAttr(foodRushReason || "组织饥饿居民入座并完成一轮忙碌上菜")}" ${foodRushReason ? "disabled" : ""}>${FOOD_RUSH_ACTIONS[floor.type] || "组织用餐高峰"}</button>` : ""}
+      ${isServiceCareFloorType(floor.type) ? `<button class="detail-btn" data-action="service-care" data-floor-id="${floor.id}" title="${escapeAttr(serviceCareReason || "安排需要照看的居民入座，降低大厅压力并完成礼宾服务")}" ${serviceCareReason ? "disabled" : ""}>${SERVICE_CARE_ACTIONS[floor.type] || "安排礼宾照看"}</button>` : ""}
       ${floor.type === "market" ? `<button class="detail-btn" data-action="market-deal" data-floor-id="${floor.id}" title="${escapeAttr(marketParcelReason || "撮合快单，并让市集摊位把现货打包发出")}" ${marketParcelReason ? "disabled" : ""}>撮合快单</button>` : ""}
       ${floor.type === "kingdom" ? `<button class="detail-btn" data-action="royal-mandate" data-floor-id="${floor.id}" title="${escapeAttr(royalMandateReason || "消耗 1 枚印信，为最缺货的订单预备物资并提高奖励")}" ${royalMandateReason ? "disabled" : ""}>签发王令</button>` : ""}
       ${floor.type === "library" ? `<button class="detail-btn" data-action="library-study" data-floor-id="${floor.id}" ${libraryCooldown || !floor.workers.length || floor.stock <= 0 ? "disabled" : ""}>整理典藏</button>` : ""}
@@ -7724,6 +8204,8 @@ function renderFloorPerks(floor) {
   } else if (floor.type === "service") {
     perks.push(`排队缓冲 +${Math.round(serviceCareBonus(state) * 90)}%`);
     perks.push(`到站接待 +${Math.round(serviceCareBonus(state) * 55)}%`);
+    perks.push(`照看 ${state.stats.serviceCareTouchesDone || 0}`);
+    if (isActiveServiceCare(floor)) perks.push(`${currentServiceCarePhase(floor).label}妥帖 ${Math.round(floor.serviceCare.care || 0)}%`);
   } else if (floor.type === "observatory") {
     perks.push(`探险收益 +${Math.round(observatoryStarBonus(state) * 55)}%`);
     perks.push(`宝石概率 +${Math.round(observatoryStarBonus(state) * 35)}%`);
@@ -8037,6 +8519,7 @@ function renderInventoryPanel() {
     renderInventoryMetric("生活记录", `${lifeStoryCount} 段`, "居民外出与日常片段"),
     renderInventoryMetric("探险回执", `${reportCount} 份`, `路线档案 +${Math.round(expeditionReportBonus(state) * 100)}%`),
     renderInventoryMetric("餐桌高峰", `${state.stats.foodRushCoursesDone || 0} 桌次`, `${state.stats.foodRushesDone || 0} 次 / ${state.stats.foodServingsDone || 0} 份`),
+    renderInventoryMetric("礼宾照看", `${state.stats.serviceCareTouchesDone || 0} 次`, `${state.stats.serviceCareSessionsDone || 0} 场 / 缓冲 +${Math.round(serviceCareBonus(state) * 90)}%`),
     renderInventoryMetric("珍藏碎片", `${progress.total}/${progress.max}`, progress.next ? `下枚 ${progress.next.name}` : "图鉴已满"),
     renderInventoryMetric("任务奖励", pending.count ? `${pending.count} 待领` : "已清点", pending.count ? `${pending.coins} 金币 / ${pending.gems} 宝石` : "暂无待领"),
   ].join("");
@@ -8681,6 +9164,9 @@ function bindEvents() {
         break;
       case "food-rush":
         startFoodRush(floorId);
+        break;
+      case "service-care":
+        startServiceCare(floorId);
         break;
       case "comfort-session":
         startComfortSession(floorId);

@@ -1729,7 +1729,7 @@ body.fullscreen-active .layout {
 }
 
 .floor[data-type="service"] .room {
-  --room-art: url("assets/art/room-service.webp");
+  --room-art: url("assets/art/room-service-v2.webp");
   --room-bg:
     radial-gradient(ellipse at 26% 86%, rgba(126, 189, 98, 0.38), transparent 31%),
     linear-gradient(160deg, #738c58, #3e674f 52%, #1d2a2c);

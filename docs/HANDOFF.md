@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v67`
-- Latest preview deployment: `https://bed78f83.little-depths.pages.dev/`
-- Local server used for v67 verification: `http://127.0.0.1:8817/`
+- Latest deployed version: `v68`
+- Latest preview deployment: `https://3d242cf1.little-depths.pages.dev/`
+- Local server used for v68 verification: `http://127.0.0.1:8818/`
 
 ## Current State
 
@@ -22,11 +22,22 @@ wrangler pages deploy dist --project-name little-depths
 ```
 
 - GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`, but current release practice is to deploy Cloudflare with local Wrangler OAuth from `dist`, then sync GitHub separately. Use `[skip ci]` when pushing documentation/code sync commits that should not ask GitHub Actions to deploy Cloudflare.
-- Current caveat: v67 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
+- Current caveat: v68 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v68 Service Care Atelier Refresh / Old Map Polish
+
+- Refreshed the old `service` / 露台花坊 loop instead of adding a new room. Service floors now start active `serviceCare` sessions with phase, tone, care score, focus guest, touch progress, earned tips, and cooldown.
+- Added `SERVICE_CARE_PHASES`, `serviceCareSessionsDone`, `serviceCareTouchesDone`, `serviceCareBonus()` practice/active scaling, `startServiceCare()`, `updateServiceCareFloor()`, `serveServiceCareTouch()`, `settleServiceCareFinale()`, `renderServiceCarePanel()`, `renderServiceCareLayer()`, and `serviceCareMapKey()`.
+- Added the `care_line` / `礼宾照看` quest. It uses the manual `ready` / `领取` flow, so the quest becomes ready without auto-awarding gems or coins.
+- Improved old service-map readability with `.service-care-layer`, `.service-care-ribbon`, `.service-care-phase-stack`, `.service-care-token-lane`, `.service-care-bloom`, `data-service-care-phase`, `data-service-care-tone`, a service-care room tag, and a dedicated status glyph.
+- The detail panel now shows service-care time, phase, tone, touch count, next touch, and start action; the asset backpack now records `礼宾照看` sessions/touches and queue-buffer value.
+- Used `gpt-image-2` through the configured gateway to generate the refreshed no-text concierge flower atelier background `assets/art/room-service-v2.webp`; the reusable prompt is tracked at `docs/v68-service-care-room-image-prompt.txt`.
+- Bumped the save version to `23`, bumped `index.html` / `sw.js` to v68, updated `styles.css` and `overrides.css` to `room-service-v2.webp`, synced `dist`, rebuilt `cloudflare-pages-upload.zip`, and verified local desktop/mobile with Edge CDP.
+- Deployed v68 to Cloudflare Pages with local Wrangler direct upload. Production: `https://little-depths.pages.dev/`; preview: `https://3d242cf1.little-depths.pages.dev/`.
 
 ### v67 Food Rush Kitchen Refresh / Old Map Polish
 
@@ -293,6 +304,25 @@ wrangler pages deploy dist --project-name little-depths
 - Elevator passenger delivery now includes real waiting/door time before the visitor exits from the destination side.
 
 ## Verification Already Done
+
+- v68 local service-care refresh verification:
+  - `node --check app.js`
+  - `node --check dist/app.js`
+  - `node --check sw.js`
+  - `node --check dist/sw.js`
+  - `node --check tmp/verify-v68-service-care-refresh.mjs`
+  - `node tmp/verify-v68-service-care-refresh.mjs`
+  - Local preview URL: `http://127.0.0.1:8818/?v68-service-care-refresh=1`
+  - Desktop screenshot: `verification-v68-service-care-refresh-local.png`
+  - Mobile screenshot: `verification-v68-service-care-refresh-mobile-local.png`
+  - Assertions confirmed save version `23`, active `serviceCare` starts from the service detail button, service stock is consumed, residents are pulled into the service floor as `serviceCare` visits, lobby wait pressure is reduced, `serviceCareTouchesDone` advances, the `礼宾照看` quest becomes ready without auto-awarding gems, the manual claim button grants exactly `430` coins and `2` gems, `.service-care-layer`, ribbon, phase dots, care tokens, bloom effects, service-care status glyph, and detail panel render, `room-service-v2.webp` is served and referenced by CSS, the asset backpack includes the service-care record, mobile drawer/detail/inventory UI has no horizontal overflow, and no runtime errors were reported.
+- Cloudflare v68 checks:
+  - Local Wrangler OAuth deploy from `dist` succeeded and produced `https://3d242cf1.little-depths.pages.dev/`.
+  - Production `https://little-depths.pages.dev/` and preview `https://3d242cf1.little-depths.pages.dev/` both load `app.js?v=68`, `overrides.css?v=68`, and `styles.css?v=68`.
+  - Both `sw.js` files use `little-depths-v68`, `app.js?v=68`, `overrides.css?v=68`, `styles.css?v=68`, and `room-service-v2.webp`.
+  - Both `app.js?v=68` files contain `serviceCareTouchesDone`, `care_line`, and `renderServiceCareLayer`; both `overrides.css?v=68` files contain `.service-care-layer` and `room-service-v2.webp`.
+  - `assets/art/room-service-v2.webp` loads from production and preview as `image/webp`; size was `142936` bytes.
+  - `cloudflare-pages-upload.zip` was rebuilt from `dist`.
 
 - v67 local food-rush refresh verification:
   - `node --check app.js`
@@ -738,6 +768,9 @@ wrangler pages deploy dist --project-name little-depths
 - The user wants image work to use `gpt-image-2` through their configured gateway.
 - Read credentials only from `GPT_IMAGE_2_API_KEY`, `GPT_IMAGE_2_BASE_URL`, and `GPT_IMAGE_2_MODEL`.
 - Never print, echo, commit, or store API keys.
+- v68 generated refreshed service/concierge flower atelier room art through the configured `gpt-image-2` gateway. The source PNG was saved in the current thread outputs as `v68-service-care-room.png`, the connected asset is `assets/art/room-service-v2.webp`, and the saved prompt is `docs/v68-service-care-room-image-prompt.txt`.
+- v67 generated refreshed food/kitchen room art through the configured `gpt-image-2` gateway. The connected asset is `assets/art/room-food-v3.webp`, and the saved prompt is `docs/v67-food-rush-kitchen-image-prompt.txt`.
+- v66 generated refreshed lobby/route hall room art through the configured `gpt-image-2` gateway. The connected asset is `assets/art/room-lobby-v3.webp`, and the saved prompt is `docs/v66-lobby-route-hall-image-prompt.txt`.
 - v63 attempted refreshed comfort-afterglow garden room art through the configured `gpt-image-2` gateway at `1280x720` low quality, but the request did not return within 360 seconds. No unstable image was connected; the saved web-ready prompt is `docs/v63-comfort-afterglow-garden-image-prompt.txt`.
 - v62 attempted refreshed dwelling/life-trail room art through the configured `gpt-image-2` gateway at `1280x720` medium and `1024x1024` low settings, but the gateway returned upstream `do_request_failed` errors. No unstable image was connected; the saved web-ready prompt is `docs/v62-life-trails-dwelling-image-prompt.txt`.
 - v61 attempted refreshed kingdom courier room art through the configured `gpt-image-2` gateway at high and medium settings, but the gateway returned upstream `do_request_failed` errors. No unstable image was connected; the saved web-ready prompt is `docs/v61-kingdom-courier-room-image-prompt.txt`.
@@ -746,7 +779,7 @@ wrangler pages deploy dist --project-name little-depths
 - v56 attempted refreshed entertainment theater room art, but the configured gateway timed out before returning an image. No new art was connected; the saved web-ready prompt is `docs/v56-entertainment-theater-image-prompt.txt`.
 - v55 attempted refreshed entertainment showtime room art, but the configured gateway returned 404 for the Images API paths. No new art was generated; the saved web-ready prompt is `docs/v55-entertainment-showtime-image-prompt.txt`.
 - v54 did not generate new art with `gpt-image-2`; it converted the old `person-performer.png` asset into lossless `assets/art/person-performer.webp`.
-- Current published image assets from prior image work include `room-craft-v2.webp`, `room-dwelling-v3.webp`, `room-market-v2.webp`, `room-library-v2.webp`, `room-garden-v2.webp`, and `room-bathhouse-v2.webp`.
+- Current published image assets from prior image work include `room-lobby-v3.webp`, `room-dwelling-v3.webp`, `room-food-v3.webp`, `room-service-v2.webp`, `room-craft-v2.webp`, `room-market-v2.webp`, `room-library-v2.webp`, `room-garden-v2.webp`, and `room-bathhouse-v2.webp`.
 - Previous `tmp/imagegen` generation images/JSON records and other intermediate image outputs were cleaned during v54 local lightweight cleanup; `tmp/imagegen` is currently empty unless a future run recreates it.
 - If the image gateway is unavailable in a future pass, save a ready-to-use prompt for the web UI without printing or storing secrets.
 
@@ -759,6 +792,7 @@ wrangler pages deploy dist --project-name little-depths
   - `garden`: refresh the comfort-afterglow garden art when the image gateway is healthy, using `docs/v63-comfort-afterglow-garden-image-prompt.txt`.
   - `kingdom`: deepen downstream city effects, courier specialization, or refreshed council-room art now that signing and receipt follow-through exist.
   - `food`: deepen dining needs with table rushes, staff serving feedback, and clearer kitchen UI.
+  - `service`: tune礼宾照看 pacing, add guest preference follow-ups, or make service specialists affect care phases differently.
   - `garden/bathhouse`: make happiness, rest, rent, and expedition preparation more visible and interactive.
   - `alchemy/training/treasure`: give the late-game floors stronger decision hooks beyond passive bonuses.
   - `market`: tune parcel pacing, expose stalled/partial packing more clearly, or let multiple market floors specialize in different goods after the first parcel-flow pass.
@@ -778,8 +812,8 @@ wrangler pages deploy dist --project-name little-depths
 继续开发 C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4 里的迪迪王国项目。
 
 线上地址：https://little-depths.pages.dev/
-最新部署版本：v63
-最新预览：https://6971228b.little-depths.pages.dev/
+最新部署版本：v68
+最新预览：https://3d242cf1.little-depths.pages.dev/
 交接文档：docs/HANDOFF.md
 
 请先读取项目代码、README.md、docs/HANDOFF.md 和最近状态，再继续优化。方向：从游戏内容、玩法、画面、图像质量等层面更新迭代，不只新增内容，也要把旧楼层和旧系统做得更好。涉及图像绘制时使用 gpt-image-2；如果网关不可用，不要写入或打印密钥，改为保存可直接用于网页端生成的提示词。

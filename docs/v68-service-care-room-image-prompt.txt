@@ -1,0 +1,6 @@
+Model: gpt-image-2
+Asset: assets/art/room-service-v2.webp
+Source render: C:\Users\Mystic\Documents\Codex\2026-06-08\019e9d38-d1cb-75f0-ab82-afd3dcaedbfd-codex\outputs\v68-service-care-room.png
+
+Prompt:
+Create a polished no-text 2D game room background for a compact underground castle service floor in Didi Kingdom. Horizontal cutaway tile, 16:9 composition. Show a refined fantasy concierge flower atelier and parcel desk: arched stone room, warm lanterns, service counter, flower buckets, ribbon spools, small mail cubbies, folded cloth, guest waiting nook, teal-and-gold hospitality accents, clean foreground walkway for tiny character sprites and UI overlays. No characters, no UI, no readable text, no letters, no numbers, no logo, no watermark. Painterly stylized 2D mobile game background, crisp readable silhouettes, warm welcoming atmosphere, high image quality, enough contrast for overlay icons.
