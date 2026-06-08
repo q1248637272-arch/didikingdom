@@ -1800,7 +1800,7 @@ body.fullscreen-active .layout {
 }
 
 .floor[data-type="observatory"] .room {
-  --room-art: url("assets/art/room-observatory.webp");
+  --room-art: url("assets/art/room-observatory-v2.webp");
   --room-bg:
     radial-gradient(ellipse at 52% 80%, rgba(157, 191, 255, 0.36), transparent 34%),
     linear-gradient(160deg, #546aa7, #283b72 54%, #17192e);

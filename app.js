@@ -257,6 +257,7 @@ const PERSON_ACTIVITY_SETS = {
   dwelling: ["rest", "chat", "stroll", "snack", "talk"],
   food: ["work", "serve", "look", "eat", "talk"],
   service: ["serve", "wave", "work", "look", "talk"],
+  observatory: ["work", "look", "talk", "chat", "wave", "applaud"],
   craft: ["work", "look", "stroll", "talk"],
   kingdom: ["work", "talk", "look", "wave"],
   entertainment: ["dance", "wave", "work", "watch", "applaud"],
@@ -289,6 +290,10 @@ const SOCIAL_SCENES = {
   ],
   service: [
     { kind: "chat", need: "social", left: "serve", right: "talk", label: "礼宾问候" },
+  ],
+  observatory: [
+    { kind: "chart", need: "entertainment", left: "look", right: "talk", label: "共读星图" },
+    { kind: "focus", need: "social", left: "work", right: "look", label: "校准星轨" },
   ],
   kingdom: [
     { kind: "chat", need: "social", left: "work", right: "talk", label: "议事签令" },
@@ -420,6 +425,19 @@ const SERVICE_CARE_PHASES = [
   { id: "deliver", label: "递送", threshold: 0.64, worker: ["serve", "work"], guest: ["talk", "look"] },
   { id: "thanks", label: "致谢", threshold: 0.86, worker: ["wave", "talk"], guest: ["wave", "chat"] },
 ];
+const STAR_CHART_FLOOR_TYPES = ["observatory"];
+const STAR_CHART_LABELS = {
+  observatory: "星图校准",
+};
+const STAR_CHART_ACTIONS = {
+  observatory: "校准星图",
+};
+const STAR_CHART_PHASES = [
+  { id: "align", label: "对星", threshold: 0, worker: ["look", "work"], guest: ["look", "talk"] },
+  { id: "chart", label: "绘轨", threshold: 0.3, worker: ["work", "talk"], guest: ["look", "chat"] },
+  { id: "forecast", label: "预报", threshold: 0.62, worker: ["wave", "work"], guest: ["talk", "look"] },
+  { id: "comet", label: "追光", threshold: 0.86, worker: ["look", "wave"], guest: ["wave", "applaud"] },
+];
 const ROYAL_MANDATE_PHASES = [
   { id: "draft", label: "拟令", threshold: 0 },
   { id: "seal", label: "盖印", threshold: 0.38 },
@@ -478,6 +496,12 @@ const PERSON_ROOM_SPOTS = {
     { id: "bench", x: 38, y: 5, scale: 1.07, activities: ["rest", "chat"] },
     { id: "flowers", x: 66, y: 15, scale: 0.98, activities: ["look", "talk"] },
     { id: "walkway", x: 22, y: 12, scale: 0.96, activities: ["stroll", "wait"] },
+  ],
+  observatory: [
+    { id: "chart", x: 50, y: 9, scale: 1.04, activities: ["work", "talk", "look"] },
+    { id: "telescope", x: 68, y: 15, scale: 0.96, activities: ["look", "wave"] },
+    { id: "shelf", x: 29, y: 15, scale: 0.94, activities: ["work", "chat"] },
+    { id: "front", x: 38, y: 2, scale: 1.08, activities: ["wait", "applaud"] },
   ],
   entertainment: [
     { id: "stage", x: 57, y: 16, scale: 0.98, activities: ["dance", "wave", "work"] },
@@ -851,6 +875,14 @@ const QUEST_DEFS = [
     text: "建成 1 层观星台",
   },
   {
+    id: "star_chart",
+    title: "星图校准",
+    goal: 6,
+    metric: "starChartMarksDone",
+    reward: { coins: 620, gems: 3 },
+    text: "用观星台完成 6 次星标校准",
+  },
+  {
     id: "sky_mail",
     title: "星港通航",
     goal: 1,
@@ -1042,7 +1074,7 @@ let guideReady = false;
 
 function makeNewGame() {
   const game = {
-    version: 23,
+    version: 24,
     coins: 560,
     gems: 7,
     happiness: 72,
@@ -1110,6 +1142,8 @@ function makeNewGame() {
       libraryFloorsBuilt: 0,
       gardenFloorsBuilt: 0,
       observatoryFloorsBuilt: 0,
+      starChartCalibrationsDone: 0,
+      starChartMarksDone: 0,
       skyportFloorsBuilt: 0,
       bathhouseFloorsBuilt: 0,
       clinicFloorsBuilt: 0,
@@ -1183,6 +1217,8 @@ function createFloor(game, type, options = {}) {
     foodRush: FOOD_RUSH_FLOOR_TYPES.includes(type) ? null : undefined,
     serviceCareCooldown: SERVICE_CARE_FLOOR_TYPES.includes(type) ? 0 : undefined,
     serviceCare: SERVICE_CARE_FLOOR_TYPES.includes(type) ? null : undefined,
+    starChartCooldown: STAR_CHART_FLOOR_TYPES.includes(type) ? 0 : undefined,
+    starChart: STAR_CHART_FLOOR_TYPES.includes(type) ? null : undefined,
     royalMandateCooldown: type === "kingdom" ? 0 : undefined,
     royalMandate: type === "kingdom" ? null : undefined,
     marketCooldown: type === "market" ? 0 : undefined,
@@ -1248,6 +1284,8 @@ function finalizeConstruction(floor) {
     foodRush: FOOD_RUSH_FLOOR_TYPES.includes(floor.type) ? null : undefined,
     serviceCareCooldown: SERVICE_CARE_FLOOR_TYPES.includes(floor.type) ? 0 : undefined,
     serviceCare: SERVICE_CARE_FLOOR_TYPES.includes(floor.type) ? null : undefined,
+    starChartCooldown: STAR_CHART_FLOOR_TYPES.includes(floor.type) ? 0 : undefined,
+    starChart: STAR_CHART_FLOOR_TYPES.includes(floor.type) ? null : undefined,
     royalMandateCooldown: floor.type === "kingdom" ? 0 : undefined,
     royalMandate: floor.type === "kingdom" ? null : undefined,
     marketCooldown: floor.type === "market" ? 0 : undefined,
@@ -1565,6 +1603,8 @@ function migrateGame(game) {
     libraryFloorsBuilt: 0,
     gardenFloorsBuilt: 0,
     observatoryFloorsBuilt: 0,
+    starChartCalibrationsDone: 0,
+    starChartMarksDone: 0,
     skyportFloorsBuilt: 0,
     bathhouseFloorsBuilt: 0,
     clinicFloorsBuilt: 0,
@@ -1572,7 +1612,7 @@ function migrateGame(game) {
     aquariumFloorsBuilt: 0,
     festivalFloorsBuilt: 0,
   };
-  game.version = Math.max(Number(game.version) || 0, 23);
+  game.version = Math.max(Number(game.version) || 0, 24);
   game.nextExpeditionId ||= 1;
   game.nextExpeditionReportId ||= 1;
   game.nextLifeStoryId ||= 1;
@@ -1736,6 +1776,29 @@ function migrateGame(game) {
               }
             : null;
       }
+      if (STAR_CHART_FLOOR_TYPES.includes(floor.type)) {
+        floor.starChartCooldown = Math.max(0, Number(floor.starChartCooldown) || 0);
+        floor.starChart =
+          floor.starChart && typeof floor.starChart === "object" && Number(floor.starChart.remaining) > 0
+            ? {
+                ...floor.starChart,
+                remaining: Math.max(0, Number(floor.starChart.remaining) || 0),
+                total: Math.max(1, Number(floor.starChart.total) || Number(floor.starChart.remaining) || 1),
+                participantIds: Array.isArray(floor.starChart.participantIds)
+                  ? floor.starChart.participantIds.map(Number).filter(Boolean)
+                  : [],
+                phase: floor.starChart.phase || "align",
+                focus: clamp(Number(floor.starChart.focus) || 24, 0, 100),
+                marks: Math.max(0, Number(floor.starChart.marks) || 0),
+                targetMarks: Math.max(1, Number(floor.starChart.targetMarks) || 1),
+                markTimer: Math.max(0, Number(floor.starChart.markTimer) || 0),
+                earned: Math.max(0, Number(floor.starChart.earned) || 0),
+                finalRewarded: Boolean(floor.starChart.finalRewarded),
+                starPulse: clamp(Number(floor.starChart.starPulse) || 0, 0, 1),
+                focusStar: Math.max(0, Number(floor.starChart.focusStar) || 0),
+              }
+            : null;
+      }
       if (floor.type === "market") {
         floor.marketCooldown = Math.max(0, Number(floor.marketCooldown) || 0);
         floor.marketParcel =
@@ -1869,6 +1932,15 @@ function applyOfflineProgress(game) {
         floor.foodRush.remaining = Math.max(0, Number(floor.foodRush.remaining || 0) - elapsed);
         if (floor.foodRush.remaining <= 0) {
           floor.foodRush = null;
+        }
+      }
+    }
+    if (STAR_CHART_FLOOR_TYPES.includes(floor.type)) {
+      floor.starChartCooldown = Math.max(0, (floor.starChartCooldown || 0) - elapsed * (1 + clockworkTempoBonus(game) * 0.14));
+      if (floor.starChart) {
+        floor.starChart.remaining = Math.max(0, Number(floor.starChart.remaining || 0) - elapsed);
+        if (floor.starChart.remaining <= 0) {
+          floor.starChart = null;
         }
       }
     }
@@ -3230,6 +3302,9 @@ function updateTimers(dt) {
       lastKingdomKey = "";
     }
     if (isServiceCareFloorType(floor.type) && updateServiceCareFloor(floor, dt)) {
+      lastKingdomKey = "";
+    }
+    if (isStarChartFloorType(floor.type) && updateStarChartFloor(floor, dt)) {
       lastKingdomKey = "";
     }
     if (isShowtimeFloorType(floor.type) && updateShowtimeFloor(floor, dt)) {
@@ -4955,6 +5030,371 @@ function serviceCareMapKey(floor) {
   return `serviceCare:${Math.ceil(floor.serviceCareCooldown || 0)}:${Math.ceil(floor.serviceCare?.remaining || 0)}:${participants.join("-")}:${floor.serviceCare?.phase || ""}:${Math.round(floor.serviceCare?.care || 0)}:${floor.serviceCare?.touches || 0}:${floor.serviceCare?.targetTouches || 0}:${floor.serviceCare?.earned || 0}:${Math.round((floor.serviceCare?.carePulse || 0) * 10)}:${floor.serviceCare?.focusGuest || 0}`;
 }
 
+function isStarChartFloorType(type) {
+  return STAR_CHART_FLOOR_TYPES.includes(type);
+}
+
+function isActiveStarChart(floor) {
+  return Boolean(isStarChartFloorType(floor?.type) && floor.starChart && Number(floor.starChart.remaining) > 0);
+}
+
+function starChartPracticeBonus(game = state) {
+  return Math.min(0.14, (game.stats?.starChartCalibrationsDone || 0) * 0.004 + (game.stats?.starChartMarksDone || 0) * 0.002);
+}
+
+function activeStarChartBonus(game = state) {
+  return businessFloors(game).some((floor) => isActiveStarChart(floor)) ? 0.038 : 0;
+}
+
+function starChartProgress(floor) {
+  if (!isActiveStarChart(floor)) return 0;
+  const total = Math.max(1, Number(floor.starChart.total) || 1);
+  const target = Math.max(1, Number(floor.starChart.targetMarks) || 1);
+  const timeProgress = clamp(1 - Number(floor.starChart.remaining || 0) / total, 0, 1);
+  const markProgress = clamp(Number(floor.starChart.marks || 0) / target, 0, 1);
+  return clamp(Math.max(timeProgress, markProgress * 0.92), 0, 1);
+}
+
+function starChartPhaseForProgress(progress = 0) {
+  return STAR_CHART_PHASES.reduce((current, phase) => (progress >= phase.threshold ? phase : current), STAR_CHART_PHASES[0]);
+}
+
+function currentStarChartPhase(floor) {
+  if (!isStarChartFloorType(floor?.type)) return STAR_CHART_PHASES[0];
+  const activePhase = STAR_CHART_PHASES.find((phase) => phase.id === floor.starChart?.phase);
+  return activePhase || starChartPhaseForProgress(starChartProgress(floor));
+}
+
+function starChartFocusTone(floor) {
+  const focus = Number(floor?.starChart?.focus || 0);
+  if (focus >= 78) return "clear";
+  if (focus >= 48) return "bright";
+  return "dim";
+}
+
+function starChartFocusLabel(floor) {
+  const focus = Number(floor?.starChart?.focus || 0);
+  if (focus >= 78) return "星路清晰";
+  if (focus >= 48) return "星光明亮";
+  return "云隙初开";
+}
+
+function starChartCooldown(floor) {
+  const skill = averageSkill(floor.workers || [], floor.type);
+  return Math.max(22, Math.round(58 - skill * 2.15 - starChartPracticeBonus(state) * 38 - clockworkTempoBonus(state) * 7));
+}
+
+function starChartCandidatesForFloor(floor) {
+  if (!isStarChartFloorType(floor?.type)) return [];
+  const staff = new Set(floor.workers || []);
+  return allResidents(state)
+    .filter((person) => person && !staff.has(person.id) && !person.expeditionId && !isActiveLifeVisit(person))
+    .map((person) => {
+      ensurePersonLife(person);
+      const currentFloor = currentFloorForPerson(person);
+      const wonderNeed = personNeedUrgency(person, "entertainment") * 1.2;
+      const socialNeed = personNeedUrgency(person, "social") * 0.72;
+      const energyNeed = personNeedUrgency(person, "energy") * 0.35;
+      const favorite = (person.favoriteTypes || []).includes("observatory") || (person.favoriteTypes || []).includes("library") ? 0.46 : 0;
+      const dream = person.dreamType === "observatory" || person.dreamType === "library" || person.dreamType === "skyport" ? 0.36 : 0;
+      const expeditionPull = Math.min(0.34, (state.expeditions?.length || 0) * 0.08);
+      const near = currentFloor ? Math.max(0, 0.38 - Math.abs(Number(currentFloor.id) - Number(floor.id)) * 0.04) : 0;
+      const mood = personMotiveMood(person);
+      const moodNeed = mood === "strained" ? 0.28 : mood === "seeking" ? 0.2 : 0;
+      return { person, score: wonderNeed + socialNeed + energyNeed + favorite + dream + expeditionPull + near + moodNeed + Math.random() * 0.18 };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.person);
+}
+
+function starChartActionBlockReason(floor) {
+  if (!isStarChartFloorType(floor?.type)) return "这个楼层不能校准星图";
+  if (!floor.workers?.length) return `${FLOOR_TYPES[floor.type].label}需要员工观测`;
+  if ((floor.stock || 0) <= 0) return `${FLOOR_TYPES[floor.type].label}星盘耗材不足，先补货`;
+  if (isActiveStarChart(floor)) return "星图校准正在进行";
+  if ((floor.starChartCooldown || 0) > 0) return `还要 ${Math.ceil(floor.starChartCooldown)}s 才能再次校准`;
+  if (!starChartCandidatesForFloor(floor).length && !(state.expeditions || []).length) return "暂时没有居民或探险队需要星象预报";
+  return "";
+}
+
+function applyStarChartMotiveBurst(floor, person, scale = 1) {
+  boostPersonMotive(person, "entertainment", 11 * scale);
+  boostPersonMotive(person, "social", 6 * scale);
+  boostPersonMotive(person, "energy", 3 * scale);
+  if (floor.level > 2) boostPersonMotive(person, "entertainment", 2 * scale);
+}
+
+function starChartParticipants(floor) {
+  if (!isStarChartFloorType(floor?.type) || !floor.starChart?.id) return [];
+  const sessionId = floor.starChart.id;
+  return allResidents(state).filter((person) => {
+    return person?.lifeVisit?.reason === "starChart" && person.lifeVisit.sessionId === sessionId && Number(person.lifeVisit.floorId) === Number(floor.id);
+  });
+}
+
+function applyStarChartPhaseMotion(floor, guests = starChartParticipants(floor), staff = null) {
+  if (!isActiveStarChart(floor)) return;
+  const phase = currentStarChartPhase(floor);
+  const workers = staff || (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
+  workers.forEach((worker, index) => {
+    endSocialForPerson(worker);
+    worker.need = "entertainment";
+    worker.activity = phase.worker[index % phase.worker.length] || "look";
+    worker.activityTimer = Math.max(worker.activityTimer || 0, randFloat(7, 12));
+    worker.activityLane = "c";
+    worker.lifeWish = `${phase.label}${STAR_CHART_LABELS[floor.type] || "星图校准"}`;
+    assignPersonMotion(worker, floor.type, worker.activity);
+  });
+  guests.forEach((person, index) => {
+    person.need = index % 2 ? "social" : "entertainment";
+    person.activity = phase.guest[index % phase.guest.length] || "look";
+    person.activityTimer = Math.max(person.activityTimer || 0, randFloat(6, 11));
+    person.lifeWish = `${phase.label}星图：${floor.name}`;
+    assignPersonMotion(person, floor.type, person.activity);
+  });
+}
+
+function pairStarChartReaders(floor, guests, staff, seed = 0) {
+  if (!guests.length) return;
+  const scene = SOCIAL_SCENES.observatory[seed % SOCIAL_SCENES.observatory.length] || SOCIAL_SCENES.default[0];
+  const readers = [...staff, ...guests].filter((person) => person && !person.socialPartnerId);
+  for (let index = 0; index + 1 < readers.length; index += 2) {
+    applySocialScene(
+      readers[index],
+      readers[index + 1],
+      scene,
+      `star-chart-${floor.id}-${readers[index].id}-${readers[index + 1].id}-${Date.now()}`,
+      randFloat(7, 12),
+      floor.type,
+      floorSocialScope(floor)
+    );
+  }
+}
+
+function pulseStarChartMark(floor, guests = starChartParticipants(floor), staff = null) {
+  if (!isActiveStarChart(floor)) return 0;
+  const workers = staff || (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
+  const chart = floor.starChart;
+  const skill = averageSkill(floor.workers || [], floor.type);
+  const remaining = Math.max(0, (chart.targetMarks || 0) - (chart.marks || 0));
+  const capacity = clamp(1 + Math.floor(skill / 5) + Math.min(1, workers.length), 1, 3);
+  const markedNow = Math.min(remaining || 1, capacity);
+  chart.marks = (chart.marks || 0) + markedNow;
+  chart.starPulse = 1;
+  chart.focusStar = ((chart.focusStar || 0) + markedNow) % 7;
+  state.stats.starChartMarksDone = (state.stats.starChartMarksDone || 0) + markedNow;
+  chart.focus = clamp(Number(chart.focus || 0) + 5 + markedNow * 6 + skill * 0.28 + starChartPracticeBonus(state) * 42, 0, 100);
+  applyStarChartPhaseMotion(floor, guests, workers);
+  guests.forEach((person) => applyStarChartMotiveBurst(floor, person, 0.36));
+  workers.forEach((worker) => {
+    boostPersonMotive(worker, "entertainment", 2.2);
+    boostPersonMotive(worker, "social", 1);
+  });
+  pairStarChartReaders(floor, guests, workers, chart.marks || 0);
+  const expeditionPush = (state.expeditions || []).length
+    ? (0.9 + skill * 0.08 + starChartPracticeBonus(state) * 7) * markedNow
+    : 0;
+  if (expeditionPush > 0) {
+    state.expeditions.forEach((expedition) => {
+      expedition.remaining = Math.max(1, Number(expedition.remaining || 0) - expeditionPush);
+      expedition.starChartPrep = Math.min(0.18, Number(expedition.starChartPrep || 0) + 0.012 * markedNow);
+    });
+  }
+  const coins = Math.round((6 + markedNow * (4 + state.happiness / 115) + skill * 0.62) * (1 + starChartPracticeBonus(state) * 0.68));
+  addCoins(coins);
+  if (Math.random() < 0.055 + starChartPracticeBonus(state) * 0.35 + Math.min(0.04, (floor.level || 1) * 0.008)) {
+    state.gems += 1;
+    addLog(`${floor.name} 捕捉到一枚星屑，额外获得 1 宝石。`);
+  }
+  showFloat(`星标 +${coins}`);
+  chart.earned = (chart.earned || 0) + coins;
+  if (chart.focus >= 78 && !chart.clearLogged) {
+    chart.clearLogged = true;
+    addLog(`${floor.name} 的星图变得格外清晰，探险队看见了更短的航线。`);
+  }
+  return coins;
+}
+
+function settleStarChartFinale(floor, guests = starChartParticipants(floor)) {
+  if (!isActiveStarChart(floor) || floor.starChart.finalRewarded) return 0;
+  const chart = floor.starChart;
+  const target = Math.max(1, Number(chart.targetMarks) || 1);
+  const ratio = clamp((chart.marks || 0) / target, 0, 1.35);
+  const bonus = Math.round((chart.earned || 0) * (0.1 + ratio * 0.2) + (chart.focus || 0) * 0.56 + (chart.marks || 0) * 4);
+  chart.finalRewarded = true;
+  chart.earned = (chart.earned || 0) + bonus;
+  if (bonus > 0) addCoins(bonus);
+  if (ratio >= 1 && Math.random() < 0.22 + starChartPracticeBonus(state) * 0.5) {
+    state.gems += 1;
+  }
+  state.happiness = clamp(state.happiness + Math.min(4, 1 + Math.floor((chart.marks || 0) / 3)), 0, 100);
+  guests.forEach((person) => {
+    applyStarChartMotiveBurst(floor, person, 0.32);
+    const home = findFloor(person.homeFloorId);
+    if (home?.type === "dwelling") {
+      home.rentReady = Math.min(420, (home.rentReady || 0) + 3);
+    }
+  });
+  return bonus;
+}
+
+function startStarChart(floorId) {
+  const floor = findFloor(floorId);
+  if (!isBusiness(floor) || !isStarChartFloorType(floor.type)) return;
+  const reason = starChartActionBlockReason(floor);
+  if (reason) {
+    showToast(reason);
+    return;
+  }
+  const skill = averageSkill(floor.workers || [], floor.type);
+  const capacity = clamp(1 + (floor.level || 1) + Math.floor(skill / 5), 1, 5);
+  const guests = starChartCandidatesForFloor(floor).slice(0, Math.min(capacity, Math.max(1, (floor.stock || 0) * 2)));
+  const stockCost = Math.min(floor.stock || 0, Math.max(1, Math.ceil(Math.max(guests.length, 1) / 2)));
+  const label = STAR_CHART_LABELS[floor.type] || "星图校准";
+  const sessionId = `star-chart-${floor.id}-${Date.now()}-${randInt(10, 99)}`;
+  const duration = randFloat(34, 46);
+  const targetMarks = Math.max(4, guests.length + 3 + Math.floor(skill / 5));
+  const openingFocus = clamp(22 + guests.length * 6 + skill * 0.82 + starChartPracticeBonus(state) * 74 + (state.expeditions?.length || 0) * 4, 18, 68);
+  floor.stock = Math.max(0, (floor.stock || 0) - stockCost);
+  floor.starChartCooldown = starChartCooldown(floor);
+  floor.starChart = {
+    id: sessionId,
+    label,
+    remaining: duration,
+    total: duration,
+    participantIds: guests.map((person) => person.id),
+    phase: "align",
+    focus: openingFocus,
+    marks: 0,
+    targetMarks,
+    markTimer: randFloat(4.0, 5.8),
+    earned: 0,
+    finalRewarded: false,
+    starPulse: 0,
+    focusStar: 0,
+  };
+  const staff = (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
+  staff.forEach((worker, index) => {
+    endSocialForPerson(worker);
+    worker.need = "entertainment";
+    worker.activity = index % 2 ? "work" : "look";
+    worker.activityTimer = Math.max(worker.activityTimer || 0, duration);
+    worker.activityLane = "c";
+    assignPersonMotion(worker, floor.type, worker.activity);
+    boostPersonMotive(worker, "entertainment", 3);
+  });
+  guests.forEach((person, index) => {
+    startLifeVisit(person, floor, index % 2 ? "social" : "entertainment", {
+      allowCompanion: false,
+      label: `参加${label}`,
+      reason: "starChart",
+      duration: duration + randFloat(-3, 4),
+      minStay: Math.max(12, duration * 0.38),
+      targetGoal: 91,
+      sessionId,
+    });
+    person.activity = index % 2 ? "talk" : "look";
+    person.activityTimer = Math.max(person.activityTimer || 0, duration * 0.5);
+    assignPersonMotion(person, floor.type, person.activity);
+    applyStarChartMotiveBurst(floor, person, 0.48);
+  });
+  applyStarChartPhaseMotion(floor, guests, staff);
+  pairStarChartReaders(floor, guests, staff, 0);
+  state.stats.starChartCalibrationsDone = (state.stats.starChartCalibrationsDone || 0) + 1;
+  state.happiness = clamp(state.happiness + Math.min(4, 1 + Math.ceil(guests.length / 2)), 0, 100);
+  const names = guests.length ? guests.map((person) => person.name).slice(0, 3).join("、") : "探险队";
+  const extra = guests.length > 3 ? `等 ${guests.length} 人` : "";
+  showToast(`${label}开始：${guests.length || state.expeditions.length} 条星路待确认`);
+  addLog(`${floor.name} 开始${label}，${names}${extra}围着星图读盘，消耗 ${stockCost} 份星盘耗材。`);
+  lastKingdomKey = "";
+  render(true);
+}
+
+function updateStarChartFloor(floor, dt) {
+  if (!isStarChartFloorType(floor?.type)) return false;
+  const before = starChartMapKey(floor);
+  floor.starChartCooldown = Math.max(0, (floor.starChartCooldown || 0) - dt * (1 + clockworkTempoBonus(state) * 0.18));
+  if (!isActiveStarChart(floor)) return before !== starChartMapKey(floor);
+  floor.starChart.remaining = Math.max(0, Number(floor.starChart.remaining || 0) - dt);
+  floor.starChart.starPulse = Math.max(0, Number(floor.starChart.starPulse || 0) - dt * 0.9);
+  const guests = starChartParticipants(floor);
+  floor.starChart.participantIds = guests.map((person) => person.id);
+  guests.forEach((person) => applyStarChartMotiveBurst(floor, person, dt * 0.05));
+  const staff = (floor.workers || []).map((id) => getResident(id)).filter(Boolean);
+  staff.forEach((person) => {
+    boostPersonMotive(person, "entertainment", dt * 0.08);
+    boostPersonMotive(person, "social", dt * 0.03);
+  });
+  const phase = starChartPhaseForProgress(starChartProgress(floor));
+  if (floor.starChart.phase !== phase.id) {
+    floor.starChart.phase = phase.id;
+    floor.starChart.focus = clamp(Number(floor.starChart.focus || 0) + 6 + Math.max(1, guests.length), 0, 100);
+    applyStarChartPhaseMotion(floor, guests, staff);
+    addLog(`${floor.name} 的${floor.starChart.label || "星图校准"}进入${phase.label}。`);
+  }
+  floor.starChart.markTimer = Math.max(0, Number(floor.starChart.markTimer || 0) - dt * (1 + starChartPracticeBonus(state) * 0.48));
+  if (floor.starChart.markTimer <= 0) {
+    pulseStarChartMark(floor, guests, staff);
+    floor.starChart.markTimer = randFloat(4.2, 6.2);
+  }
+  if (floor.starChart.remaining <= 0 || (floor.starChart.marks || 0) >= (floor.starChart.targetMarks || 1)) {
+    const label = STAR_CHART_LABELS[floor.type] || "星图校准";
+    const marks = floor.starChart.marks || 0;
+    const focus = Math.round(floor.starChart.focus || 0);
+    const finale = settleStarChartFinale(floor, guests);
+    floor.starChart = null;
+    addLog(`${floor.name} 的${label}收束，标记 ${marks} 颗星，清晰度 ${focus}%，追加 ${finale} 金币。`);
+  }
+  return before !== starChartMapKey(floor);
+}
+
+function renderStarChartPanel(floor) {
+  if (!isStarChartFloorType(floor?.type)) return "";
+  const active = isActiveStarChart(floor);
+  const guests = active ? starChartParticipants(floor) : [];
+  const phase = currentStarChartPhase(floor);
+  const focus = active ? Math.round(Number(floor.starChart.focus || 0)) : 0;
+  const tone = active ? starChartFocusTone(floor) : "dim";
+  const marks = active ? floor.starChart.marks || 0 : state.stats.starChartMarksDone || 0;
+  const target = active ? Math.max(1, Number(floor.starChart.targetMarks) || 1) : Math.max(1, marks || 1);
+  const progress = active ? clamp(marks / target, 0, 1) : 0;
+  const nextMark = active ? Math.ceil(floor.starChart.markTimer || 0) : 0;
+  const names = guests.length ? guests.map((person) => person.name).slice(0, 4).join("、") : (state.expeditions || []).length ? "为探险队预报" : "等待居民读星";
+  const status = active
+    ? `${phase.label} ${Math.ceil(floor.starChart.remaining)}s · ${names}`
+    : (floor.starChartCooldown || 0) > 0
+      ? `冷却 ${Math.ceil(floor.starChartCooldown)}s`
+      : "就绪";
+  const extra = active ? ` · 收益 ${floor.starChart.earned || 0}` : "";
+  const phaseRow = STAR_CHART_PHASES.map((entry) => {
+    const done = active && starChartProgress(floor) >= entry.threshold;
+    const current = active && entry.id === phase.id;
+    return `<i class="${done ? "done" : ""} ${current ? "current" : ""}" title="${escapeAttr(entry.label)}"><b></b><span>${escapeHtml(entry.label)}</span></i>`;
+  }).join("");
+  return `
+    <div class="star-chart-panel ${active ? "active" : ""}" data-focus="${escapeAttr(tone)}" data-phase="${escapeAttr(phase.id)}">
+      <div class="star-chart-panel-head">
+        <strong>${STAR_CHART_LABELS[floor.type] || "星图校准"}</strong>
+        <em>${active ? `${starChartFocusLabel(floor)} ${focus}%` : "待校准"}</em>
+      </div>
+      <div class="star-chart-meter" aria-hidden="true"><i style="width:${Math.round(progress * 100)}%"></i></div>
+      <div class="star-chart-phase-row" aria-hidden="true">${phaseRow}</div>
+      <div class="star-chart-readout">
+        <b><span>星标</span><strong>${active ? `${marks}/${target}` : `${state.stats.starChartMarksDone || 0}`}</strong></b>
+        <b><span>下次</span><strong>${active ? `${nextMark}s` : "就绪"}</strong></b>
+        <b><span>探险</span><strong>${(state.expeditions || []).length}</strong></b>
+      </div>
+      <span>${escapeHtml(status)}${extra}</span>
+      <small>校准 ${state.stats.starChartCalibrationsDone || 0} 次 · 星标 ${state.stats.starChartMarksDone || 0} · 星象 +${Math.round(observatoryStarBonus(state) * 100)}%</small>
+    </div>`;
+}
+
+function starChartMapKey(floor) {
+  if (!isStarChartFloorType(floor?.type)) return "";
+  const participants = floor.starChart?.participantIds || [];
+  return `starChart:${Math.ceil(floor.starChartCooldown || 0)}:${Math.ceil(floor.starChart?.remaining || 0)}:${participants.join("-")}:${floor.starChart?.phase || ""}:${Math.round(floor.starChart?.focus || 0)}:${floor.starChart?.marks || 0}:${floor.starChart?.targetMarks || 0}:${floor.starChart?.earned || 0}:${Math.round((floor.starChart?.starPulse || 0) * 10)}:${floor.starChart?.focusStar || 0}`;
+}
+
 function isShowtimeFloorType(type) {
   return SHOWTIME_FLOOR_TYPES.includes(type);
 }
@@ -5605,7 +6045,7 @@ function serviceCareBonus(game = state) {
 }
 
 function observatoryStarBonus(game = state) {
-  return Math.min(0.24, floorTypeInfluence(game, "observatory") * 0.052);
+  return Math.min(0.3, floorTypeInfluence(game, "observatory") * 0.052 + starChartPracticeBonus(game) * 0.74 + activeStarChartBonus(game));
 }
 
 function bathhouseRestBonus(game = state) {
@@ -5781,6 +6221,7 @@ function recordExpeditionReport(game, expedition, resident, options = {}) {
     .filter(Boolean)
     .join(" / ");
   const comfortText = expedition.comfortPrepBonus > 0 ? `，${expedition.comfortPrepLabel || "舒缓余韵"}稳定了队伍` : "";
+  const starText = expedition.starChartPrep > 0 ? `，星图预报 +${Math.round(Number(expedition.starChartPrep || 0) * 100)}%` : "";
   const relicText = options.relicFound ? "，发现珍藏碎片" : "";
   const gemText = options.gems ? `，带回 ${options.gems} 宝石` : "";
   const report = normalizeExpeditionReport({
@@ -5793,7 +6234,7 @@ function recordExpeditionReport(game, expedition, resident, options = {}) {
     routeLabel: def.tag || def.title,
     originFloorId: origin?.id ?? expedition.originFloorId ?? null,
     originFloorName: origin?.name || "",
-    detail: `${origin ? `${formatFloorLabel(origin.id)} ${origin.name}` : "公共探险队"} → ${def.title}，路标 ${waymarkText || "完整"}${gemText}${relicText}${comfortText}`,
+    detail: `${origin ? `${formatFloorLabel(origin.id)} ${origin.name}` : "公共探险队"} → ${def.title}，路标 ${waymarkText || "完整"}${gemText}${relicText}${comfortText}${starText}`,
     coins: options.coins || expedition.rewardCoins || 0,
     gems: options.gems || 0,
     relicFound: Boolean(options.relicFound),
@@ -5937,6 +6378,7 @@ function reconcileExpeditions(game) {
         relicChance: expedition.relicChance ?? def.relicChance,
         comfortPrepBonus: clamp(Number(expedition.comfortPrepBonus) || 0, 0, 0.28),
         comfortPrepLabel: expedition.comfortPrepLabel || "",
+        starChartPrep: clamp(Number(expedition.starChartPrep) || 0, 0, 0.18),
         routeNote: expedition.routeNote || def.text,
         waymarkIds: Array.isArray(expedition.waymarkIds)
           ? expedition.waymarkIds.filter((id) => EXPEDITION_WAYMARKS.some((mark) => mark.id === id))
@@ -6114,14 +6556,15 @@ function completeExpedition(game, expeditionId, noisy = game === state) {
   const resident = allResidents(game).find((entry) => entry.id === expedition.residentId);
   if (resident) resident.expeditionId = null;
   game.expeditions = game.expeditions.filter((entry) => entry.id !== expeditionId);
-  const coins = expedition.rewardCoins || 50;
-  const gems = expedition.rewardGems || 0;
+  const starPrep = Math.min(0.18, Number(expedition.starChartPrep || 0));
+  const coins = Math.round((expedition.rewardCoins || 50) * (1 + starPrep));
+  const gems = (expedition.rewardGems || 0) + (starPrep > 0 && Math.random() < starPrep * 1.35 ? 1 : 0);
   addCoinsToGame(game, coins);
   game.gems += gems;
   game.stats.expeditionsDone += 1;
   const provisionJoy = Math.round(foodWarmthBonus(game) * 6);
   game.happiness = clamp(game.happiness + 1 + provisionJoy, 0, 100);
-  const relicFound = Math.random() < (expedition.relicChance || 0);
+  const relicFound = Math.random() < clamp((expedition.relicChance || 0) + starPrep * 0.32, 0, 0.92);
   if (relicFound) awardRelicPiece(game);
   const report = recordExpeditionReport(game, expedition, resident, { coins, gems, relicFound });
   const gemText = gems ? `、${gems} 宝石` : "";
@@ -6129,13 +6572,14 @@ function completeExpedition(game, expeditionId, noisy = game === state) {
   const provisionText = provisionJoy ? "，暖锅补给让队伍精神更足" : "";
   const toolText = craftToolBonus(game) > 0 ? "，工坊工具包让路线更稳" : "";
   const comfortText = expedition.comfortPrepBonus > 0 ? `，${expedition.comfortPrepLabel || "舒缓余韵"}让路线更安稳` : "";
+  const starText = starPrep > 0 ? `，星图预报让收益 +${Math.round(starPrep * 100)}%` : "";
   const reportText = report ? "，留下回城报告" : "";
   const homeFloor = game.floors.find((floor) => floor.id === expedition.originFloorId && floor.type === "dwelling");
   if (homeFloor) {
     const homeShare = Math.round(coins * (0.08 + dwellingJourneyBonus(game) * 0.24));
     homeFloor.rentReady = Math.min(420, (homeFloor.rentReady || 0) + homeShare);
   }
-  addLogToGame(game, `${expedition.residentName || resident?.name || "斥候"} 完成「${expedition.title}」，带回 ${coins} 金币${gemText}${relicText}${provisionText}${toolText}${comfortText}${reportText}。`);
+  addLogToGame(game, `${expedition.residentName || resident?.name || "斥候"} 完成「${expedition.title}」，带回 ${coins} 金币${gemText}${relicText}${provisionText}${toolText}${comfortText}${starText}${reportText}。`);
   if (noisy) {
     showFloat(`探险 +${coins}`);
     if (gems || relicFound) showToast(relicFound ? "探险发现珍藏碎片" : `探险带回 ${gems} 宝石`);
@@ -6857,7 +7301,7 @@ function getKingdomRenderKey() {
       if (floor.type === "lobby") {
         return `${floor.id}:lobby:${state.queue.map((visitor) => `${visitor.id}:${visitor.need || ""}:${visitor.activity || ""}:${Math.floor(lobbyWaitSeconds(visitor) / 5)}:${visitor.targetFloorId || ""}`).join("-")}:${lobbyPressureInfo(state).tone}:${state.selectedFloorId}`;
       }
-      return `${floor.id}:${floor.type}:${floor.level}:${floor.stock}:${floor.stockMax}:${floor.workers.length}:${Boolean(floor.production)}:${foodRushMapKey(floor)}:${serviceCareMapKey(floor)}:${marketParcelMapKey(floor)}:${royalMandateMapKey(floor)}:${comfortSessionMapKey(floor)}:${showtimeMapKey(floor)}:${lifeTrailMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
+      return `${floor.id}:${floor.type}:${floor.level}:${floor.stock}:${floor.stockMax}:${floor.workers.length}:${Boolean(floor.production)}:${foodRushMapKey(floor)}:${serviceCareMapKey(floor)}:${starChartMapKey(floor)}:${marketParcelMapKey(floor)}:${royalMandateMapKey(floor)}:${comfortSessionMapKey(floor)}:${showtimeMapKey(floor)}:${lifeTrailMapKey(floor)}:${floorPeopleMotionKey(floor)}:${state.selectedFloorId}`;
     })
     .join("|");
   const arrivalKey = (state.arrivals || []).map((arrival) => `${arrival.id}:${arrival.floorId}`).join("-");
@@ -6914,6 +7358,10 @@ function renderFloor(floor) {
   const serviceCareAttrs = isActiveServiceCare(floor)
     ? ` data-service-care-phase="${escapeAttr(currentServiceCarePhase(floor).id)}" data-service-care-tone="${escapeAttr(serviceCareTone(floor))}"`
     : "";
+  const starChartClass = isActiveStarChart(floor) ? "star-chart-active" : "";
+  const starChartAttrs = isActiveStarChart(floor)
+    ? ` data-star-chart-phase="${escapeAttr(currentStarChartPhase(floor).id)}" data-star-chart-focus="${escapeAttr(starChartFocusTone(floor))}"`
+    : "";
   const royalMandateClass = isActiveRoyalMandate(floor) ? "royal-mandate-active" : "";
   const royalMandateAttrs = isActiveRoyalMandate(floor)
     ? ` data-royal-mandate-phase="${escapeAttr(currentRoyalMandatePhase(floor).id)}"`
@@ -6937,7 +7385,7 @@ function renderFloor(floor) {
     : "";
   const zone = getFloorZone(floor);
   return `
-    <article class="floor ${selected} ${constructing} ${routeClass} ${lifeTrailClass} ${expeditionWaymarkClass} ${foodRushClass} ${serviceCareClass} ${marketParcelClass} ${royalMandateClass} ${royalCourierClass} ${comfortClass} ${comfortEchoClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${lifeTrailAttrs}${expeditionWaymarkAttrs}${foodRushAttrs}${serviceCareAttrs}${marketParcelAttrs}${royalMandateAttrs}${royalCourierAttrs}${comfortEchoAttrs}${showtimeAttrs}>
+    <article class="floor ${selected} ${constructing} ${routeClass} ${lifeTrailClass} ${expeditionWaymarkClass} ${foodRushClass} ${serviceCareClass} ${starChartClass} ${marketParcelClass} ${royalMandateClass} ${royalCourierClass} ${comfortClass} ${comfortEchoClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${lifeTrailAttrs}${expeditionWaymarkAttrs}${foodRushAttrs}${serviceCareAttrs}${starChartAttrs}${marketParcelAttrs}${royalMandateAttrs}${royalCourierAttrs}${comfortEchoAttrs}${showtimeAttrs}>
       ${renderFloorIndex(floor)}
       <div class="room" data-action="select-floor" data-floor-id="${floor.id}" title="${escapeAttr(floorMapLabel(floor))}" aria-label="${escapeAttr(floorMapLabel(floor))}">
         ${floor.status === "construction" ? renderConstruction(floor) : renderOpenFloor(floor)}
@@ -6996,6 +7444,7 @@ function renderOpenFloor(floor) {
         ${renderRoomStateTag(floor)}
         ${renderFoodRushServiceLayer(floor)}
         ${renderServiceCareLayer(floor)}
+        ${renderStarChartLayer(floor)}
         ${floor.type === "lobby" ? renderLobbyRouteLayer() : ""}
         ${renderLifeTrailLayer(floor)}
         ${renderExpeditionWaymarkLayer(floor)}
@@ -7249,6 +7698,34 @@ function renderServiceCareLayer(floor) {
     </span>`;
 }
 
+function renderStarChartLayer(floor) {
+  if (!isActiveStarChart(floor)) return "";
+  const chart = floor.starChart;
+  const phase = currentStarChartPhase(floor);
+  const tone = starChartFocusTone(floor);
+  const progress = Math.round(starChartProgress(floor) * 100);
+  const markProgress = Math.round(clamp(Number(chart.marks || 0) / Math.max(1, Number(chart.targetMarks) || 1), 0, 1) * 100);
+  const focusStar = clamp(Number(chart.focusStar) || 0, 0, 6);
+  const stars = Array.from({ length: 7 }, (_, index) => {
+    const lit = index < Math.ceil((markProgress / 100) * 7);
+    const current = index === focusStar;
+    const left = 12 + index * 12;
+    const top = 22 + (index % 3) * 16;
+    return `<b class="${lit ? "lit" : ""} ${current ? "current" : ""}" style="--star-left:${left}%; --star-top:${top}%"><i></i></b>`;
+  }).join("");
+  const phases = STAR_CHART_PHASES.map((entry) => {
+    const lit = progress >= Math.round(entry.threshold * 100);
+    return `<i class="${lit ? "lit" : ""} ${entry.id === phase.id ? "current" : ""}" data-phase="${escapeAttr(entry.id)}"></i>`;
+  }).join("");
+  return `
+    <span class="star-chart-layer" data-phase="${escapeAttr(phase.id)}" data-focus="${escapeAttr(tone)}" data-pulse="${chart.starPulse > 0 ? "pulse" : "idle"}" style="--chart-progress:${progress}%; --mark-progress:${markProgress}%; --chart-focus:${Math.round(chart.focus || 0)};" title="${escapeAttr(`${phase.label} · 星标 ${chart.marks || 0}/${chart.targetMarks || 0}`)}" aria-label="${escapeAttr(`${phase.label} · 星标 ${chart.marks || 0}/${chart.targetMarks || 0}`)}">
+      <span class="star-chart-sweep"><i></i><b></b></span>
+      <span class="star-chart-constellation">${stars}</span>
+      <span class="star-chart-phase-stack">${phases}</span>
+      <span class="star-chart-comet"><i></i></span>
+    </span>`;
+}
+
 function renderRoyalCourierLayer(floor) {
   if (!isActiveRoyalMandate(floor)) return "";
   const phase = currentRoyalCourierPhase(floor);
@@ -7295,6 +7772,10 @@ function renderRoomStateTag(floor) {
   if (isActiveServiceCare(floor)) {
     const label = SERVICE_CARE_LABELS[floor.type] || "礼宾照看";
     return `<span class="room-state-tag good icon-only" data-state="service-care" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"></span>`;
+  }
+  if (isActiveStarChart(floor)) {
+    const label = STAR_CHART_LABELS[floor.type] || "星图校准";
+    return `<span class="room-state-tag good icon-only" data-state="star-chart" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"></span>`;
   }
   if (isActiveMarketParcel(floor)) {
     const phase = currentMarketParcelPhase(floor);
@@ -7360,6 +7841,7 @@ function renderFloorStatusGlyph(floor) {
   else if (isActiveComfortAfterglow(floor)) stateName = "comfort-echo";
   else if (isActiveFoodRush(floor)) stateName = "meal-rush";
   else if (isActiveServiceCare(floor)) stateName = "service-care";
+  else if (isActiveStarChart(floor)) stateName = "star-chart";
   else if (isActiveMarketParcel(floor)) stateName = "market-parcel";
   else if (isActiveRoyalMandate(floor)) stateName = "royal-mandate";
   else if (isActiveShowtime(floor)) stateName = "showtime";
@@ -7571,6 +8053,10 @@ function renderFloorMeter(floor) {
     const progress = serviceCareProgress(floor);
     return `<div class="meter service-care-inline-meter"><span style="width:${Math.round(progress * 100)}%"></span></div>`;
   }
+  if (isActiveStarChart(floor)) {
+    const progress = starChartProgress(floor);
+    return `<div class="meter star-chart-inline-meter"><span style="width:${Math.round(progress * 100)}%"></span></div>`;
+  }
   if (floor.production) {
     const progress = 1 - floor.production.remaining / floor.production.total;
     return `<div class="meter"><span style="width:${clamp(progress * 100, 0, 100)}%"></span></div>`;
@@ -7597,6 +8083,7 @@ function renderFloorStatus(floor) {
   if (isActiveComfortSession(floor)) return `${COMFORT_SESSION_LABELS[floor.type] || "休整"} ${Math.ceil(floor.comfortSession.remaining)}s`;
   if (isActiveComfortAfterglow(floor)) return `${floor.comfortAfterglow.label || "余韵"} ${Math.ceil(floor.comfortAfterglow.remaining)}s`;
   if (isActiveServiceCare(floor)) return `${currentServiceCarePhase(floor).label}${SERVICE_CARE_LABELS[floor.type] || "礼宾照看"} · 照看 ${floor.serviceCare.touches || 0}/${floor.serviceCare.targetTouches || 0}`;
+  if (isActiveStarChart(floor)) return `${currentStarChartPhase(floor).label}${STAR_CHART_LABELS[floor.type] || "星图校准"} · 星标 ${floor.starChart.marks || 0}/${floor.starChart.targetMarks || 0}`;
   if (isActiveRoyalMandate(floor)) return `${currentRoyalMandatePhase(floor).label}王令 · ${currentRoyalCourierPhase(floor).label} ${Math.ceil(floor.royalMandate.remaining)}s`;
   if (isActiveShowtime(floor)) return `${currentShowtimeBeat(floor).label}${SHOWTIME_LABELS[floor.type] || "小剧"} · 热度 ${Math.round(floor.showtime.heat || 0)}%`;
   if (floor.production) return `补货 ${Math.ceil(floor.production.remaining)}s`;
@@ -7629,6 +8116,7 @@ function renderFloorStatus(floor) {
   if (isActiveComfortAfterglow(floor)) return `${floor.comfortAfterglow.label || "余韵"} ${Math.ceil(floor.comfortAfterglow.remaining)}s`;
   if (isActiveFoodRush(floor)) return `${currentFoodRushPace(floor).label}${FOOD_RUSH_LABELS[floor.type] || "餐桌高峰"} · 上菜 ${floor.foodRush.served || 0}/${floor.foodRush.targetServings || 0}`;
   if (isActiveServiceCare(floor)) return `${currentServiceCarePhase(floor).label}${SERVICE_CARE_LABELS[floor.type] || "礼宾照看"} · 照看 ${floor.serviceCare.touches || 0}/${floor.serviceCare.targetTouches || 0}`;
+  if (isActiveStarChart(floor)) return `${currentStarChartPhase(floor).label}${STAR_CHART_LABELS[floor.type] || "星图校准"} · 星标 ${floor.starChart.marks || 0}/${floor.starChart.targetMarks || 0}`;
   if (isActiveMarketParcel(floor)) return `${currentMarketParcelPhase(floor).label}包裹 · 打包 ${floor.marketParcel.packed || 0}`;
   if (isActiveRoyalMandate(floor)) return `${currentRoyalMandatePhase(floor).label}王令 · ${currentRoyalCourierPhase(floor).label} ${Math.ceil(floor.royalMandate.remaining)}s`;
   if (isActiveShowtime(floor)) return `${currentShowtimeBeat(floor).label}${SHOWTIME_LABELS[floor.type] || "小剧"} · 热度 ${Math.round(floor.showtime.heat || 0)}%`;
@@ -7945,6 +8433,9 @@ function renderFloorPerks(floor) {
   } else if (floor.type === "observatory") {
     perks.push(`探险收益 +${Math.round(observatoryStarBonus(state) * 55)}%`);
     perks.push(`宝石概率 +${Math.round(observatoryStarBonus(state) * 35)}%`);
+    perks.push(`校准 ${state.stats.starChartCalibrationsDone || 0}`);
+    perks.push(`星标 ${state.stats.starChartMarksDone || 0}`);
+    if (isActiveStarChart(floor)) perks.push(`${currentStarChartPhase(floor).label}清晰 ${Math.round(floor.starChart.focus || 0)}%`);
   } else if (floor.type === "skyport") {
     perks.push(`访客节奏 +${Math.round(skyportFlowBonus(state) * 185)}%`);
     perks.push(`订单/探险 +${Math.round(skyportFlowBonus(state) * 42)}%`);
@@ -8071,6 +8562,12 @@ function renderFloorDetail() {
   const serviceCareToneValue = serviceCareActive ? `${Math.round(floor.serviceCare.care || 0)}%` : "-";
   const serviceCarePhaseValue = serviceCareActive ? currentServiceCarePhase(floor).label : serviceCareCooldownValue ? `${serviceCareCooldownValue}s` : "就绪";
   const serviceCareTouchValue = serviceCareActive ? `${floor.serviceCare.touches || 0}/${floor.serviceCare.targetTouches || 0}` : `${state.stats.serviceCareTouchesDone || 0}`;
+  const starChartCooldownValue = isStarChartFloorType(floor.type) ? Math.ceil(floor.starChartCooldown || 0) : 0;
+  const starChartActive = isActiveStarChart(floor);
+  const starChartReason = isStarChartFloorType(floor.type) ? starChartActionBlockReason(floor) : "";
+  const starChartFocusValue = starChartActive ? `${Math.round(floor.starChart.focus || 0)}%` : "-";
+  const starChartPhaseValue = starChartActive ? currentStarChartPhase(floor).label : starChartCooldownValue ? `${starChartCooldownValue}s` : "就绪";
+  const starChartMarksValue = starChartActive ? `${floor.starChart.marks || 0}/${floor.starChart.targetMarks || 0}` : `${state.stats.starChartMarksDone || 0}`;
   const comfortCooldown = isComfortFloorType(floor.type) ? Math.ceil(floor.comfortCooldown || 0) : 0;
   const comfortActive = isActiveComfortSession(floor);
   const comfortAfterglow = isActiveComfortAfterglow(floor) ? floor.comfortAfterglow : null;
@@ -8114,6 +8611,7 @@ function renderFloorDetail() {
       <div class="stat"><b>${floor.production ? Math.ceil(floor.production.remaining) + "s" : "就绪"}</b><span>补货</span></div>
       ${isFoodRushFloorType(floor.type) ? `<div class="stat"><b>${foodRushActive ? Math.ceil(floor.foodRush.remaining) + "s" : foodRushCooldownValue ? foodRushCooldownValue + "s" : "就绪"}</b><span>高峰</span></div><div class="stat"><b>${foodRushPaceValue}</b><span>节奏</span></div><div class="stat"><b>${foodRushCourseValue}</b><span>菜序</span></div><div class="stat"><b>${foodRushHeatValue}</b><span>忙场</span></div><div class="stat"><b>${foodRushServedValue}</b><span>上菜</span></div>` : ""}
       ${isServiceCareFloorType(floor.type) ? `<div class="stat"><b>${serviceCareActive ? Math.ceil(floor.serviceCare.remaining) + "s" : serviceCareCooldownValue ? serviceCareCooldownValue + "s" : "就绪"}</b><span>照看</span></div><div class="stat"><b>${serviceCarePhaseValue}</b><span>阶段</span></div><div class="stat"><b>${serviceCareToneValue}</b><span>妥帖</span></div><div class="stat"><b>${serviceCareTouchValue}</b><span>次数</span></div>` : ""}
+      ${isStarChartFloorType(floor.type) ? `<div class="stat"><b>${starChartActive ? Math.ceil(floor.starChart.remaining) + "s" : starChartCooldownValue ? starChartCooldownValue + "s" : "就绪"}</b><span>校准</span></div><div class="stat"><b>${starChartPhaseValue}</b><span>阶段</span></div><div class="stat"><b>${starChartFocusValue}</b><span>清晰</span></div><div class="stat"><b>${starChartMarksValue}</b><span>星标</span></div>` : ""}
       ${floor.type === "market" ? `<div class="stat"><b>${state.orders.length}/${orderCapacity(state)}</b><span>订单栏</span></div><div class="stat"><b>${marketCooldown ? marketCooldown + "s" : "就绪"}</b><span>撮合</span></div><div class="stat"><b>${marketParcelStageValue}</b><span>包裹</span></div><div class="stat"><b>${marketParcelPackedValue}</b><span>打包</span></div><div class="stat"><b>${state.stats.marketParcelsDone || 0}</b><span>流转</span></div>` : ""}
       ${floor.type === "kingdom" ? `<div class="stat"><b>${royalMandateStageValue}</b><span>王令</span></div><div class="stat"><b>${royalMandatePreparedValue}</b><span>预备</span></div><div class="stat"><b>${state.stats.royalMandatesDone || 0}</b><span>签发</span></div><div class="stat"><b>${state.stats.royalCourierReceiptsDone || 0}</b><span>回执</span></div><div class="stat"><b>${royalMandateInfo ? royalMandateInfo.missing : "-"}</b><span>缺口</span></div>` : ""}
       ${floor.type === "library" ? `<div class="stat"><b>${catalog.completed}/${COLLECTION_DEFS.length}</b><span>图鉴</span></div><div class="stat"><b>${libraryCooldown ? libraryCooldown + "s" : "就绪"}</b><span>编目</span></div>` : ""}
@@ -8127,6 +8625,7 @@ function renderFloorDetail() {
     ${renderRoyalMandatePanel(floor)}
     ${renderFoodRushPanel(floor)}
     ${renderServiceCarePanel(floor)}
+    ${renderStarChartPanel(floor)}
     ${renderComfortSessionPanel(floor)}
     ${renderShowtimePanel(floor)}
     ${renderResidentList(workers, floor.type)}
@@ -8134,6 +8633,7 @@ function renderFloorDetail() {
       <button class="detail-btn primary" data-action="stock" data-floor-id="${floor.id}">补货</button>
       ${isFoodRushFloorType(floor.type) ? `<button class="detail-btn" data-action="food-rush" data-floor-id="${floor.id}" title="${escapeAttr(foodRushReason || "组织饥饿居民入座并完成一轮忙碌上菜")}" ${foodRushReason ? "disabled" : ""}>${FOOD_RUSH_ACTIONS[floor.type] || "组织用餐高峰"}</button>` : ""}
       ${isServiceCareFloorType(floor.type) ? `<button class="detail-btn" data-action="service-care" data-floor-id="${floor.id}" title="${escapeAttr(serviceCareReason || "安排需要照看的居民入座，降低大厅压力并完成礼宾服务")}" ${serviceCareReason ? "disabled" : ""}>${SERVICE_CARE_ACTIONS[floor.type] || "安排礼宾照看"}</button>` : ""}
+      ${isStarChartFloorType(floor.type) ? `<button class="detail-btn" data-action="star-chart" data-floor-id="${floor.id}" title="${escapeAttr(starChartReason || "消耗星盘耗材，为居民和探险队校准星图")}" ${starChartReason ? "disabled" : ""}>${STAR_CHART_ACTIONS[floor.type] || "校准星图"}</button>` : ""}
       ${floor.type === "market" ? `<button class="detail-btn" data-action="market-deal" data-floor-id="${floor.id}" title="${escapeAttr(marketParcelReason || "撮合快单，并让市集摊位把现货打包发出")}" ${marketParcelReason ? "disabled" : ""}>撮合快单</button>` : ""}
       ${floor.type === "kingdom" ? `<button class="detail-btn" data-action="royal-mandate" data-floor-id="${floor.id}" title="${escapeAttr(royalMandateReason || "消耗 1 枚印信，为最缺货的订单预备物资并提高奖励")}" ${royalMandateReason ? "disabled" : ""}>签发王令</button>` : ""}
       ${floor.type === "library" ? `<button class="detail-btn" data-action="library-study" data-floor-id="${floor.id}" ${libraryCooldown || !floor.workers.length || floor.stock <= 0 ? "disabled" : ""}>整理典藏</button>` : ""}
@@ -8209,6 +8709,9 @@ function renderFloorPerks(floor) {
   } else if (floor.type === "observatory") {
     perks.push(`探险收益 +${Math.round(observatoryStarBonus(state) * 55)}%`);
     perks.push(`宝石概率 +${Math.round(observatoryStarBonus(state) * 35)}%`);
+    perks.push(`校准 ${state.stats.starChartCalibrationsDone || 0}`);
+    perks.push(`星标 ${state.stats.starChartMarksDone || 0}`);
+    if (isActiveStarChart(floor)) perks.push(`${currentStarChartPhase(floor).label}清晰 ${Math.round(floor.starChart.focus || 0)}%`);
   } else if (floor.type === "skyport") {
     perks.push(`访客节奏 +${Math.round(skyportFlowBonus(state) * 185)}%`);
     perks.push(`订单/探险 +${Math.round(skyportFlowBonus(state) * 42)}%`);
@@ -8520,6 +9023,7 @@ function renderInventoryPanel() {
     renderInventoryMetric("探险回执", `${reportCount} 份`, `路线档案 +${Math.round(expeditionReportBonus(state) * 100)}%`),
     renderInventoryMetric("餐桌高峰", `${state.stats.foodRushCoursesDone || 0} 桌次`, `${state.stats.foodRushesDone || 0} 次 / ${state.stats.foodServingsDone || 0} 份`),
     renderInventoryMetric("礼宾照看", `${state.stats.serviceCareTouchesDone || 0} 次`, `${state.stats.serviceCareSessionsDone || 0} 场 / 缓冲 +${Math.round(serviceCareBonus(state) * 90)}%`),
+    renderInventoryMetric("星图校准", `${state.stats.starChartMarksDone || 0} 星标`, `${state.stats.starChartCalibrationsDone || 0} 场 / 星象 +${Math.round(observatoryStarBonus(state) * 100)}%`),
     renderInventoryMetric("珍藏碎片", `${progress.total}/${progress.max}`, progress.next ? `下枚 ${progress.next.name}` : "图鉴已满"),
     renderInventoryMetric("任务奖励", pending.count ? `${pending.count} 待领` : "已清点", pending.count ? `${pending.coins} 金币 / ${pending.gems} 宝石` : "暂无待领"),
   ].join("");
@@ -8605,11 +9109,12 @@ function renderExpeditions() {
       const mark = expeditionCurrentWaymark(expedition);
       const next = expeditionNextWaymark(expedition);
       const comfortPrep = expedition.comfortPrepBonus > 0 ? ` · ${expedition.comfortPrepLabel || "舒缓余韵"} +${Math.round(expedition.comfortPrepBonus * 100)}%` : "";
+      const starPrep = expedition.starChartPrep > 0 ? ` · 星图预报 +${Math.round(expedition.starChartPrep * 100)}%` : "";
       const routeArchive = expedition.reportBonus > 0 ? ` · 路线档案 +${Math.round(expedition.reportBonus * 100)}%` : "";
       return `
         <div class="expedition-card active expedition-report-active" data-stage="${escapeAttr(mark.id)}">
           <div class="expedition-head">
-            <span><strong>${escapeHtml(expedition.title)}</strong><small>${escapeHtml(expedition.residentName || resident?.name || "斥候")} · ${escapeHtml(mark.label)} · 剩余 ${Math.ceil(expedition.remaining)}s${escapeHtml(comfortPrep)}${escapeHtml(routeArchive)}</small></span>
+            <span><strong>${escapeHtml(expedition.title)}</strong><small>${escapeHtml(expedition.residentName || resident?.name || "斥候")} · ${escapeHtml(mark.label)} · 剩余 ${Math.ceil(expedition.remaining)}s${escapeHtml(comfortPrep)}${escapeHtml(starPrep)}${escapeHtml(routeArchive)}</small></span>
             <span class="expedition-tag">${escapeHtml(mark.label)}</span>
           </div>
           <div class="expedition-waymark-readout">
@@ -9167,6 +9672,9 @@ function bindEvents() {
         break;
       case "service-care":
         startServiceCare(floorId);
+        break;
+      case "star-chart":
+        startStarChart(floorId);
         break;
       case "comfort-session":
         startComfortSession(floorId);

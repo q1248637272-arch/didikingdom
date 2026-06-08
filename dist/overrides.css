@@ -5383,3 +5383,397 @@ body.fullscreen-active .build-grid {
     white-space: normal;
   }
 }
+
+.floor[data-type="observatory"] .room {
+  --room-art: url("assets/art/room-observatory-v2.webp");
+}
+
+.star-chart-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(101, 205, 214, 0.28);
+  background:
+    linear-gradient(135deg, rgba(18, 31, 54, 0.82), rgba(44, 34, 62, 0.76)),
+    rgba(11, 16, 28, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(255, 242, 184, 0.08);
+}
+
+.star-chart-panel.active {
+  border-color: rgba(116, 217, 224, 0.42);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 242, 184, 0.14),
+    0 0 18px rgba(72, 188, 214, 0.16);
+}
+
+.star-chart-panel-head,
+.star-chart-readout,
+.star-chart-phase-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.star-chart-panel-head {
+  justify-content: space-between;
+}
+
+.star-chart-panel strong {
+  color: #f8edc1;
+  font-size: 13px;
+}
+
+.star-chart-panel em {
+  color: #9fe8ef;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.star-chart-panel span,
+.star-chart-panel small {
+  min-width: 0;
+  color: rgba(224, 238, 255, 0.78);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.star-chart-meter {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(10, 18, 35, 0.64);
+  border: 1px solid rgba(140, 221, 233, 0.18);
+}
+
+.star-chart-meter i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #61d8df, #f5cc6d, #ffffff);
+  box-shadow: 0 0 10px rgba(97, 216, 223, 0.42);
+  transition: width 0.25s ease;
+}
+
+.star-chart-phase-row {
+  justify-content: space-between;
+}
+
+.star-chart-phase-row i {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 24px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.star-chart-phase-row i b {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background: rgba(159, 232, 239, 0.38);
+}
+
+.star-chart-phase-row i span {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  left: 3px;
+  overflow: hidden;
+  color: rgba(224, 238, 255, 0.74);
+  font-size: 9px;
+  line-height: 1.1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.star-chart-phase-row i.done {
+  background: rgba(97, 216, 223, 0.13);
+  border-color: rgba(97, 216, 223, 0.26);
+}
+
+.star-chart-phase-row i.done b {
+  background: #f5cc6d;
+  box-shadow: 0 0 9px rgba(245, 204, 109, 0.56);
+}
+
+.star-chart-phase-row i.current {
+  border-color: rgba(255, 238, 178, 0.44);
+}
+
+.star-chart-readout {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.star-chart-readout b {
+  min-width: 0;
+  padding: 6px 7px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+}
+
+.star-chart-readout b span,
+.star-chart-readout b strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.star-chart-readout b span {
+  color: rgba(224, 238, 255, 0.62);
+  font-size: 9px;
+}
+
+.star-chart-readout b strong {
+  color: #f8edc1;
+  font-size: 12px;
+}
+
+.star-chart-layer {
+  position: absolute;
+  inset: 7% 7% 11%;
+  z-index: 5;
+  pointer-events: none;
+  --chart-glow: calc(var(--chart-focus, 0) * 0.004);
+}
+
+.star-chart-sweep {
+  position: absolute;
+  right: 23%;
+  bottom: 26%;
+  width: 42%;
+  height: 40%;
+  border-radius: 50%;
+  border: 1px solid rgba(111, 222, 232, 0.28);
+  background:
+    conic-gradient(from 220deg, rgba(97, 216, 223, 0.0), rgba(97, 216, 223, 0.2), rgba(245, 204, 109, 0.14), rgba(97, 216, 223, 0.0)),
+    rgba(10, 18, 35, 0.18);
+  opacity: 0.86;
+  transform: rotate(-8deg);
+  box-shadow:
+    0 0 calc(11px + var(--chart-glow) * 18px) rgba(97, 216, 223, 0.24),
+    inset 0 0 18px rgba(4, 9, 22, 0.28);
+}
+
+.star-chart-sweep i,
+.star-chart-sweep b {
+  position: absolute;
+  inset: 22% 12%;
+  border-top: 1px solid rgba(255, 241, 184, 0.6);
+  transform-origin: center;
+}
+
+.star-chart-sweep b {
+  transform: rotate(62deg);
+  border-color: rgba(111, 222, 232, 0.52);
+}
+
+.star-chart-layer[data-pulse="pulse"] .star-chart-sweep {
+  animation: star-chart-sweep 1.3s ease-out infinite;
+}
+
+.star-chart-constellation {
+  position: absolute;
+  inset: 9% 18% 32% 17%;
+}
+
+.star-chart-constellation b {
+  position: absolute;
+  left: var(--star-left, 50%);
+  top: var(--star-top, 50%);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(159, 232, 239, 0.34);
+  box-shadow: 0 0 7px rgba(159, 232, 239, 0.3);
+}
+
+.star-chart-constellation b i {
+  position: absolute;
+  inset: 3px;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.86);
+  opacity: 0.5;
+}
+
+.star-chart-constellation b.lit {
+  background: #f5cc6d;
+  box-shadow: 0 0 12px rgba(245, 204, 109, 0.62);
+}
+
+.star-chart-constellation b.current {
+  animation: star-chart-star 1.05s ease-in-out infinite;
+}
+
+.star-chart-phase-stack {
+  position: absolute;
+  right: 10%;
+  bottom: 16%;
+  display: grid;
+  gap: 4px;
+  width: 13px;
+}
+
+.star-chart-phase-stack i {
+  width: 13px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.star-chart-phase-stack i.lit {
+  background: rgba(97, 216, 223, 0.72);
+  box-shadow: 0 0 8px rgba(97, 216, 223, 0.4);
+}
+
+.star-chart-phase-stack i.current {
+  background: #f5cc6d;
+}
+
+.star-chart-comet {
+  position: absolute;
+  left: 12%;
+  top: 18%;
+  width: 38%;
+  height: 24%;
+  border-top: 2px solid rgba(245, 204, 109, 0.44);
+  border-radius: 50%;
+  transform: rotate(-11deg);
+  opacity: 0.72;
+}
+
+.star-chart-comet i {
+  position: absolute;
+  right: -3px;
+  top: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff7c8;
+  box-shadow: 0 0 14px rgba(255, 247, 200, 0.74);
+}
+
+.floor.star-chart-active[data-type="observatory"] .room {
+  box-shadow:
+    0 0 0 1px rgba(111, 222, 232, 0.32),
+    0 20px 34px rgba(21, 45, 70, 0.26),
+    inset 0 0 28px rgba(97, 216, 223, 0.16);
+}
+
+.floor.star-chart-active[data-type="observatory"][data-star-chart-focus="clear"] .room {
+  filter: saturate(1.08) brightness(1.04);
+}
+
+.floor.star-chart-active[data-type="observatory"] .life-stage::before {
+  content: "";
+  position: absolute;
+  inset: 12% 14% 24%;
+  border-radius: 50%;
+  border: 1px solid rgba(245, 204, 109, 0.22);
+  opacity: 0.72;
+  animation: star-chart-floor-glow 2s ease-in-out infinite;
+}
+
+.status-glyph[data-state="star-chart"],
+.room-state-tag[data-state="star-chart"] {
+  border-color: rgba(111, 222, 232, 0.42);
+  background: rgba(12, 35, 56, 0.78);
+  color: #f8edc1;
+}
+
+.status-glyph[data-state="star-chart"]::before,
+.room-state-tag[data-state="star-chart"]::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f5cc6d;
+  box-shadow:
+    9px -3px 0 -2px #9fe8ef,
+    -7px 5px 0 -2px #ffffff,
+    0 0 10px rgba(245, 204, 109, 0.7);
+  animation: star-chart-glyph 1.18s ease-in-out infinite;
+}
+
+.star-chart-inline-meter span {
+  background: linear-gradient(90deg, #61d8df, #f5cc6d, #ffffff);
+}
+
+@keyframes star-chart-sweep {
+  0%,
+  100% {
+    transform: rotate(-10deg) scale(1);
+    opacity: 0.72;
+  }
+  50% {
+    transform: rotate(5deg) scale(1.03);
+    opacity: 1;
+  }
+}
+
+@keyframes star-chart-star {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.34);
+  }
+}
+
+@keyframes star-chart-floor-glow {
+  0%,
+  100% {
+    transform: scale(0.96);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 0.74;
+  }
+}
+
+@keyframes star-chart-glyph {
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(24deg) scale(1.12);
+  }
+}
+
+@media (max-width: 620px) {
+  .star-chart-panel {
+    padding: 8px;
+  }
+
+  .star-chart-phase-row {
+    gap: 4px;
+  }
+
+  .star-chart-phase-row i span {
+    font-size: 8px;
+  }
+
+  .star-chart-layer {
+    inset: 8% 8% 15%;
+  }
+
+  .star-chart-readout {
+    gap: 5px;
+  }
+}

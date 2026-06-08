@@ -1,0 +1,5 @@
+Model: gpt-image-2
+Asset: assets/art/room-observatory-v2.webp
+
+Prompt:
+Create a polished 2.5D isometric fantasy game room background for a cozy vertical kingdom management game. Subject: a sky-rooftop observatory room, readable at small mobile size. Architecture: warm wooden platform, brass telescope aimed through an open moonlit window, circular star-chart table in the center, shelves with scrolls and glass lenses, hanging constellation mobiles, blue night sky and soft clouds outside. Style: painterly mobile game art, crisp silhouettes, high-quality texture, luminous stars, teal and amber accents, whimsical but not childish. Composition: 1536x1024 landscape room background, centered interior, no characters, no text, no UI, no logos, leave clear floor space for tiny NPC sprites near the bottom center and left, strong depth and clean readable shapes, not dark, not blurry, no photorealism.
