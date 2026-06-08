@@ -3400,10 +3400,11 @@ function personMotionStyle(person) {
   const motion = person?.motion || {};
   const x = clamp(Number(motion.x) || 50, 8, 88);
   const y = clamp(Number(motion.y) || 0, 0, 24);
+  const lift = Math.round(clamp(y * 0.34, 0, 8.2) * 10) / 10;
   const scale = clamp(Number(motion.scale) || 1, 0.86, 1.16);
   const facing = motion.facing === "left" ? -1 : 1;
   const depth = Math.round(20 + y * 2);
-  return `--person-x:${x}%;--person-y:${y}px;--person-scale:${scale};--person-facing:${facing};--person-depth:${depth};`;
+  return `--person-x:${x}%;--person-y:${y}px;--person-lift:${lift}px;--person-scale:${scale};--person-facing:${facing};--person-depth:${depth};`;
 }
 
 function socialPairStyle(left, right) {
@@ -3411,9 +3412,10 @@ function socialPairStyle(left, right) {
   const rightMotion = right?.motion || {};
   const x = ((Number(leftMotion.x) || 45) + (Number(rightMotion.x) || 55)) / 2;
   const y = Math.max(Number(leftMotion.y) || 0, Number(rightMotion.y) || 0);
+  const lift = Math.round(clamp(y * 0.34, 0, 8.2) * 10) / 10;
   const scale = ((Number(leftMotion.scale) || 1) + (Number(rightMotion.scale) || 1)) / 2;
   const depth = Math.round(26 + y * 2);
-  return `--pair-x:${clamp(x, 12, 84)}%;--pair-y:${clamp(y, 0, 24)}px;--pair-scale:${clamp(scale, 0.9, 1.14)};--person-depth:${depth};`;
+  return `--pair-x:${clamp(x, 12, 84)}%;--pair-y:${clamp(y, 0, 24)}px;--pair-lift:${lift}px;--pair-scale:${clamp(scale, 0.9, 1.14)};--person-depth:${depth};`;
 }
 
 function enqueueFloorArrival(passenger, floor, correct = true) {
@@ -7418,7 +7420,7 @@ function boardVisitor(visitorId, options = {}) {
   state.elevator.doorTimer = 0;
   state.selectedFloorId = floor.id;
   toggleElevatorPanel(true);
-  showToast(`${options.routeDispatch ? "灯号已派发" : "访客已进入电梯"}，前往 ${formatFloorLabel(floor.id)} 层`);
+  showToast(`${options.routeDispatch ? "灯号已派发" : "访客已进入电梯"}，前往 ${formatFloorLabel(floor.id)} 层`, { duration: 2400 });
   render(true);
   return true;
 }
@@ -10291,11 +10293,19 @@ function escapeAttr(value) {
   return escapeHtml(value).replace(/`/g, "&#96;");
 }
 
-function showToast(message) {
+function showToast(message, options = {}) {
+  const duration = clamp(Number(options.duration) || 2200, 900, 2600);
   clearTimeout(toastTimer);
   els.toast.textContent = message;
+  els.toast.removeAttribute("aria-hidden");
   els.toast.classList.add("show");
-  toastTimer = setTimeout(() => els.toast.classList.remove("show"), 1800);
+  toastTimer = setTimeout(() => {
+    els.toast.classList.remove("show");
+    els.toast.setAttribute("aria-hidden", "true");
+    window.setTimeout(() => {
+      if (!els.toast.classList.contains("show")) els.toast.textContent = "";
+    }, 240);
+  }, duration);
 }
 
 function showFloat(message) {

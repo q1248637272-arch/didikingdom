@@ -6660,3 +6660,40 @@ body.fullscreen-active .build-grid {
     bottom: 25px;
   }
 }
+
+/* v75 transient feedback and grounded room people. */
+.toast {
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 0.22s ease,
+    opacity 0.18s ease;
+}
+
+.toast.show {
+  opacity: 1;
+}
+
+.floor[data-type="dwelling"] .room-scene {
+  position: absolute;
+}
+
+.life-stage > .resident-dot,
+.life-stage > .worker-dot {
+  bottom: calc(var(--person-lift, 0px) + 14px);
+}
+
+.life-stage > .social-pair {
+  bottom: calc(var(--pair-lift, 0px) + 14px);
+}
+
+@media (max-width: 620px) {
+  .life-stage > .resident-dot,
+  .life-stage > .worker-dot {
+    bottom: calc(var(--person-lift, 0px) + 12px);
+  }
+
+  .life-stage > .social-pair {
+    bottom: calc(var(--pair-lift, 0px) + 12px);
+  }
+}

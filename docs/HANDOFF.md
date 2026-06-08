@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v74`
-- Latest preview deployment: `https://584e0548.little-depths.pages.dev/`
-- Local server used for v74 verification: `http://127.0.0.1:8825/`
+- Latest deployed version: `v75`
+- Latest preview deployment: `https://4c7e0d05.little-depths.pages.dev/`
+- Local server used for v75 verification: `http://127.0.0.1:8826/`
 
 ## Current State
 
@@ -22,11 +22,20 @@ wrangler pages deploy dist --project-name little-depths
 ```
 
 - GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`, but current release practice is to deploy Cloudflare with local Wrangler OAuth from `dist`, then sync GitHub separately. Use `[skip ci]` when pushing documentation/code sync commits that should not ask GitHub Actions to deploy Cloudflare.
-- Current caveat: v73 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
+- Current caveat: v75 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v75 Transient Toasts / Grounded Dwelling People
+
+- Fixed non-confirmation toast feedback such as `访客已进入电梯` and `灯号已派发` so it fades out within three seconds, becomes `aria-hidden`, clears its text, and never intercepts pointer input.
+- Clamped `showToast()` durations to `900..2600ms`; lobby boarding and route dispatch use `2400ms` explicitly.
+- Reworked room-person vertical placement so motion `y` still affects depth but only applies a small capped visual lift via `--person-lift` / `--pair-lift`.
+- Restored dwelling `.room-scene` to absolute map positioning after the v74 life-review overlay made it relative, which was causing residents/social pairs to appear suspended near the windows.
+- Added `tmp/verify-v75-toast-grounding.mjs`, verified mobile toast lifecycle, no pointer blocking, no horizontal overflow, and grounded dwelling social/solo sprites. Screenshots: `verification-v75-toast-grounding-toast-local.png`, `verification-v75-toast-grounding-mobile-local.png`, and `verification-v75-toast-grounding-room-local.png`.
+- Bumped `index.html` / `sw.js` to v75, synced `dist`, and deployed v75 to Cloudflare Pages with local Wrangler direct upload. Production: `https://little-depths.pages.dev/`; preview: `https://4c7e0d05.little-depths.pages.dev/`.
 
 ### v74 Dwelling Life Reviews / Old Room Polish
 
