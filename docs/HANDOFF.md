@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v75`
-- Latest preview deployment: `https://4c7e0d05.little-depths.pages.dev/`
-- Local server used for v75 verification: `http://127.0.0.1:8826/`
+- Latest deployed version: `v76`
+- Latest preview deployment: `https://ccbda666.little-depths.pages.dev/`
+- Local server used for v76 verification: `http://127.0.0.1:8827/`
 
 ## Current State
 
@@ -22,11 +22,18 @@ wrangler pages deploy dist --project-name little-depths
 ```
 
 - GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`, but current release practice is to deploy Cloudflare with local Wrangler OAuth from `dist`, then sync GitHub separately. Use `[skip ci]` when pushing documentation/code sync commits that should not ask GitHub Actions to deploy Cloudflare.
-- Current caveat: v75 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
+- Current caveat: v76 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v76 Dwelling Footing Follow-Up
+
+- Corrected the v75 dwelling sprite baseline so residents/social pairs no longer sink into the bottom foreground or appear as heads on the floor.
+- Added dwelling-only footing offsets in `overrides.css`: other room types keep the v75 anti-floating grounding, while dwelling sprites align to the visible bed-front floor line.
+- Bumped `index.html` / `sw.js` to v76 and verified with `tmp/verify-v76-dwelling-footing.mjs`. The browser QA measured dwelling sprite bottom gaps at `46..49px` and confirmed toast behavior still passes. Screenshot: `verification-v76-dwelling-footing-room-local.png`.
+- Synced `dist` and deployed v76 to Cloudflare Pages with local Wrangler direct upload. Production: `https://little-depths.pages.dev/`; preview: `https://ccbda666.little-depths.pages.dev/`.
 
 ### v75 Transient Toasts / Grounded Dwelling People
 
