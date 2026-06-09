@@ -908,6 +908,14 @@ const QUEST_DEFS = [
     text: "用书库整理 3 次典藏",
   },
   {
+    id: "collection_exhibit",
+    title: "典藏陈列",
+    goal: 3,
+    metric: "collectionExhibitsDone",
+    reward: { coins: 720, gems: 3 },
+    text: "手动陈列 3 件已完成的珍藏",
+  },
+  {
     id: "garden_party",
     title: "云端花宴",
     goal: 1,
@@ -1095,6 +1103,19 @@ const COLLECTION_DEFS = [
   { id: "compass", name: "星港罗盘", desc: "探险和订单航线更顺", source: "星港航线" },
   { id: "program", name: "星愿节目单", desc: "庆典声望让连送更稳", source: "演艺 / 庆典" },
 ];
+
+const COLLECTION_EXHIBIT_LIMIT = 3;
+const COLLECTION_EXHIBIT_BASE_DURATION = 96;
+const COLLECTION_EXHIBIT_PROFILES = {
+  crown: { label: "王室声望", tone: "royal", order: 0.044, map: 0.006, library: 0.012, visitor: 0.006 },
+  key: { label: "深井通路", tone: "royal", order: 0.052, map: 0.008, library: 0.014, visitor: 0.004 },
+  seed: { label: "萤火温室", tone: "garden", order: 0.012, map: 0.018, library: 0.014, visitor: 0.014 },
+  map: { label: "旧图索引", tone: "route", order: 0.018, map: 0.045, library: 0.018, visitor: 0.004 },
+  bell: { label: "铜铃导览", tone: "lobby", order: 0.014, map: 0.012, library: 0.01, visitor: 0.02 },
+  mask: { label: "迷宫回声", tone: "depth", order: 0.022, map: 0.036, library: 0.018, visitor: 0.006 },
+  compass: { label: "星港航线", tone: "route", order: 0.036, map: 0.032, library: 0.014, visitor: 0.01 },
+  program: { label: "星愿展演", tone: "festival", order: 0.026, map: 0.014, library: 0.012, visitor: 0.016 },
+};
 const MOBILE_PANEL_QUERY = "(max-width: 980px)";
 const MOBILE_PANEL_DEFAULT = "detail";
 
@@ -1147,7 +1168,7 @@ let guideReady = false;
 
 function makeNewGame() {
   const game = {
-    version: 28,
+    version: 29,
     coins: 560,
     gems: 7,
     happiness: 72,
@@ -1209,6 +1230,7 @@ function makeNewGame() {
       lifeStoriesDone: 0,
       lifeStoryReviewsDone: 0,
       libraryStudiesDone: 0,
+      collectionExhibitsDone: 0,
       comfortSessionsDone: 0,
       comfortEchoesDone: 0,
       comfortFocusesDone: 0,
@@ -1234,6 +1256,7 @@ function makeNewGame() {
     quests: QUEST_DEFS.map((quest) => ({ id: quest.id, claimed: false, ready: false })),
     orders: [],
     collection: makeEmptyCollection(),
+    collectionExhibits: [],
     expeditions: [],
     expeditionReports: [],
     lifeStories: [],
@@ -1681,6 +1704,7 @@ function migrateGame(game) {
     lifeStoriesDone: 0,
     lifeStoryReviewsDone: 0,
     libraryStudiesDone: 0,
+    collectionExhibitsDone: 0,
     comfortSessionsDone: 0,
     comfortEchoesDone: 0,
     comfortFocusesDone: 0,
@@ -1703,7 +1727,7 @@ function migrateGame(game) {
     aquariumFloorsBuilt: 0,
     festivalFloorsBuilt: 0,
   };
-  game.version = Math.max(Number(game.version) || 0, 28);
+  game.version = Math.max(Number(game.version) || 0, 29);
   game.nextExpeditionId ||= 1;
   game.nextExpeditionReportId ||= 1;
   game.nextLifeStoryId ||= 1;
@@ -1762,6 +1786,7 @@ function migrateGame(game) {
   COLLECTION_DEFS.forEach((item) => {
     game.collection[item.id] ||= 0;
   });
+  game.collectionExhibits = normalizeCollectionExhibits(game);
   QUEST_DEFS.forEach((quest) => {
     if (!game.quests.some((entry) => entry.id === quest.id)) {
       game.quests.push({ id: quest.id, claimed: false, ready: false });
@@ -2014,6 +2039,7 @@ function migrateGame(game) {
 
 function applyOfflineProgress(game) {
   const elapsed = Math.min(21600, Math.max(0, (Date.now() - game.lastSavedAt) / 1000));
+  normalizeCollectionExhibits(game, { elapsed });
   advanceOfflineExpeditions(game, elapsed);
   if (elapsed < 45) return;
   let income = 0;
@@ -2100,6 +2126,7 @@ function resetGame() {
 
 function update(dt) {
   updateElevator(dt);
+  updateCollectionExhibits(dt);
   updateLifeVisits(dt);
   updateLifeStories(dt);
   updateExpeditionReports(dt);
@@ -3563,7 +3590,8 @@ function getNextVisitorDelay(queueCount) {
     clinicCareBonus(state) * 0.9 +
     aquariumWonderBonus(state) * 1.4 +
     skyportFlowBonus(state) * 1.85 +
-    festivalBuzzBonus(state) * 1.55;
+    festivalBuzzBonus(state) * 1.55 +
+    collectionExhibitBonus(state).visitor * 2.2;
   const queueRelief = 1 - Math.min(0.32, serviceCareBonus(state) * 0.9 + foodWarmthBonus(state) * 0.45);
   const crowdPause = queueCount * (2.8 + Math.random() * 1.8) * queueRelief;
   const quietBeat = Math.random() < 0.18 + queueCount * 0.08 ? 4.5 + Math.random() * 6 : 0;
@@ -3585,7 +3613,8 @@ function shouldVisitorArrive(queueCount) {
       bathhouseRestBonus(state) * 0.14 +
       aquariumWonderBonus(state) * 0.16 +
       skyportFlowBonus(state) * 0.16 +
-      festivalBuzzBonus(state) * 0.18,
+      festivalBuzzBonus(state) * 0.18 +
+      collectionExhibitBonus(state).visitor * 0.16,
     0.42,
     0.92
   );
@@ -4513,6 +4542,174 @@ function collectionProgress(game = state) {
   const max = COLLECTION_DEFS.length * 3;
   const next = nextCollectionItem(game);
   return { total, completed, max, next };
+}
+
+function collectionItemById(itemId) {
+  return COLLECTION_DEFS.find((item) => item.id === itemId) || null;
+}
+
+function collectionExhibitProfile(itemId) {
+  return COLLECTION_EXHIBIT_PROFILES[itemId] || { label: "典藏陈列", tone: "library", order: 0.018, map: 0.014, library: 0.012, visitor: 0.006 };
+}
+
+function collectionItemCompleted(itemId, game = state) {
+  return (game.collection?.[itemId] || 0) >= 3;
+}
+
+function completedCollectionItems(game = state) {
+  return COLLECTION_DEFS.filter((item) => collectionItemCompleted(item.id, game));
+}
+
+function normalizeCollectionExhibit(entry, game = state) {
+  if (!entry || typeof entry !== "object") return null;
+  const item = collectionItemById(entry.itemId);
+  if (!item || !collectionItemCompleted(item.id, game)) return null;
+  const remaining = Math.max(0, Number(entry.remaining) || 0);
+  if (remaining <= 0) return null;
+  const total = Math.max(1, Number(entry.total) || remaining || COLLECTION_EXHIBIT_BASE_DURATION);
+  return {
+    id: typeof entry.id === "string" && entry.id ? entry.id.slice(0, 42) : `exhibit-${item.id}-${Date.now()}`,
+    itemId: item.id,
+    floorId: Number.isFinite(Number(entry.floorId)) ? Number(entry.floorId) : null,
+    floorName: typeof entry.floorName === "string" ? entry.floorName.slice(0, 48) : "",
+    remaining: Math.min(360, remaining),
+    total: Math.min(360, total),
+    startedAt: Number(entry.startedAt) || Date.now(),
+  };
+}
+
+function normalizeCollectionExhibits(game = state, options = {}) {
+  const elapsed = Math.max(0, Number(options.elapsed) || 0);
+  const seen = new Set();
+  const source = Array.isArray(game.collectionExhibits) ? game.collectionExhibits : [];
+  const exhibits = [];
+  source.forEach((entry) => {
+    const shifted = elapsed ? { ...entry, remaining: Math.max(0, Number(entry.remaining || 0) - elapsed) } : entry;
+    const exhibit = normalizeCollectionExhibit(shifted, game);
+    if (!exhibit || seen.has(exhibit.itemId)) return;
+    seen.add(exhibit.itemId);
+    exhibits.push(exhibit);
+  });
+  game.collectionExhibits = exhibits
+    .sort((a, b) => (b.remaining || 0) - (a.remaining || 0))
+    .slice(0, COLLECTION_EXHIBIT_LIMIT);
+  return game.collectionExhibits;
+}
+
+function activeCollectionExhibits(game = state) {
+  return normalizeCollectionExhibits(game);
+}
+
+function activeCollectionExhibit(itemId, game = state) {
+  return activeCollectionExhibits(game).find((entry) => entry.itemId === itemId) || null;
+}
+
+function activeCollectionExhibitsForFloor(floor, game = state) {
+  if (!floor || floor.type !== "library") return [];
+  return activeCollectionExhibits(game).filter((entry) => Number(entry.floorId) === Number(floor.id));
+}
+
+function collectionExhibitBonus(game = state) {
+  const bonus = { order: 0, map: 0, library: 0, visitor: 0, count: 0, labels: [] };
+  activeCollectionExhibits(game).forEach((entry) => {
+    const item = collectionItemById(entry.itemId);
+    const profile = collectionExhibitProfile(entry.itemId);
+    bonus.order += profile.order || 0;
+    bonus.map += profile.map || 0;
+    bonus.library += profile.library || 0;
+    bonus.visitor += profile.visitor || 0;
+    bonus.count += 1;
+    bonus.labels.push(profile.label || item?.name || "典藏");
+  });
+  bonus.order = Math.min(0.14, bonus.order);
+  bonus.map = Math.min(0.12, bonus.map);
+  bonus.library = Math.min(0.09, bonus.library);
+  bonus.visitor = Math.min(0.06, bonus.visitor);
+  return bonus;
+}
+
+function collectionExhibitBonusLabel(game = state) {
+  const bonus = collectionExhibitBonus(game);
+  if (!bonus.count) return "暂无陈列";
+  const parts = [
+    bonus.order ? `订单 +${Math.round(bonus.order * 100)}%` : "",
+    bonus.map ? `探险 +${Math.round(bonus.map * 100)}%` : "",
+    bonus.library ? `书库 +${Math.round(bonus.library * 100)}%` : "",
+  ].filter(Boolean);
+  return parts.join(" / ") || `${bonus.count} 件陈列`;
+}
+
+function collectionExhibitDuration(floor) {
+  const skill = averageSkill(floor.workers || [], "library");
+  return Math.round(COLLECTION_EXHIBIT_BASE_DURATION + skill * 4.5 + (floor.level || 1) * 7 + libraryResearchBonus(state) * 60);
+}
+
+function availableCollectionExhibitLibrary(game = state, preferredFloorId = null) {
+  const floors = businessFloors(game).filter((floor) => floor.type === "library");
+  const preferred = preferredFloorId !== null ? floors.find((floor) => Number(floor.id) === Number(preferredFloorId)) : null;
+  const ready = floors
+    .filter((floor) => (floor.workers || []).length > 0 && (floor.stock || 0) > 0)
+    .sort((a, b) => (b.stock || 0) - (a.stock || 0) || (b.level || 1) - (a.level || 1));
+  if (preferred && (preferred.workers || []).length > 0 && (preferred.stock || 0) > 0) return preferred;
+  return ready[0] || null;
+}
+
+function collectionExhibitActionBlockReason(itemId, game = state) {
+  const item = collectionItemById(itemId);
+  if (!item) return "未知珍藏";
+  if (!collectionItemCompleted(item.id, game)) return "珍藏尚未完成";
+  if (activeCollectionExhibit(item.id, game)) return "正在陈列";
+  if (activeCollectionExhibits(game).length >= COLLECTION_EXHIBIT_LIMIT) return "陈列位已满";
+  const libraries = businessFloors(game).filter((floor) => floor.type === "library");
+  if (!libraries.length) return "需要书库";
+  if (!libraries.some((floor) => (floor.workers || []).length > 0)) return "书库需要馆员";
+  if (!libraries.some((floor) => (floor.stock || 0) > 0)) return "书库卷宗不足";
+  return "";
+}
+
+function startCollectionExhibit(itemId, options = {}) {
+  const item = collectionItemById(itemId);
+  if (!item) return;
+  const reason = collectionExhibitActionBlockReason(item.id);
+  if (reason) {
+    showToast(reason);
+    return;
+  }
+  const floor = availableCollectionExhibitLibrary(state, options.floorId);
+  if (!floor) {
+    showToast("暂无可用书库");
+    return;
+  }
+  const duration = collectionExhibitDuration(floor);
+  floor.stock = Math.max(0, (floor.stock || 0) - 1);
+  state.collectionExhibits = activeCollectionExhibits(state);
+  state.collectionExhibits.push({
+    id: `exhibit-${state.nextLogId++}`,
+    itemId: item.id,
+    floorId: floor.id,
+    floorName: floor.name,
+    remaining: duration,
+    total: duration,
+    startedAt: Date.now(),
+  });
+  state.stats.collectionExhibitsDone = (state.stats.collectionExhibitsDone || 0) + 1;
+  checkQuests();
+  const profile = collectionExhibitProfile(item.id);
+  addLog(`${floor.name} 陈列「${item.name}」，${profile.label}亮起，订单、探险和书库短时增强。`);
+  showToast(`已陈列：${item.name}`);
+  lastKingdomKey = "";
+  render(true);
+  saveGame(false);
+}
+
+function updateCollectionExhibits(dt) {
+  if (!Array.isArray(state.collectionExhibits) || !state.collectionExhibits.length) return;
+  const before = state.collectionExhibits.length;
+  state.collectionExhibits = state.collectionExhibits
+    .map((entry) => normalizeCollectionExhibit({ ...entry, remaining: Math.max(0, Number(entry.remaining || 0) - dt) }, state))
+    .filter(Boolean)
+    .slice(0, COLLECTION_EXHIBIT_LIMIT);
+  if (state.collectionExhibits.length !== before) lastKingdomKey = "";
 }
 
 function nextCollectionItem(game = state) {
@@ -6896,14 +7093,21 @@ function comfortSessionMapKey(floor) {
   return `comfort:${Math.ceil(floor.comfortCooldown || 0)}:${Math.ceil(floor.comfortSession?.remaining || 0)}:${participants.join("-")}:echo:${Math.ceil(glow?.remaining || 0)}:${glow?.participantIds?.join("-") || ""}:${glow?.rentBonus || 0}:${Math.round((glow?.expeditionBonus || 0) * 100)}:${glow?.focus || ""}:${Math.round((glow?.focusPulse || 0) * 10)}`;
 }
 
+function collectionExhibitMapKey(floor) {
+  if (floor?.type !== "library") return "";
+  return activeCollectionExhibitsForFloor(floor)
+    .map((entry) => `${entry.itemId}:${Math.ceil((entry.remaining || 0) / 5)}:${collectionExhibitProfile(entry.itemId).tone}`)
+    .join("-");
+}
+
 function collectionOrderBonus(game) {
   const map = game.collection || {};
   const total = COLLECTION_DEFS.reduce((sum, item) => sum + (map[item.id] || 0), 0);
-  return 1 + Math.min(0.58, total * 0.03 + libraryResearchBonus(game) * 0.36 + libraryStudyBonus(game) * 0.72 + treasureVaultBonus(game) * 0.34 + alchemyPotionBonus(game) * 0.16);
+  return 1 + Math.min(0.58, total * 0.03 + libraryResearchBonus(game) * 0.36 + libraryStudyBonus(game) * 0.72 + collectionExhibitBonus(game).order + treasureVaultBonus(game) * 0.34 + alchemyPotionBonus(game) * 0.16);
 }
 
 function collectionMapBonus() {
-  return Math.min(0.28, ((state.collection.map || 0) + (state.collection.key || 0) + (state.collection.compass || 0)) * 0.02 + libraryResearchBonus(state) * 0.5 + libraryStudyBonus(state) * 0.45 + observatoryStarBonus(state) * 0.45);
+  return Math.min(0.28, ((state.collection.map || 0) + (state.collection.key || 0) + (state.collection.compass || 0)) * 0.02 + libraryResearchBonus(state) * 0.5 + libraryStudyBonus(state) * 0.45 + collectionExhibitBonus(state).map + observatoryStarBonus(state) * 0.45);
 }
 
 function floorTypeInfluence(game, type) {
@@ -6963,7 +7167,7 @@ function craftToolBonus(game = state) {
 }
 
 function libraryResearchBonus(game = state) {
-  return Math.min(0.28, floorTypeInfluence(game, "library") * 0.05 + libraryStudyBonus(game) * 0.65);
+  return Math.min(0.28, floorTypeInfluence(game, "library") * 0.05 + libraryStudyBonus(game) * 0.65 + collectionExhibitBonus(game).library);
 }
 
 function kingdomMandateBonus(game = state) {
@@ -8245,7 +8449,7 @@ function getKingdomRenderKey() {
       if (floor.type === "lobby") {
         return `${floor.id}:lobby:${state.queue.map((visitor) => `${visitor.id}:${visitor.need || ""}:${visitor.activity || ""}:${Math.floor(lobbyWaitSeconds(visitor) / 5)}:${visitor.targetFloorId || ""}`).join("-")}:${lobbyPressureInfo(state).tone}:${objectiveKey}:${state.selectedFloorId}`;
       }
-      return `${floor.id}:${floor.type}:${floor.level}:${floor.stock}:${floor.stockMax}:${floor.workers.length}:${Boolean(floor.production)}:${foodRushMapKey(floor)}:${serviceCareMapKey(floor)}:${starChartMapKey(floor)}:${toolTuneMapKey(floor)}:${marketParcelMapKey(floor)}:${royalMandateMapKey(floor)}:${comfortSessionMapKey(floor)}:${showtimeMapKey(floor)}:${lifeTrailMapKey(floor)}:${floorPeopleMotionKey(floor)}:${objectiveKey}:${state.selectedFloorId}`;
+      return `${floor.id}:${floor.type}:${floor.level}:${floor.stock}:${floor.stockMax}:${floor.workers.length}:${Boolean(floor.production)}:${foodRushMapKey(floor)}:${serviceCareMapKey(floor)}:${starChartMapKey(floor)}:${toolTuneMapKey(floor)}:${marketParcelMapKey(floor)}:${royalMandateMapKey(floor)}:${comfortSessionMapKey(floor)}:${collectionExhibitMapKey(floor)}:${showtimeMapKey(floor)}:${lifeTrailMapKey(floor)}:${floorPeopleMotionKey(floor)}:${objectiveKey}:${state.selectedFloorId}`;
     })
     .join("|");
   const arrivalKey = (state.arrivals || []).map((arrival) => `${arrival.id}:${arrival.floorId}`).join("-");
@@ -8343,13 +8547,18 @@ function renderFloor(floor) {
   const comfortEchoAttrs = isActiveComfortAfterglow(floor)
     ? ` data-comfort-echo="${escapeAttr(floor.comfortAfterglow.type)}" data-comfort-echo-focus="${escapeAttr(comfortFocusTone(floor.comfortAfterglow))}" data-comfort-echo-power="${escapeAttr(Math.round((floor.comfortAfterglow.expeditionBonus || 0) * 100))}"`
     : "";
+  const collectionExhibitItems = activeCollectionExhibitsForFloor(floor);
+  const collectionExhibitClass = collectionExhibitItems.length ? "collection-exhibit-active" : "";
+  const collectionExhibitAttrs = collectionExhibitItems.length
+    ? ` data-collection-exhibits="${collectionExhibitItems.length}" data-collection-exhibit-tone="${escapeAttr(collectionExhibitProfile(collectionExhibitItems[0].itemId).tone)}"`
+    : "";
   const showtimeClass = isActiveShowtime(floor) ? "showtime-active" : "";
   const showtimeAttrs = isActiveShowtime(floor)
     ? ` data-showtime-beat="${escapeAttr(currentShowtimeBeat(floor).id)}" data-showtime-heat="${escapeAttr(showtimeHeatTone(floor))}"`
     : "";
   const zone = getFloorZone(floor);
   return `
-    <article class="floor ${selected} ${constructing} ${objectiveClass} ${routeClass} ${lifeTrailClass} ${lifeStoryReviewClass} ${expeditionWaymarkClass} ${foodRushClass} ${serviceCareClass} ${starChartClass} ${toolTuneClass} ${marketParcelClass} ${royalMandateClass} ${royalCourierClass} ${comfortClass} ${comfortEchoClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${objectiveAttrs}${lifeTrailAttrs}${lifeStoryReviewAttrs}${expeditionWaymarkAttrs}${foodRushAttrs}${serviceCareAttrs}${starChartAttrs}${toolTuneAttrs}${marketParcelAttrs}${royalMandateAttrs}${royalCourierAttrs}${comfortEchoAttrs}${showtimeAttrs}>
+    <article class="floor ${selected} ${constructing} ${objectiveClass} ${routeClass} ${lifeTrailClass} ${lifeStoryReviewClass} ${expeditionWaymarkClass} ${foodRushClass} ${serviceCareClass} ${starChartClass} ${toolTuneClass} ${marketParcelClass} ${royalMandateClass} ${royalCourierClass} ${comfortClass} ${comfortEchoClass} ${collectionExhibitClass} ${showtimeClass}" data-floor-id="${floor.id}" data-type="${floor.type}" data-zone="${zone}" data-direction="${floor.direction || floorDirectionFromId(floor.id)}" data-level="${floor.level || 1}"${objectiveAttrs}${lifeTrailAttrs}${lifeStoryReviewAttrs}${expeditionWaymarkAttrs}${foodRushAttrs}${serviceCareAttrs}${starChartAttrs}${toolTuneAttrs}${marketParcelAttrs}${royalMandateAttrs}${royalCourierAttrs}${comfortEchoAttrs}${collectionExhibitAttrs}${showtimeAttrs}>
       ${renderFloorIndex(floor)}
       <div class="room" data-action="select-floor" data-floor-id="${floor.id}" title="${escapeAttr(floorMapLabel(floor))}" aria-label="${escapeAttr(floorMapLabel(floor))}">
         ${floor.status === "construction" ? renderConstruction(floor) : renderOpenFloor(floor)}
@@ -8389,6 +8598,7 @@ function makeFloorObjective(floor, options = {}) {
     actionLabel: options.actionLabel || "",
     disabled: Boolean(options.disabled),
     storyId: options.storyId || "",
+    itemId: options.itemId || "",
     direction: options.direction || "",
   };
 }
@@ -8587,6 +8797,26 @@ function readyFloorEventObjective(floor) {
     });
   }
   if (floor.type === "library") {
+    const exhibitCandidate = completedCollectionItems(state).find((item) => !activeCollectionExhibit(item.id));
+    if (
+      exhibitCandidate &&
+      activeCollectionExhibits(state).length < COLLECTION_EXHIBIT_LIMIT &&
+      floor.workers?.length &&
+      (floor.stock || 0) > 0
+    ) {
+      const profile = collectionExhibitProfile(exhibitCandidate.id);
+      return makeFloorObjective(floor, {
+        tone: "ready",
+        title: "书库目标",
+        label: `陈列珍藏：${exhibitCandidate.name}`,
+        detail: `${profile.label}会短时增强订单、探险和书库研究，让完成后的图鉴继续参与旧玩法。`,
+        mapLabel: "陈列",
+        progress: activeCollectionExhibits(state).length / COLLECTION_EXHIBIT_LIMIT,
+        action: "collection-exhibit",
+        actionLabel: "陈列",
+        itemId: exhibitCandidate.id,
+      });
+    }
     let reason = "";
     if (!floor.workers?.length) reason = "书库需要馆员整理典藏";
     else if ((floor.stock || 0) <= 0) reason = "书库卷宗不足，先补货";
@@ -8816,6 +9046,7 @@ function floorObjectiveMapKey(floor) {
     objective.tone,
     objective.mapLabel,
     objective.action,
+    objective.itemId,
     objective.disabled ? 1 : 0,
     Math.round(objective.progress * 100),
   ].join(":");
@@ -8837,7 +9068,7 @@ function renderFloorObjectivePanel(floor) {
   if (!objective) return "";
   const disabled = objective.disabled ? "disabled" : "";
   const actionButton = objective.action
-    ? `<button class="floor-objective-action detail-btn primary" type="button" data-action="${escapeAttr(objective.action)}" data-floor-id="${escapeAttr(objective.floorId)}"${objective.storyId ? ` data-story-id="${escapeAttr(objective.storyId)}"` : ""}${objective.direction ? ` data-direction="${escapeAttr(objective.direction)}"` : ""} ${disabled}>${escapeHtml(objective.actionLabel || "执行")}</button>`
+    ? `<button class="floor-objective-action detail-btn primary" type="button" data-action="${escapeAttr(objective.action)}" data-floor-id="${escapeAttr(objective.floorId)}"${objective.storyId ? ` data-story-id="${escapeAttr(objective.storyId)}"` : ""}${objective.itemId ? ` data-item-id="${escapeAttr(objective.itemId)}"` : ""}${objective.direction ? ` data-direction="${escapeAttr(objective.direction)}"` : ""} ${disabled}>${escapeHtml(objective.actionLabel || "执行")}</button>`
     : "";
   return `
     <div class="floor-objective-panel" data-tone="${escapeAttr(objective.tone)}">
@@ -8919,6 +9150,7 @@ function renderOpenFloor(floor) {
         ${renderExpeditionWaymarkLayer(floor)}
         ${renderComfortAfterglowLayer(floor)}
         ${renderRoyalCourierLayer(floor)}
+        ${renderCollectionExhibitLayer(floor)}
         ${renderFloorArrivals(floor)}
         ${floor.type === "lobby" ? renderLobbyQueue() : renderFloorPeople(floor)}
         ${renderFixture(floor)}
@@ -9242,9 +9474,34 @@ function renderComfortAfterglowLayer(floor) {
     </span>`;
 }
 
+function renderCollectionExhibitLayer(floor) {
+  const exhibits = activeCollectionExhibitsForFloor(floor).slice(0, COLLECTION_EXHIBIT_LIMIT);
+  if (!exhibits.length) return "";
+  const bonus = collectionExhibitBonus(state);
+  const primary = exhibits[0];
+  const profile = collectionExhibitProfile(primary.itemId);
+  const progress = Math.round((Number(primary.remaining) / Math.max(1, Number(primary.total) || 1)) * 100);
+  const relics = exhibits
+    .map((entry, index) => {
+      const entryProfile = collectionExhibitProfile(entry.itemId);
+      return `<b data-tone="${escapeAttr(entryProfile.tone)}" style="--exhibit-index:${index}; --exhibit-life:${Math.round((entry.remaining / Math.max(1, entry.total)) * 100)}%"><i></i><em></em></b>`;
+    })
+    .join("");
+  const title = `${exhibits.map((entry) => collectionItemById(entry.itemId)?.name || "典藏").join(" / ")} · ${collectionExhibitBonusLabel(state)}`;
+  return `
+    <span class="collection-exhibit-layer" data-tone="${escapeAttr(profile.tone)}" style="--exhibit-progress:${progress}%; --exhibit-order:${Math.round(bonus.order * 100)}; --exhibit-map:${Math.round(bonus.map * 100)}" title="${escapeAttr(title)}" aria-label="${escapeAttr(title)}">
+      <span class="collection-exhibit-shelf"><i></i><i></i></span>
+      <span class="collection-exhibit-relics">${relics}</span>
+      <span class="collection-exhibit-glow"><i></i><i></i><i></i></span>
+    </span>`;
+}
+
 function renderRoomStateTag(floor) {
   if ((state.arrivals || []).some((arrival) => arrival.floorId === floor.id)) {
     return `<span class="room-state-tag good icon-only" data-state="arrival" title="到站" aria-label="到站"></span>`;
+  }
+  if (floor.type === "library" && activeCollectionExhibitsForFloor(floor).length) {
+    return `<span class="room-state-tag good icon-only" data-state="collection-exhibit" title="典藏陈列" aria-label="典藏陈列"></span>`;
   }
   if (isActiveComfortSession(floor)) {
     const label = COMFORT_SESSION_LABELS[floor.type] || "休整";
@@ -9334,6 +9591,7 @@ function renderFloorStatusGlyph(floor) {
   let stateName = "open";
   if (floor.type === "lobby") stateName = state.queue.length ? "queue" : "idle";
   else if (floor.type === "dwelling") stateName = expeditionWaymarksForFloor(floor).length ? "expedition-report" : pendingLifeStoryReviewsForFloor(floor).length ? "life-story" : floor.rentReady ? "rent" : "home";
+  else if (floor.type === "library" && activeCollectionExhibitsForFloor(floor).length) stateName = "collection-exhibit";
   else if (isActiveComfortSession(floor)) stateName = "comfort";
   else if (isActiveComfortAfterglow(floor)) stateName = floor.comfortAfterglow.focus ? "comfort-focus" : "comfort-echo";
   else if (isActiveFoodRush(floor)) stateName = "meal-rush";
@@ -9862,7 +10120,7 @@ function renderFloorDetail() {
       <div class="stat"><b>${skill.toFixed(1)}</b><span>技能</span></div>
       <div class="stat"><b>${floor.production ? Math.ceil(floor.production.remaining) + "s" : "就绪"}</b><span>补货</span></div>
       ${floor.type === "market" ? `<div class="stat"><b>${state.orders.length}/${orderCapacity(state)}</b><span>订单栏</span></div><div class="stat"><b>${marketCooldown ? marketCooldown + "s" : "就绪"}</b><span>撮合</span></div><div class="stat"><b>${marketParcelStageValue}</b><span>包裹</span></div><div class="stat"><b>${marketParcelPackedValue}</b><span>打包</span></div><div class="stat"><b>${state.stats.marketParcelsDone || 0}</b><span>流转</span></div>` : ""}
-      ${floor.type === "library" ? `<div class="stat"><b>${catalog.completed}/${COLLECTION_DEFS.length}</b><span>图鉴</span></div><div class="stat"><b>${libraryCooldown ? libraryCooldown + "s" : "就绪"}</b><span>编目</span></div>` : ""}
+      ${floor.type === "library" ? `<div class="stat"><b>${catalog.completed}/${COLLECTION_DEFS.length}</b><span>图鉴</span></div><div class="stat"><b>${libraryCooldown ? libraryCooldown + "s" : "就绪"}</b><span>编目</span></div><div class="stat"><b>${activeCollectionExhibits(state).length}/${COLLECTION_EXHIBIT_LIMIT}</b><span>陈列</span></div><div class="stat"><b>+${Math.round(collectionExhibitBonus(state).order * 100)}%</b><span>订单</span></div>` : ""}
       ${isComfortFloorType(floor.type) ? `<div class="stat"><b>${comfortActive ? Math.ceil(floor.comfortSession.remaining) + "s" : comfortCooldown ? comfortCooldown + "s" : "就绪"}</b><span>休整</span></div>` : ""}
       ${isShowtimeFloorType(floor.type) ? `<div class="stat"><b>${showtimeActive ? Math.ceil(floor.showtime.remaining) + "s" : showtimeCooldownValue ? showtimeCooldownValue + "s" : "就绪"}</b><span>演出</span></div><div class="stat"><b>${showtimeBeatValue}</b><span>段落</span></div><div class="stat"><b>${showtimeHeatValue}</b><span>热度</span></div><div class="stat"><b>${state.stats.entertainmentShowsDone || 0}/${state.stats.showtimeReactionsDone || 0}</b><span>小剧/反应</span></div>` : ""}
     </div>
@@ -9920,9 +10178,12 @@ function renderFloorPerks(floor) {
     if (isActiveMarketParcel(floor)) perks.push(`${currentMarketParcelPhase(floor).label} ${floor.marketParcel.packed || 0}件`);
   } else if (floor.type === "library") {
     const next = nextCollectionItem(state);
+    const exhibits = activeCollectionExhibitsForFloor(floor);
     perks.push(`探险碎片 +${Math.round(libraryResearchBonus(state) * 100)}%`);
     perks.push(`典藏订单 +${Math.round((collectionOrderBonus(state) - 1) * 100)}%`);
     perks.push(`整理 ${state.stats.libraryStudiesDone || 0}`);
+    perks.push(`陈列 ${activeCollectionExhibits(state).length}/${COLLECTION_EXHIBIT_LIMIT}`);
+    if (exhibits.length) perks.push(`展柜 ${exhibits.map((entry) => collectionItemById(entry.itemId)?.name).filter(Boolean).join(" / ")}`);
     if (next) perks.push(`下枚 ${next.name}`);
   } else if (floor.type === "kingdom") {
     perks.push(`王令订单 +${Math.round(kingdomMandateBonus(state) * 55)}%`);
@@ -10139,7 +10400,7 @@ function renderFloorDetail() {
       ${isToolTuneFloorType(floor.type) ? `<div class="stat"><b>${toolTuneActive ? Math.ceil(floor.toolTune.remaining) + "s" : toolTuneCooldownValue ? toolTuneCooldownValue + "s" : "就绪"}</b><span>校准</span></div><div class="stat"><b>${toolTunePhaseValue}</b><span>阶段</span></div><div class="stat"><b>${toolTunePrecisionValue}</b><span>精度</span></div><div class="stat"><b>${toolTuneMarksValue}</b><span>校准点</span></div>` : ""}
       ${floor.type === "market" ? `<div class="stat"><b>${state.orders.length}/${orderCapacity(state)}</b><span>订单栏</span></div><div class="stat"><b>${marketCooldown ? marketCooldown + "s" : "就绪"}</b><span>撮合</span></div><div class="stat"><b>${marketParcelStageValue}</b><span>包裹</span></div><div class="stat"><b>${marketParcelPackedValue}</b><span>打包</span></div><div class="stat"><b>${state.stats.marketParcelsDone || 0}</b><span>流转</span></div>` : ""}
       ${floor.type === "kingdom" ? `<div class="stat"><b>${royalMandateStageValue}</b><span>王令</span></div><div class="stat"><b>${royalMandatePreparedValue}</b><span>预备</span></div><div class="stat"><b>${state.stats.royalMandatesDone || 0}</b><span>签发</span></div><div class="stat"><b>${state.stats.royalCourierReceiptsDone || 0}</b><span>回执</span></div><div class="stat"><b>${royalMandateInfo ? royalMandateInfo.missing : "-"}</b><span>缺口</span></div>` : ""}
-      ${floor.type === "library" ? `<div class="stat"><b>${catalog.completed}/${COLLECTION_DEFS.length}</b><span>图鉴</span></div><div class="stat"><b>${libraryCooldown ? libraryCooldown + "s" : "就绪"}</b><span>编目</span></div>` : ""}
+      ${floor.type === "library" ? `<div class="stat"><b>${catalog.completed}/${COLLECTION_DEFS.length}</b><span>图鉴</span></div><div class="stat"><b>${libraryCooldown ? libraryCooldown + "s" : "就绪"}</b><span>编目</span></div><div class="stat"><b>${activeCollectionExhibits(state).length}/${COLLECTION_EXHIBIT_LIMIT}</b><span>陈列</span></div><div class="stat"><b>+${Math.round(collectionExhibitBonus(state).order * 100)}%</b><span>订单</span></div>` : ""}
       ${isComfortFloorType(floor.type) ? `<div class="stat"><b>${comfortActive ? Math.ceil(floor.comfortSession.remaining) + "s" : comfortCooldown ? comfortCooldown + "s" : "就绪"}</b><span>休整</span></div><div class="stat"><b>${comfortEchoValue}</b><span>余韵</span></div><div class="stat"><b>${comfortPrepValue}</b><span>探险准备</span></div><div class="stat"><b>${comfortFocusValue}</b><span>调息</span></div>` : ""}
       ${isShowtimeFloorType(floor.type) ? `<div class="stat"><b>${showtimeActive ? Math.ceil(floor.showtime.remaining) + "s" : showtimeCooldownValue ? showtimeCooldownValue + "s" : "就绪"}</b><span>演出</span></div><div class="stat"><b>${showtimeBeatValue}</b><span>段落</span></div><div class="stat"><b>${showtimeHeatValue}</b><span>热度</span></div><div class="stat"><b>${state.stats.entertainmentShowsDone || 0}/${state.stats.showtimeReactionsDone || 0}</b><span>小剧/反应</span></div>` : ""}
     </div>
@@ -10152,6 +10413,7 @@ function renderFloorDetail() {
     ${renderServiceCarePanel(floor)}
     ${renderStarChartPanel(floor)}
     ${renderToolTunePanel(floor)}
+    ${renderCollectionExhibitPanel(floor)}
     ${renderComfortSessionPanel(floor)}
     ${renderShowtimePanel(floor)}
     ${renderResidentList(workers, floor.type)}
@@ -10211,9 +10473,12 @@ function renderFloorPerks(floor) {
     if (isActiveMarketParcel(floor)) perks.push(`${currentMarketParcelPhase(floor).label} ${floor.marketParcel.packed || 0}件`);
   } else if (floor.type === "library") {
     const next = nextCollectionItem(state);
+    const exhibits = activeCollectionExhibitsForFloor(floor);
     perks.push(`探险碎片 +${Math.round(libraryResearchBonus(state) * 100)}%`);
     perks.push(`典藏订单 +${Math.round((collectionOrderBonus(state) - 1) * 100)}%`);
     perks.push(`整理 ${state.stats.libraryStudiesDone || 0}`);
+    perks.push(`陈列 ${activeCollectionExhibits(state).length}/${COLLECTION_EXHIBIT_LIMIT}`);
+    if (exhibits.length) perks.push(`展柜 ${exhibits.map((entry) => collectionItemById(entry.itemId)?.name).filter(Boolean).join(" / ")}`);
     if (next) perks.push(`下枚 ${next.name}`);
   } else if (floor.type === "kingdom") {
     perks.push(`王令订单 +${Math.round(kingdomMandateBonus(state) * 55)}%`);
@@ -10279,6 +10544,53 @@ function renderFloorPerks(floor) {
   }
   if (!perks.length) return "";
   return `<div class="detail-perks">${perks.map((text) => `<span class="perk">${escapeHtml(text)}</span>`).join("")}</div>`;
+}
+
+function renderCollectionExhibitPanel(floor) {
+  if (floor?.type !== "library") return "";
+  const active = activeCollectionExhibitsForFloor(floor);
+  const completed = completedCollectionItems(state);
+  const activeHtml = active.length
+    ? active
+        .map((entry) => {
+          const item = collectionItemById(entry.itemId);
+          const profile = collectionExhibitProfile(entry.itemId);
+          const pct = Math.round((entry.remaining / Math.max(1, entry.total)) * 100);
+          return `
+            <div class="collection-exhibit-card active" data-tone="${escapeAttr(profile.tone)}">
+              <div>
+                <strong>${escapeHtml(item?.name || "典藏陈列")}</strong>
+                <small>${escapeHtml(profile.label)} · ${Math.ceil(entry.remaining)}s · ${escapeHtml(collectionExhibitBonusLabel(state))}</small>
+              </div>
+              <span>${Math.ceil(entry.remaining)}s</span>
+              <div class="meter"><span style="width:${pct}%"></span></div>
+            </div>`;
+        })
+        .join("")
+    : `<div class="collection-exhibit-empty">暂无正在陈列的珍藏。</div>`;
+  const choices = completed
+    .filter((item) => !activeCollectionExhibit(item.id))
+    .slice(0, 4)
+    .map((item) => {
+      const profile = collectionExhibitProfile(item.id);
+      const reason = collectionExhibitActionBlockReason(item.id);
+      return `
+        <button type="button" class="collection-exhibit-choice" data-action="collection-exhibit" data-item-id="${escapeAttr(item.id)}" data-floor-id="${floor.id}" data-tone="${escapeAttr(profile.tone)}" title="${escapeAttr(reason || `${profile.label} · 消耗 1 份书库卷宗`)}" ${reason ? "disabled" : ""}>
+          <strong>${escapeHtml(item.name)}</strong>
+          <small>${escapeHtml(profile.label)} · 订单 +${Math.round((profile.order || 0) * 100)}% / 探险 +${Math.round((profile.map || 0) * 100)}%</small>
+        </button>`;
+    })
+    .join("");
+  const choiceHtml = choices || `<div class="collection-exhibit-empty">${completed.length ? "陈列位已满或珍藏正在陈列。" : "完成任意珍藏后可陈列。"}</div>`;
+  return `
+    <div class="collection-exhibit-panel">
+      <div class="collection-exhibit-head">
+        <strong>典藏陈列</strong>
+        <span>${activeCollectionExhibits(state).length}/${COLLECTION_EXHIBIT_LIMIT}</span>
+      </div>
+      <div class="collection-exhibit-active-list">${activeHtml}</div>
+      <div class="collection-exhibit-choice-grid">${choiceHtml}</div>
+    </div>`;
 }
 
 function renderResidentList(residents, skillType = null) {
@@ -10555,36 +10867,57 @@ function renderOrders() {
 function renderCollection() {
   const progress = collectionProgress(state);
   const pct = Math.round((progress.total / progress.max) * 100);
-  els.collectionCount.textContent = `${progress.completed}/${COLLECTION_DEFS.length} · ${progress.total}/${progress.max}`;
+  const activeExhibits = activeCollectionExhibits(state);
+  const exhibitBonus = collectionExhibitBonus(state);
+  els.collectionCount.textContent = activeExhibits.length
+    ? `${progress.completed}/${COLLECTION_DEFS.length} · 陈列${activeExhibits.length}/${COLLECTION_EXHIBIT_LIMIT}`
+    : `${progress.completed}/${COLLECTION_DEFS.length} · ${progress.total}/${progress.max}`;
   const ordered = COLLECTION_DEFS.slice().sort((a, b) => {
     const av = state.collection[a.id] || 0;
     const bv = state.collection[b.id] || 0;
     return Number(av >= 3) - Number(bv >= 3) || bv - av || a.name.localeCompare(b.name, "zh-CN");
   });
   const nextText = progress.next ? `下枚优先：${progress.next.name} · ${state.collection[progress.next.id] || 0}/3` : "图鉴已满，后续碎片会转化为宝石";
+  const exhibitText = activeExhibits.length
+    ? `陈列 ${activeExhibits.length}/${COLLECTION_EXHIBIT_LIMIT} · ${collectionExhibitBonusLabel(state)}`
+    : completedCollectionItems(state).length
+      ? `可陈列 ${completedCollectionItems(state).length} 件完成珍藏`
+      : "完成珍藏后可手动陈列";
   const summary = `
     <div class="collection-summary">
       <div class="collection-summary-head">
         <strong>典藏进度</strong>
-        <span>${pct}%</span>
+        <span>${pct}%${activeExhibits.length ? ` · +${Math.round(exhibitBonus.order * 100)}%` : ""}</span>
       </div>
       <div class="meter"><span style="width:${pct}%"></span></div>
-      <small>${escapeHtml(nextText)} · 整理 ${state.stats.libraryStudiesDone || 0} 次</small>
+      <small>${escapeHtml(nextText)} · 整理 ${state.stats.libraryStudiesDone || 0} 次 · ${escapeHtml(exhibitText)}</small>
     </div>`;
   const items = ordered.map((item) => {
     const value = state.collection[item.id] || 0;
     const done = value >= 3;
+    const active = activeCollectionExhibit(item.id);
+    const reason = done ? collectionExhibitActionBlockReason(item.id) : "";
+    const profile = collectionExhibitProfile(item.id);
     const itemPct = Math.round((value / 3) * 100);
     const focus = progress.next?.id === item.id ? "next" : "";
+    const action = done
+      ? active
+        ? `<span class="collection-exhibit-timer" title="${escapeAttr(profile.label)}">${Math.ceil(active.remaining)}s</span>`
+        : `<button type="button" class="detail-btn collection-exhibit-btn" data-action="start-collection-exhibit" data-item-id="${escapeAttr(item.id)}" title="${escapeAttr(reason || `${profile.label} · 消耗 1 份书库卷宗`)}" ${reason ? "disabled" : ""}>陈列</button>`
+      : "";
     return `
-      <div class="collection-item ${done ? "done" : ""} ${focus}">
-        <span class="relic-mark" aria-label="${escapeAttr(item.name)} ${value}/3">${done ? "★" : value}</span>
+      <div class="collection-item ${done ? "done" : ""} ${active ? "exhibit-active" : ""} ${focus}" data-exhibit-tone="${escapeAttr(profile.tone)}">
+        <span class="relic-mark" aria-label="${escapeAttr(item.name)} ${value}/3">${active ? "◆" : done ? "★" : value}</span>
         <div class="collection-copy">
-          <strong>${escapeHtml(item.name)}</strong>
+          <div class="collection-title-row">
+            <strong>${escapeHtml(item.name)}</strong>
+            ${action}
+          </div>
           <small>${escapeHtml(item.desc)}</small>
           <div class="collection-tags">
             <span>${escapeHtml(item.source || "订单 / 探险")}</span>
-            <span>${done ? "已完成" : `${value}/3`}</span>
+            <span>${active ? "陈列中" : done ? "已完成" : `${value}/3`}</span>
+            ${done ? `<span>${escapeHtml(profile.label)}</span>` : ""}
           </div>
           <div class="meter"><span style="width:${itemPct}%"></span></div>
         </div>
@@ -10607,6 +10940,8 @@ function renderInventoryPanel() {
   ensureOrders(state);
   const pending = pendingQuestRewards();
   const progress = collectionProgress(state);
+  const activeExhibits = activeCollectionExhibits(state);
+  const exhibitBonus = collectionExhibitBonus(state);
   const stockFloors = businessFloors(state);
   const stockTotal = stockFloors.reduce((sum, floor) => sum + (floor.stock || 0), 0);
   const stockMax = stockFloors.reduce((sum, floor) => sum + (floor.stockMax || 0), 0);
@@ -10625,6 +10960,7 @@ function renderInventoryPanel() {
     renderInventoryMetric("星图校准", `${state.stats.starChartMarksDone || 0} 星标`, `${state.stats.starChartCalibrationsDone || 0} 场 / 星象 +${Math.round(observatoryStarBonus(state) * 100)}%`),
     renderInventoryMetric("工具校准", `${state.stats.toolTuneMarksDone || 0} 校准点`, `${state.stats.toolTuneSessionsDone || 0} 场 / 工具 +${Math.round(craftToolBonus(state) * 100)}%`),
     renderInventoryMetric("珍藏碎片", `${progress.total}/${progress.max}`, progress.next ? `下枚 ${progress.next.name}` : "图鉴已满"),
+    renderInventoryMetric("典藏陈列", `${state.stats.collectionExhibitsDone || 0} 次`, activeExhibits.length ? `${activeExhibits.length}/${COLLECTION_EXHIBIT_LIMIT} 生效 / ${collectionExhibitBonusLabel(state)}` : "暂无生效陈列"),
     renderInventoryMetric("任务奖励", pending.count ? `${pending.count} 待领` : "已清点", pending.count ? `${pending.coins} 金币 / ${pending.gems} 宝石` : "暂无待领"),
   ].join("");
   const overview = [
@@ -10636,17 +10972,20 @@ function renderInventoryPanel() {
     renderInventoryMetric("王室订单", `${readyOrders}/${state.orders.length}`, `容量 ${orderCapacity(state)}`),
     renderInventoryMetric("楼层现货", `${stockTotal}/${stockMax || 0}`, `${stockFloors.length} 个经营楼层`),
     renderInventoryMetric("探险档案", `${reportCount} 份`, activeExpeditions ? `进行中 ${activeExpeditions}` : "暂无出发队伍"),
+    renderInventoryMetric("陈列加成", activeExhibits.length ? `${activeExhibits.length}/${COLLECTION_EXHIBIT_LIMIT}` : "未陈列", activeExhibits.length ? `订单 +${Math.round(exhibitBonus.order * 100)}% / 探险 +${Math.round(exhibitBonus.map * 100)}%` : "在珍藏图鉴手动陈列"),
   ].join("");
   const relicItems = COLLECTION_DEFS.map((item) => {
     const value = state.collection[item.id] || 0;
     const pct = Math.round((value / 3) * 100);
+    const active = activeCollectionExhibit(item.id);
+    const profile = collectionExhibitProfile(item.id);
     return `
-      <div class="inventory-relic ${value >= 3 ? "done" : ""}">
+      <div class="inventory-relic ${value >= 3 ? "done" : ""} ${active ? "active" : ""}" data-tone="${escapeAttr(profile.tone)}">
         <div>
           <strong>${escapeHtml(item.name)}</strong>
-          <small>${escapeHtml(item.source || "订单 / 探险")} · ${escapeHtml(item.desc)}</small>
+          <small>${escapeHtml(item.source || "订单 / 探险")} · ${escapeHtml(item.desc)}${active ? ` · 陈列 ${Math.ceil(active.remaining)}s` : value >= 3 ? ` · ${profile.label}` : ""}</small>
         </div>
-        <span>${value}/3</span>
+        <span>${active ? `${Math.ceil(active.remaining)}s` : `${value}/3`}</span>
         <div class="meter"><span style="width:${pct}%"></span></div>
       </div>`;
   }).join("");
@@ -11281,6 +11620,9 @@ function bindEvents() {
       case "library-study":
         startLibraryStudy(floorId);
         break;
+      case "collection-exhibit":
+        startCollectionExhibit(button.dataset.itemId, { floorId });
+        break;
       case "food-rush":
         startFoodRush(floorId);
         break;
@@ -11328,6 +11670,12 @@ function bindEvents() {
     const button = event.target.closest("[data-action='claim-quest']");
     if (!button || button.disabled) return;
     claimQuest(button.dataset.questId);
+  });
+
+  els.collection.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-action='start-collection-exhibit']");
+    if (!button || button.disabled) return;
+    startCollectionExhibit(button.dataset.itemId);
   });
 
   els.orders.addEventListener("click", (event) => {

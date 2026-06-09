@@ -1,0 +1,5 @@
+Prompt used for the v80 library exhibit refresh attempt with gpt-image-2.
+
+Create a polished 2.5D fantasy tower-management room background for the web game "迪迪王国": an old royal library transformed into a relic exhibit hall. No text, no letters, no UI, no characters. Cozy readable game-art style, front-facing cutaway room, moon-blue shelves, warm amber lamps, glass display cases, small crown/key/map/compass relic silhouettes, clean floor area in the lower center for character sprites to stand, high contrast, crisp edges, mobile-readable, whimsical kingdom mood. Keep composition compatible with a 16:9 room card and avoid dark muddy corners.
+
+Notes: the gateway returned the New API front-end HTML instead of an OpenAI-compatible image response during this pass, so no bitmap asset was wired into production.

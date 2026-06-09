@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v79`
-- Latest preview deployment: `https://3508cd21.little-depths.pages.dev/`
-- Local server used for v79 verification: `http://127.0.0.1:8831/`
+- Latest deployed version: `v80`
+- Latest preview deployment: `https://4e7959c9.little-depths.pages.dev/`
+- Local server used for v80 verification: `http://127.0.0.1:8832/`
 
 ## Current State
 
@@ -22,11 +22,24 @@ wrangler pages deploy dist --project-name little-depths
 ```
 
 - GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`, but current release practice is to deploy Cloudflare with local Wrangler OAuth from `dist`, then sync GitHub separately. Use `[skip ci]` when pushing documentation/code sync commits that should not ask GitHub Actions to deploy Cloudflare.
-- Current caveat: v79 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
+- Current caveat: v80 was deployed successfully from local `dist`. The normal Wrangler deploy hit Node fetch/proxy/TLS trouble after asset upload, so the successful release used the local Pages upload manifest plus the Cloudflare Pages deployment API. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v80 Collection Exhibits / Library Collection Loop
+
+- Deepened the old `library` / collection loop instead of adding another floor. Completed relics can now be manually placed into a timed `典藏陈列` exhibit from the collection panel or library detail view.
+- Added `collectionExhibits`, `collectionExhibitsDone`, exhibit duration/offline ticking, duplicate prevention, max-three active exhibit protection, and one-stock consumption from an available staffed library.
+- Active exhibits increase order rewards, expedition/relic chances, library research, and visitor pull while they remain active, then expire cleanly through the same update flow.
+- Updated collection/library/backpack UI with exhibit buttons, active states, bonus summaries, timers, and active relic records so players have a clear entrance to see their resources and temporary boosts.
+- Library rooms now render a textless `.collection-exhibit-layer` and `data-state="collection-exhibit"` cue over the old map without disturbing room-person footing.
+- Added the `collection_exhibit` / `典藏陈列` quest keyed to `collectionExhibitsDone`. It uses the existing manual claim flow, so completion makes the quest ready without auto-awarding coins or gems.
+- Attempted refreshed no-text library exhibit room art through the configured `gpt-image-2` gateway twice. The gateway returned New API frontend HTML rather than usable image data, so no unstable bitmap was connected. The reusable prompt is tracked at `docs/v80-collection-exhibit-library-image-prompt.txt`.
+- Added `tmp/verify-v80-collection-exhibits.mjs`. It verifies v29 save migration, exhibit starting/stock consumption, bonus increases, manual quest readiness and exact claim rewards, map/library/inventory UI, mobile no-overflow, library worker footing, and v80 cache markers.
+- Bumped save version to `29`, bumped `index.html` / `sw.js` to v80, synced `dist`, rebuilt `cloudflare-pages-upload.zip`, and deployed v80 to Cloudflare Pages. Production: `https://little-depths.pages.dev/`; preview: `https://4e7959c9.little-depths.pages.dev/`.
+- Remote verification confirmed both production and preview load `app.js?v=80`, `styles.css?v=80`, `overrides.css?v=80`, and `little-depths-v80`.
 
 ### v79 Kingdom Dispatch / Old Order UI
 
@@ -904,6 +917,7 @@ wrangler pages deploy dist --project-name little-depths
 - The user wants image work to use `gpt-image-2` through their configured gateway.
 - Read credentials only from `GPT_IMAGE_2_API_KEY`, `GPT_IMAGE_2_BASE_URL`, and `GPT_IMAGE_2_MODEL`.
 - Never print, echo, commit, or store API keys.
+- v80 attempted refreshed library/exhibit room art through the configured `gpt-image-2` gateway twice, but the gateway returned New API frontend HTML instead of image data. No unstable image was connected; the saved web-ready prompt is `docs/v80-collection-exhibit-library-image-prompt.txt`.
 - v74 attempted refreshed dwelling/life-route review room art through the configured `gpt-image-2` gateway, but the gateway connection closed on the first request and timed out on retry. No unstable image was connected; the saved web-ready prompt is `docs/v74-dwelling-life-room-image-prompt.txt`.
 - v72 generated refreshed sky-garden comfort-focus room art through the configured `gpt-image-2` gateway. The source PNG is `tmp/imagegen/v72-comfort-focus/room-garden-v3.png`, the connected asset is `assets/art/room-garden-v3.webp`, and the saved prompt is `docs/v72-comfort-focus-garden-image-prompt.txt`.
 - v71 generated refreshed craft/tool-tune room art through the configured `gpt-image-2` gateway. The source PNG was saved in the current thread outputs as `room-craft-v3.png`, the connected asset is `assets/art/room-craft-v3.webp`, and the saved prompt is `docs/v71-craft-tool-tune-room-image-prompt.txt`.
@@ -927,6 +941,7 @@ wrangler pages deploy dist --project-name little-depths
 
 - Continue improving older floors instead of only adding new floors. Good next targets:
   - `character life`: add short interruptions, route conflicts, remembered preferences, or second-step choices after player-clickable story reviews.
+  - `collection/library`: add exhibit choice follow-ups, room-specialist curation bonuses, or a refreshed library exhibit bitmap when the `gpt-image-2` gateway is healthy, using `docs/v80-collection-exhibit-library-image-prompt.txt`.
   - `dwelling`: refresh the dwelling/life-trail/review room art when the `gpt-image-2` gateway is healthy, using `docs/v74-dwelling-life-room-image-prompt.txt`.
   - `garden/bathhouse`: add second-step follow-ups after `余韵调息`, such as resident story choices or floor-specialist modifiers for each focus.
   - `kingdom`: deepen downstream city effects, courier specialization, or refreshed council-room art now that signing and receipt follow-through exist.
@@ -951,8 +966,8 @@ wrangler pages deploy dist --project-name little-depths
 继续开发 C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4 里的迪迪王国项目。
 
 线上地址：https://little-depths.pages.dev/
-最新部署版本：v74
-最新预览：https://584e0548.little-depths.pages.dev/
+最新部署版本：v80
+最新预览：https://4e7959c9.little-depths.pages.dev/
 交接文档：docs/HANDOFF.md
 
 请先读取项目代码、README.md、docs/HANDOFF.md 和最近状态，再继续优化。方向：从游戏内容、玩法、画面、图像质量等层面更新迭代，不只新增内容，也要把旧楼层和旧系统做得更好。涉及图像绘制时使用 gpt-image-2；如果网关不可用，不要写入或打印密钥，改为保存可直接用于网页端生成的提示词。

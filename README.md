@@ -4,10 +4,10 @@
 
 ## 本地运行
 
-直接打开 `index.html` 可以游玩；最近一次 v79 本地验证使用：
+直接打开 `index.html` 可以游玩；最近一次 v80 本地验证使用：
 
 ```text
-http://127.0.0.1:8831
+http://127.0.0.1:8832
 ```
 
 ## 玩法切片
@@ -27,6 +27,7 @@ http://127.0.0.1:8831
 - v66 翻新旧入口大厅：大厅访客会累积等待压力，推荐派号会按贵宾、久候、库存/空房等综合排序；旧地图大厅增加候车道和路线信号，电梯面板和路线票显示“顺畅/繁忙/压线”等状态，并用 `gpt-image-2` 刷新了无文字大厅背景 `room-lobby-v3.webp`。
 - v67 翻新旧餐饮楼层：餐桌高峰现在会显示服务轨、桌况点、菜序灯和下一次上菜倒计时；新增 `流水上菜` 手动领取任务，资产背包也会记录高峰桌次、组织次数和上菜份数，并用 `gpt-image-2` 刷新了无文字厨房背景 `room-food-v3.webp`。
 - v69 翻新旧观星台：观星台现在可主动 `星图校准`，消耗星盘耗材拉居民读星、为正在进行的探险缩短时间并沉淀星图预报奖励；新增 `星图校准` 手动领取任务，资产背包记录校准场次和星标，并用 `gpt-image-2` 刷新了无文字云顶观星背景 `room-observatory-v2.webp`。
+- v80 深化旧书库/珍藏图鉴：完整珍藏现在可手动放入 `典藏陈列`，消耗书库存量并在限时内提升订单收益、探险/遗物机会、书库研究和访客吸引；书库详情、图鉴和资产背包都会显示当前陈列与倒计时，并新增 `典藏陈列` 手动领取任务。
 - v79 深化旧王国/王室订单：订单栏新增 `王室订单调度桌`、分段库存条和下一步行动，能区分真实库存、王令预备、市集打包与缺口；王国地图也会显示无文字调度桌/卷宗光带，并新增 `调度交付` 手动领取任务。
 - v78 给所有旧房间补上 `房间目标` 系统：当前楼层详情会显示推荐目标、进度条和可点击的一键操作；地图房间会显示无文字目标角标和 ready/running/warn 视觉状态，市集、书库、王国、公寓、厨房、礼宾、工坊等旧玩法都能更清楚地告诉玩家下一步该做什么。
 - v77 把人物脚底线修复扩展到全部房间：所有已有经营房间和后续新建房间统一继承安全地板基线，避免任何房间再次只露头或陷进底部前景。
@@ -61,6 +62,18 @@ http://127.0.0.1:8831
 - 键盘支持 `W / ↑`、`S / ↓` 移动升降梯，`Space / Enter` 下客，`B` 打开建设。
 - v54 进行了轻量化清理：发布包移除了已被新版替代的旧房间图和旧表演者 PNG，表演者素材改为无损 WebP；发布运行目录只保留当前必要资产，本地旧浏览器配置、旧截图、图像中间产物和过期生成记录已清理。
 - v55 深化了旧演艺玩法：新增小剧任务、演出冷却、观众需求撮合、掌声金币奖励和娱乐/社交恢复，并保留 `docs/v55-entertainment-showtime-image-prompt.txt` 供后续图像网关恢复后刷新演艺房间背景。
+
+## v80 Update
+
+- v80 deepens the old `library` / collection loop: completed relics can now be manually placed into a `典藏陈列` exhibit from the collection panel or library detail view.
+- Exhibits require a completed relic, an available library worker and stock, no duplicate active exhibit, and at most three active exhibits. Starting one consumes one library stock and creates a timed bonus rather than an automatic payout.
+- Active exhibits boost order rewards, expedition/relic chances, library research, and visitor pull. Timers tick during play and reduce during offline settlement, then expire cleanly.
+- The collection panel, library detail, and asset backpack now show exhibit actions, active states, bonus summaries, timers, and current relic display records.
+- Library rooms now render a textless `collection-exhibit-layer` and `data-state="collection-exhibit"` cue over the old map while preserving the shared all-room character footing.
+- Added the `collection_exhibit` / `典藏陈列` quest keyed to `collectionExhibitsDone`. It uses the existing manual claim flow, so coins and gems are not auto-awarded.
+- `gpt-image-2` was attempted twice for refreshed no-text library exhibit room art, but the gateway returned a New API frontend HTML response instead of image data. No unstable bitmap was connected; the reusable prompt is saved at `docs/v80-collection-exhibit-library-image-prompt.txt`.
+- Added `tmp/verify-v80-collection-exhibits.mjs`, which verifies stock consumption, exhibit bonuses, manual quest claim behavior, map/library/inventory UI, mobile no-overflow, library worker footing, and v80 cache markers.
+- Bumped save version to `29`, bumped `index.html` / `sw.js` to v80, synced `dist`, rebuilt `cloudflare-pages-upload.zip`, and deployed to Cloudflare. Production: `https://little-depths.pages.dev/`; preview: `https://4e7959c9.little-depths.pages.dev/`.
 
 ## v79 Update
 

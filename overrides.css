@@ -7355,3 +7355,353 @@ body.fullscreen-active .build-grid {
     font-size: 10.5px;
   }
 }
+
+/* v80 collection exhibits: completed relics become short-lived manual library displays. */
+.collection-title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.collection-title-row strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.collection-exhibit-btn {
+  min-height: 28px;
+  padding: 0 9px;
+  white-space: nowrap;
+}
+
+.collection-exhibit-timer {
+  min-width: 44px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  color: #1d1917;
+  background: linear-gradient(180deg, #ffe29b, #64c4b0);
+  font-size: 11px;
+  font-weight: 900;
+  text-align: center;
+  box-shadow: 0 0 12px rgba(100, 196, 176, 0.22);
+}
+
+.collection-item.exhibit-active {
+  border-color: rgba(255, 226, 155, 0.62);
+  background:
+    linear-gradient(115deg, rgba(255, 226, 155, 0.16), rgba(100, 196, 176, 0.1)),
+    rgba(255, 255, 255, 0.05);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 226, 155, 0.14),
+    0 0 16px rgba(100, 196, 176, 0.1);
+}
+
+.collection-item.exhibit-active .relic-mark {
+  color: #191c20;
+  background: linear-gradient(180deg, #fff1ba, #73d0be);
+  box-shadow: 0 0 16px rgba(255, 226, 155, 0.34);
+}
+
+.collection-exhibit-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(177, 217, 255, 0.22);
+  background:
+    linear-gradient(115deg, rgba(123, 169, 224, 0.13), rgba(255, 214, 126, 0.1), rgba(100, 196, 176, 0.08)),
+    rgba(255, 255, 255, 0.045);
+}
+
+.collection-exhibit-head,
+.collection-exhibit-card,
+.collection-exhibit-choice {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.collection-exhibit-head strong,
+.collection-exhibit-card strong,
+.collection-exhibit-choice strong {
+  min-width: 0;
+  color: #fff0b6;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.collection-exhibit-head span,
+.collection-exhibit-card span {
+  color: #ffe29b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.collection-exhibit-card,
+.collection-exhibit-choice,
+.collection-exhibit-empty {
+  min-width: 0;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 14, 24, 0.3);
+}
+
+.collection-exhibit-card small,
+.collection-exhibit-choice small,
+.collection-exhibit-empty {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.collection-exhibit-card .meter {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.collection-exhibit-choice {
+  width: 100%;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.collection-exhibit-choice:not(:disabled):hover {
+  border-color: rgba(255, 226, 155, 0.44);
+  background: rgba(255, 226, 155, 0.08);
+}
+
+.collection-exhibit-choice:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.collection-exhibit-choice-grid,
+.collection-exhibit-active-list {
+  display: grid;
+  gap: 7px;
+}
+
+.inventory-relic.active {
+  border-color: rgba(255, 226, 155, 0.58);
+  background:
+    linear-gradient(115deg, rgba(255, 226, 155, 0.14), rgba(100, 196, 176, 0.1)),
+    rgba(255, 255, 255, 0.04);
+}
+
+.inventory-relic.active span {
+  color: #7bf0d7;
+}
+
+.collection-exhibit-layer {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: 38px;
+  height: 54px;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.collection-exhibit-shelf {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: 0;
+  height: 22px;
+  border-radius: 8px 8px 4px 4px;
+  background:
+    linear-gradient(180deg, rgba(255, 226, 155, 0.9), rgba(93, 76, 99, 0.86)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 10px, transparent 10px 20px);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.18),
+    0 8px 13px rgba(0, 0, 0, 0.32);
+}
+
+.collection-exhibit-shelf i {
+  position: absolute;
+  bottom: 18px;
+  width: 22px;
+  height: 18px;
+  border-radius: 4px 4px 2px 2px;
+  background:
+    linear-gradient(180deg, rgba(215, 232, 255, 0.9), rgba(123, 169, 224, 0.64)),
+    linear-gradient(90deg, transparent 48%, rgba(255, 255, 255, 0.22) 49% 51%, transparent 52%);
+}
+
+.collection-exhibit-shelf i:first-child {
+  left: 16%;
+}
+
+.collection-exhibit-shelf i:last-child {
+  right: 16%;
+}
+
+.collection-exhibit-relics {
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 18px;
+  height: 34px;
+}
+
+.collection-exhibit-relics b {
+  position: absolute;
+  left: calc(18% + var(--exhibit-index, 0) * 31%);
+  bottom: 0;
+  width: 25px;
+  height: 28px;
+  border-radius: 7px 7px 4px 4px;
+  transform: translateX(-50%);
+  background:
+    radial-gradient(circle at 50% 26%, rgba(255, 255, 255, 0.5), transparent 24%),
+    linear-gradient(180deg, rgba(255, 241, 186, 0.96), rgba(100, 196, 176, 0.64));
+  box-shadow:
+    0 0 15px rgba(255, 226, 155, 0.38),
+    inset 0 -3px 0 rgba(29, 25, 23, 0.16);
+  animation: collection-exhibit-breathe 2.4s ease-in-out infinite;
+}
+
+.collection-exhibit-relics b[data-tone="royal"] {
+  background:
+    radial-gradient(circle at 50% 25%, rgba(255, 255, 255, 0.46), transparent 24%),
+    linear-gradient(180deg, #fff0b6, #ffad5f);
+}
+
+.collection-exhibit-relics b[data-tone="route"] {
+  background:
+    radial-gradient(circle at 50% 25%, rgba(255, 255, 255, 0.46), transparent 24%),
+    linear-gradient(180deg, #d7e8ff, #64c4b0);
+}
+
+.collection-exhibit-relics b[data-tone="depth"] {
+  background:
+    radial-gradient(circle at 50% 25%, rgba(255, 255, 255, 0.44), transparent 24%),
+    linear-gradient(180deg, #d7e8ff, #8d70d6);
+}
+
+.collection-exhibit-relics b[data-tone="festival"] {
+  background:
+    radial-gradient(circle at 50% 25%, rgba(255, 255, 255, 0.45), transparent 24%),
+    linear-gradient(180deg, #ffe476, #ec6f5d);
+}
+
+.collection-exhibit-relics b i {
+  position: absolute;
+  inset: 6px 7px 7px;
+  border-radius: 50% 50% 6px 6px;
+  border: 2px solid rgba(33, 28, 30, 0.32);
+}
+
+.collection-exhibit-relics b em {
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 32px;
+  height: 8px;
+  border-radius: 50%;
+  translate: -50% 0;
+  background: rgba(255, 226, 155, 0.26);
+  filter: blur(2px);
+}
+
+.collection-exhibit-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 80%, rgba(255, 226, 155, 0.22), rgba(100, 196, 176, 0.12) 42%, transparent 70%);
+  filter: blur(1px);
+  animation: collection-exhibit-glow 2.8s ease-in-out infinite;
+}
+
+.status-glyph[data-state="collection-exhibit"],
+.room-state-tag[data-state="collection-exhibit"] {
+  color: #ffe29b;
+}
+
+.status-glyph[data-state="collection-exhibit"]::before,
+.room-state-tag[data-state="collection-exhibit"]::before {
+  width: 15px;
+  height: 15px;
+  border-radius: 5px 5px 3px 3px;
+  background:
+    radial-gradient(circle at 50% 35%, #fff8d7 0 20%, transparent 21%),
+    linear-gradient(180deg, #ffe29b, #64c4b0);
+  box-shadow:
+    0 0 13px rgba(255, 226, 155, 0.75),
+    inset 0 -2px 0 rgba(31, 41, 45, 0.18);
+}
+
+.floor.collection-exhibit-active[data-type="library"] .room {
+  box-shadow:
+    inset 0 5px 0 rgba(215, 232, 255, 0.18),
+    inset 0 -24px 30px rgba(0, 0, 0, 0.33),
+    0 0 0 2px rgba(255, 226, 155, 0.24),
+    0 18px 34px rgba(0, 0, 0, 0.4),
+    0 0 30px rgba(100, 196, 176, 0.18);
+}
+
+.floor.collection-exhibit-active[data-type="library"] .fixture-vial,
+.floor.collection-exhibit-active[data-type="library"] .fixture-charms {
+  filter: drop-shadow(0 0 10px rgba(255, 226, 155, 0.38));
+}
+
+@keyframes collection-exhibit-breathe {
+  0%,
+  100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-3px);
+  }
+}
+
+@keyframes collection-exhibit-glow {
+  0%,
+  100% {
+    opacity: 0.62;
+  }
+  50% {
+    opacity: 0.94;
+  }
+}
+
+@media (max-width: 620px) {
+  .collection-title-row,
+  .collection-exhibit-head,
+  .collection-exhibit-card,
+  .collection-exhibit-choice {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .collection-exhibit-btn,
+  .collection-exhibit-timer,
+  .collection-exhibit-choice {
+    width: 100%;
+  }
+
+  .collection-exhibit-layer {
+    left: 9%;
+    right: 9%;
+    bottom: 32px;
+    height: 46px;
+  }
+
+  .collection-exhibit-shelf {
+    left: 7%;
+    right: 7%;
+    height: 18px;
+  }
+
+  .collection-exhibit-relics b {
+    width: 21px;
+    height: 24px;
+  }
+}
