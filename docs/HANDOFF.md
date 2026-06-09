@@ -7,9 +7,9 @@ Use this file when starting a new Codex conversation for this project.
 - Project path: `C:\Users\Mystic\Documents\Codex\2026-05-30\new-chat-4`
 - GitHub: `https://github.com/q1248637272-arch/didikingdom`
 - Production: `https://little-depths.pages.dev/`
-- Latest deployed version: `v78`
-- Latest preview deployment: `https://83e19efd.little-depths.pages.dev/`
-- Local server used for v78 verification: `http://127.0.0.1:8830/`
+- Latest deployed version: `v79`
+- Latest preview deployment: `https://3508cd21.little-depths.pages.dev/`
+- Local server used for v79 verification: `http://127.0.0.1:8831/`
 
 ## Current State
 
@@ -22,11 +22,23 @@ wrangler pages deploy dist --project-name little-depths
 ```
 
 - GitHub sync is configured with `.github/workflows/cloudflare-pages.yml`, but current release practice is to deploy Cloudflare with local Wrangler OAuth from `dist`, then sync GitHub separately. Use `[skip ci]` when pushing documentation/code sync commits that should not ask GitHub Actions to deploy Cloudflare.
-- Current caveat: v78 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
+- Current caveat: v79 was deployed successfully with local Wrangler OAuth from `dist`. Do not rely on GitHub Actions for Cloudflare unless the repository Cloudflare secrets are refreshed and explicitly revalidated.
 - `.gitignore` excludes local dependency/tool caches, old browser profiles, temporary imagegen output, verification screenshots, logs, and rebuilt zip artifacts while keeping source, `dist`, assets, docs, and `tmp/verify-*.mjs` verification scripts trackable.
 - Git remote `origin` points to `https://github.com/q1248637272-arch/didikingdom.git`; use `[skip ci]` on GitHub sync commits when Cloudflare has already been deployed locally.
 
 ## Latest Completed Work
+
+### v79 Kingdom Dispatch / Old Order UI
+
+- Deepened the old `kingdom` / royal-order loop instead of adding another floor. `renderOrders()` now builds an `orderDispatchSummary()` and per-order `orderDispatchInfo()` so orders distinguish real stock, royal-mandate preparation, market parcel packing, missing items, and the best next action.
+- Added the `王室订单调度桌` summary panel with ready/missing/running counts, segmented preparation progress, and one-click `交付` / `签令` / floor-location actions that reuse the existing order handlers.
+- Order cards now include segmented `.order-supply-bar` progress and `.order-next-step` copy, while keeping existing `mandate-tag`, `parcel-tag`, and fulfillment behavior intact.
+- Added a textless `.kingdom-dispatch-layer` to old kingdom rooms so the map shows ledger bars and a dispatch route over `room-kingdom.webp` even though no new bitmap was connected.
+- Added the `order_triage` / `调度交付` quest keyed to `commissionsDone`. It uses the existing manual claim flow, so completion makes the quest ready without auto-awarding coins or gems.
+- Attempted the refreshed no-text kingdom dispatch room through the configured `gpt-image-2` gateway at `1280x720` medium and `1024x576` low. Both requests closed unexpectedly; no unstable bitmap was connected. The reusable prompt is tracked at `docs/v79-kingdom-dispatch-room-image-prompt.txt`.
+- Added `tmp/verify-v79-kingdom-dispatch.mjs`. It verifies dispatch-desk fulfillment, follow-up royal mandate startup, manual quest readiness, mobile order layout, the kingdom dispatch map layer, v79 cache markers, and seeded room-person footing.
+- Bumped save version to `28`, bumped `index.html` / `sw.js` to v79, synced `dist`, rebuilt `cloudflare-pages-upload.zip`, and deployed v79 to Cloudflare Pages with local Wrangler direct upload. Production: `https://little-depths.pages.dev/`; preview: `https://3508cd21.little-depths.pages.dev/`.
+- Remote verification confirmed both production and preview load `app.js?v=79`, `styles.css?v=79`, `overrides.css?v=79`, and `little-depths-v79`.
 
 ### v78 Room Objectives / Old UI Readability
 

@@ -1,0 +1,9 @@
+Model: gpt-image-2
+
+Create a polished no-text 2D game room background for the original game Didi Kingdom. Horizontal 16:9 side-view cutaway room tile for a cozy vertical tower management browser game.
+
+Scene: refresh the old kingdom room into a practical royal order dispatch chamber. Show a compact underground royal council office with a small throne alcove, an order triage desk, wax seal press, sealed scroll tubes, courier satchels, abstract route board made only of simple shapes, stacked ledgers shown as colored blocks with no writing, blue-and-gold banners, carved stone walls, warm amber lanterns, and a clear lower foreground walkway for tiny character sprites and courier path overlays. The composition should communicate order sorting, royal mandates, and courier dispatch, while leaving the middle-lower floor uncluttered so characters can stand with feet visible.
+
+Style: painterly stylized 2D mobile game background, cozy fantasy castle, crisp readable silhouettes at small mobile size, warm amber light with muted royal blue and gold accents, soft atmospheric depth, high image quality. No characters, no UI, no readable text, no letters, no numbers, no signage, no logos, no watermark. No transparent border.
+
+Generation note: v79 attempted this prompt through the configured gpt-image-2 gateway at 1280x720 medium and 1024x576 low. Both requests closed unexpectedly before returning an image, so no unstable or missing bitmap was wired into the game.

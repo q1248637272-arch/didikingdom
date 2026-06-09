@@ -1020,6 +1020,14 @@ const QUEST_DEFS = [
     text: "完成 3 张王室订单",
   },
   {
+    id: "order_triage",
+    title: "调度交付",
+    goal: 6,
+    metric: "commissionsDone",
+    reward: { coins: 680, gems: 3 },
+    text: "通过订单调度完成 6 张王室订单",
+  },
+  {
     id: "royal_seals",
     title: "王令签发",
     goal: 3,
@@ -1139,7 +1147,7 @@ let guideReady = false;
 
 function makeNewGame() {
   const game = {
-    version: 27,
+    version: 28,
     coins: 560,
     gems: 7,
     happiness: 72,
@@ -1695,7 +1703,7 @@ function migrateGame(game) {
     aquariumFloorsBuilt: 0,
     festivalFloorsBuilt: 0,
   };
-  game.version = Math.max(Number(game.version) || 0, 27);
+  game.version = Math.max(Number(game.version) || 0, 28);
   game.nextExpeditionId ||= 1;
   game.nextExpeditionReportId ||= 1;
   game.nextLifeStoryId ||= 1;
@@ -3787,6 +3795,173 @@ function orderStockInfo(order, game = state) {
     missing: Math.max(0, order.amount - owned),
     ready: owned >= order.amount,
     floor: bestFloor || null,
+  };
+}
+
+function orderSupplySegments(order, info = orderStockInfo(order)) {
+  const amount = Math.max(1, Number(order?.amount) || 1);
+  const stock = clamp(Number(info.stockOwned) || 0, 0, amount);
+  const mandate = clamp(Number(info.mandatePrepared) || 0, 0, Math.max(0, amount - stock));
+  const packed = clamp(Number(info.packed) || 0, 0, Math.max(0, amount - stock - mandate));
+  const filled = clamp(stock + mandate + packed, 0, amount);
+  const missing = Math.max(0, amount - filled);
+  const pct = (value) => `${clamp((value / amount) * 100, 0, 100).toFixed(2)}%`;
+  return {
+    stock,
+    mandate,
+    packed,
+    missing,
+    filled,
+    stockPct: pct(stock),
+    mandatePct: pct(mandate),
+    packedPct: pct(packed),
+    missingPct: pct(missing),
+    filledPct: clamp((filled / amount) * 100, 0, 100),
+  };
+}
+
+function orderDispatchInfo(order, mandateFloor = null) {
+  const info = orderStockInfo(order);
+  const segments = orderSupplySegments(order, info);
+  const typeLabel = FLOOR_TYPES[order.type]?.label || "订单";
+  const ready = info.ready;
+  const mandateActive = Boolean(order.royalMandate?.active);
+  const parcelActive = Boolean(order.marketParcel?.active);
+  const mandateReason = mandateFloor ? royalMandateActionBlockReason(mandateFloor, order) : "暂无可签令的王国楼层";
+  const base = {
+    order,
+    info,
+    segments,
+    tone: "missing",
+    stateLabel: `缺 ${info.missing}`,
+    nextLabel: "定位补货",
+    detail: info.floor
+      ? `${info.floor.name} 还有 ${info.floor.stock || 0}/${info.floor.stockMax || 0} 现货`
+      : `需要建造或补足 ${typeLabel} 楼层`,
+    action: info.floor ? "focus" : "",
+    actionLabel: info.floor ? "定位" : "等待",
+    floorId: info.floor?.id || 0,
+    disabled: !info.floor,
+  };
+
+  if (ready) {
+    return {
+      ...base,
+      tone: "ready",
+      stateLabel: "可交付",
+      nextLabel: "立即交付",
+      detail: `${typeLabel} ${order.amount} 件已备齐，交付可获得 ${order.reward} 金币${order.gemReward ? ` / ${order.gemReward} 宝石` : ""}`,
+      action: "fulfill",
+      actionLabel: "交付",
+      disabled: false,
+    };
+  }
+
+  if (mandateActive) {
+    return {
+      ...base,
+      tone: "running",
+      stateLabel: "王令中",
+      nextLabel: "等待王令",
+      detail: `王令正在补 ${typeLabel} 缺口，已预备 ${info.mandatePrepared}/${order.amount}`,
+      action: order.royalMandate?.floorId ? "focus" : "",
+      actionLabel: order.royalMandate?.floorId ? "看王令" : "等待",
+      floorId: Number(order.royalMandate?.floorId) || 0,
+      disabled: !order.royalMandate?.floorId,
+    };
+  }
+
+  if (parcelActive) {
+    return {
+      ...base,
+      tone: "running",
+      stateLabel: "包裹中",
+      nextLabel: "等待包裹",
+      detail: `市集正在打包 ${typeLabel}，已装箱 ${info.packed}/${order.amount}`,
+      action: order.marketParcel?.floorId ? "focus" : "",
+      actionLabel: order.marketParcel?.floorId ? "看包裹" : "等待",
+      floorId: Number(order.marketParcel?.floorId) || 0,
+      disabled: !order.marketParcel?.floorId,
+    };
+  }
+
+  if (!mandateReason) {
+    return {
+      ...base,
+      tone: "mandate",
+      stateLabel: `缺 ${info.missing}`,
+      nextLabel: "签令补缺",
+      detail: `王国可优先补 ${typeLabel} 缺口，真实库存 ${Math.min(info.stockOwned, order.amount)}/${order.amount}`,
+      action: "mandate",
+      actionLabel: "签令",
+      floorId: mandateFloor.id,
+      disabled: false,
+    };
+  }
+
+  if (info.floor) {
+    const stocking = Boolean(info.floor.production);
+    const empty = (info.floor.stock || 0) <= 0;
+    return {
+      ...base,
+      tone: empty ? "missing" : "stock",
+      stateLabel: `缺 ${info.missing}`,
+      nextLabel: stocking ? "等待补货" : empty ? "定位补货" : "定位现货",
+      detail: stocking
+        ? `${info.floor.name} 正在补货，剩余 ${Math.ceil(info.floor.production.remaining || 0)}s`
+        : empty
+          ? `${info.floor.name} 货架见底，先补货再交付`
+          : `${info.floor.name} 有 ${info.floor.stock || 0} 件现货，可继续凑单`,
+      action: "focus",
+      actionLabel: stocking ? "看补货" : "定位",
+      floorId: info.floor.id,
+      disabled: false,
+    };
+  }
+
+  return {
+    ...base,
+    tone: "blocked",
+    nextLabel: "缺少产线",
+    detail: `王国暂时找不到 ${typeLabel} 楼层，先建设或等待新订单`,
+  };
+}
+
+function orderDispatchPriority(dispatch) {
+  const rank = {
+    ready: 0,
+    mandate: 1,
+    stock: 2,
+    missing: 3,
+    running: 4,
+    blocked: 5,
+  };
+  return (rank[dispatch.tone] ?? 9) * 100000 - (dispatch.order.reward || 0) * 10 - (dispatch.info.missing || 0);
+}
+
+function orderDispatchSummary(mandateFloor) {
+  const dispatches = state.orders.map((order) => orderDispatchInfo(order, mandateFloor));
+  const totals = dispatches.reduce(
+    (sum, dispatch) => {
+      sum.amount += Math.max(1, Number(dispatch.order.amount) || 1);
+      sum.filled += dispatch.segments.filled;
+      if (dispatch.tone === "ready") sum.ready += 1;
+      if (dispatch.tone === "running") sum.running += 1;
+      if (dispatch.info.missing > 0 && dispatch.tone !== "running") sum.missing += 1;
+      return sum;
+    },
+    { amount: 0, filled: 0, ready: 0, running: 0, missing: 0 }
+  );
+  const best = dispatches.slice().sort((a, b) => orderDispatchPriority(a) - orderDispatchPriority(b))[0] || null;
+  const tone = totals.ready ? "ready" : totals.running ? "running" : totals.missing ? "missing" : "calm";
+  return {
+    dispatches,
+    best,
+    tone,
+    ready: totals.ready,
+    running: totals.running,
+    missing: totals.missing,
+    progress: totals.amount ? clamp((totals.filled / totals.amount) * 100, 0, 100) : 0,
   };
 }
 
@@ -8734,6 +8909,7 @@ function renderOpenFloor(floor) {
       <div class="room-scene">
         ${renderRoomStateTag(floor)}
         ${renderRoomObjectiveCue(floor)}
+        ${renderKingdomDispatchLayer(floor)}
         ${renderFoodRushServiceLayer(floor)}
         ${renderServiceCareLayer(floor)}
         ${renderStarChartLayer(floor)}
@@ -8874,6 +9050,24 @@ function renderLobbyRouteBoard() {
         })
         .join("")}
     </div>`;
+}
+
+function renderKingdomDispatchLayer(floor) {
+  if (floor?.type !== "kingdom" || !(state.orders || []).length) return "";
+  const summary = orderDispatchSummary(availableRoyalMandateFloor());
+  const ledgers = summary.dispatches.slice(0, 5).map((dispatch, index) => {
+    const width = Math.max(12, Math.round(dispatch.segments.filledPct));
+    return `<b data-tone="${escapeAttr(dispatch.tone)}" style="--ledger-index:${index}; --ledger-fill:${width}%"><i></i></b>`;
+  }).join("");
+  const title = summary.best
+    ? `${summary.best.nextLabel} · ${summary.best.order.title} · ${summary.best.detail}`
+    : "王室订单调度桌";
+  return `
+    <span class="kingdom-dispatch-layer" data-tone="${escapeAttr(summary.tone)}" style="--dispatch-progress:${Math.round(summary.progress)}%" title="${escapeAttr(title)}" aria-label="${escapeAttr(title)}">
+      <span class="kingdom-dispatch-desk"><i></i><em></em></span>
+      <span class="kingdom-dispatch-ledgers">${ledgers}</span>
+      <span class="kingdom-dispatch-route"><i></i><b></b></span>
+    </span>`;
 }
 
 function renderFloorArrivals(floor) {
@@ -10233,15 +10427,72 @@ function renderQuests() {
   }).join("");
 }
 
+function renderOrderDispatchAction(dispatch, extraClass = "") {
+  const disabled = dispatch.disabled ? "disabled" : "";
+  const className = `detail-btn ${dispatch.tone === "ready" ? "primary" : ""} ${extraClass}`.trim();
+  if (dispatch.action === "fulfill") {
+    return `<button type="button" class="${escapeAttr(className)}" data-action="fulfill-order" data-order-id="${escapeAttr(dispatch.order.id)}" ${disabled}>${escapeHtml(dispatch.actionLabel)}</button>`;
+  }
+  if (dispatch.action === "mandate") {
+    return `<button type="button" class="${escapeAttr(className)} royal-order-btn" data-action="royal-mandate-order" data-order-id="${escapeAttr(dispatch.order.id)}" ${disabled}>${escapeHtml(dispatch.actionLabel)}</button>`;
+  }
+  if (dispatch.action === "focus") {
+    return `<button type="button" class="${escapeAttr(className)}" data-action="focus-order-floor" data-floor-id="${escapeAttr(dispatch.floorId)}" ${disabled}>${escapeHtml(dispatch.actionLabel)}</button>`;
+  }
+  return `<button type="button" class="${escapeAttr(className)}" disabled>${escapeHtml(dispatch.actionLabel || "等待")}</button>`;
+}
+
+function renderOrderSupplyBar(dispatch) {
+  const { segments, order, info } = dispatch;
+  const label = `库存 ${segments.stock}/${order.amount}，王令 ${segments.mandate}，市集 ${segments.packed}，缺 ${info.missing}`;
+  return `
+    <div class="meter order-supply-bar" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">
+      <i data-kind="stock" style="flex-basis:${segments.stockPct}"></i>
+      <i data-kind="mandate" style="flex-basis:${segments.mandatePct}"></i>
+      <i data-kind="parcel" style="flex-basis:${segments.packedPct}"></i>
+      <i data-kind="missing" style="flex-basis:${segments.missingPct}"></i>
+    </div>`;
+}
+
+function renderOrderDispatchSummary(summary) {
+  if (!summary.dispatches.length) return "";
+  const best = summary.best;
+  const focus = best
+    ? `
+      <div class="order-dispatch-focus" data-tone="${escapeAttr(best.tone)}">
+        <div>
+          <strong>${escapeHtml(best.nextLabel)}</strong>
+          <small>${escapeHtml(best.order.title)} · ${escapeHtml(best.detail)}</small>
+        </div>
+        ${renderOrderDispatchAction(best, "order-dispatch-action")}
+      </div>`
+    : "";
+  return `
+    <div class="order-dispatch-panel" data-tone="${escapeAttr(summary.tone)}">
+      <div class="order-dispatch-head">
+        <strong>王室订单调度桌</strong>
+        <span>${Math.round(summary.progress)}% 已备</span>
+      </div>
+      <div class="order-dispatch-meter" aria-hidden="true"><i style="width:${Math.round(summary.progress)}%"></i></div>
+      <div class="order-dispatch-stats">
+        <span><b>${summary.ready}</b><small>可交付</small></span>
+        <span><b>${summary.missing}</b><small>待补缺</small></span>
+        <span><b>${summary.running}</b><small>流转中</small></span>
+      </div>
+      ${focus}
+    </div>`;
+}
+
 function renderOrders() {
   ensureOrders(state);
-  els.orderCount.textContent = `${state.orders.length}/${orderCapacity(state)}`;
   const mandateFloor = availableRoyalMandateFloor();
-  els.orders.innerHTML = state.orders
-    .map((order) => {
-      const info = orderStockInfo(order);
+  const summary = orderDispatchSummary(mandateFloor);
+  els.orderCount.textContent = summary.ready ? `${state.orders.length}/${orderCapacity(state)} · ${summary.ready}可交` : `${state.orders.length}/${orderCapacity(state)}`;
+  const ordersHtml = summary.dispatches
+    .map((dispatch) => {
+      const order = dispatch.order;
+      const info = dispatch.info;
       const owned = info.owned;
-      const pct = Math.min(100, Math.round((owned / order.amount) * 100));
       const ready = info.ready;
       const prepared = info.prepared || 0;
       const mandatePrepared = info.mandatePrepared || 0;
@@ -10265,16 +10516,16 @@ function renderOrders() {
       const stockText = preparedParts.length
         ? `库存 ${Math.min(info.stockOwned, order.amount)}/${order.amount} · ${preparedParts.join(" · ")}`
         : `${Math.min(owned, order.amount)}/${order.amount}`;
-      const floorButton = info.floor ? `<button class="detail-btn" data-action="focus-order-floor" data-floor-id="${info.floor.id}">定位</button>` : "";
+      const floorButton = info.floor ? `<button type="button" class="detail-btn" data-action="focus-order-floor" data-floor-id="${info.floor.id}">定位</button>` : "";
       return `
-        <div class="order ${ready ? "ready" : ""} ${order.source === "market" ? "market-order" : ""} ${mandatePrepared ? "mandated-order" : ""} ${mandateDelivered ? "mandate-delivered royal-courier-order" : ""} ${packed ? "parcel-order" : ""} ${parcelActive ? "parcel-active" : ""} ${mandateActive ? "mandate-active" : ""}">
+        <div class="order dispatch-${escapeAttr(dispatch.tone)} ${ready ? "ready" : ""} ${order.source === "market" ? "market-order" : ""} ${mandatePrepared ? "mandated-order" : ""} ${mandateDelivered ? "mandate-delivered royal-courier-order" : ""} ${packed ? "parcel-order" : ""} ${parcelActive ? "parcel-active" : ""} ${mandateActive ? "mandate-active" : ""}">
           <div class="order-head">
             <span class="type-token">${FLOOR_TYPES[order.type].icon}</span>
             <span><strong>${escapeHtml(order.title)}</strong><small>${escapeHtml(order.note)}</small></span>
           </div>
           <div class="order-tags">
             <span>${orderSourceLabel(order)}</span>
-            <span>${ready ? "可交付" : `缺 ${info.missing}`}</span>
+            <span class="dispatch-tag" data-tone="${escapeAttr(dispatch.tone)}">${escapeHtml(dispatch.stateLabel)}</span>
             ${packed ? `<span class="parcel-tag">市集打包 ${packed}</span>` : ""}
             ${parcelActive ? `<span class="parcel-tag active">发货中</span>` : ""}
             ${parcelShipped && !parcelActive ? `<span class="parcel-tag shipped">已发货</span>` : ""}
@@ -10284,7 +10535,11 @@ function renderOrders() {
             ${receiptBonus ? `<span class="mandate-tag receipt">回执 +${receiptBonus}</span>` : ""}
             ${order.royalMandate?.seal ? `<span class="mandate-tag seal">御印</span>` : ""}
           </div>
-          <div class="meter"><span style="width:${pct}%"></span></div>
+          ${renderOrderSupplyBar(dispatch)}
+          <div class="order-next-step" data-tone="${escapeAttr(dispatch.tone)}">
+            <strong>${escapeHtml(dispatch.nextLabel)}</strong>
+            <small>${escapeHtml(dispatch.detail)}</small>
+          </div>
           <div class="order-foot">
             <span>${stockText} · ${order.reward} 金币${order.gemReward ? ` / ${order.gemReward} 宝石` : ""}</span>
             ${ready ? "" : floorButton}
@@ -10294,6 +10549,7 @@ function renderOrders() {
         </div>`;
     })
     .join("");
+  els.orders.innerHTML = renderOrderDispatchSummary(summary) + ordersHtml;
 }
 
 function renderCollection() {
